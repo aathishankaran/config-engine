@@ -318,97 +318,115 @@
     /* .studio-props is already 320px in dataflow-studio.css */
 
     /* ══════════════════════════════════════════════════════════════
-       TEST OVERLAY  — full-screen wizard
+       BOTTOM PANEL  — embedded test panel (VS Code terminal style)
     ══════════════════════════════════════════════════════════════ */
     #test-page {
-      position: fixed;
-      inset: 0;
-      z-index: 500;
+      flex-shrink: 0;
+      height: 300px;
       background: #fff;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      border-top: 2px solid #1e293b;
+      position: relative;
     }
-    .test-overlay-header {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 10px 20px;
-      background: var(--usb-blue);
-      border-bottom: 3px solid var(--usb-red);
+
+    /* Resize drag handle at top of panel */
+    #bottom-panel-resizer {
+      height: 4px;
+      background: #1e293b;
+      cursor: ns-resize;
       flex-shrink: 0;
+      transition: background 0.15s;
+      position: relative;
+      z-index: 2;
     }
-    .test-overlay-header h1 {
-      font-size: 15px;
-      font-weight: 700;
-      color: #fff;
-      margin: 0;
+    #bottom-panel-resizer:hover { background: var(--usb-red); }
+    #bottom-panel-resizer::after {
+      content: '';
+      position: absolute;
+      top: -4px; left: 0; right: 0; bottom: -4px;
+    }
+
+    /* Dark tab bar — VS Code bottom panel style */
+    .bottom-panel-tabs {
+      display: flex;
+      align-items: stretch;
+      background: #1e293b;
+      flex-shrink: 0;
+      height: 34px;
+      padding: 0 4px;
+      gap: 0;
+    }
+    .bpt-tabs-left {
+      display: flex;
+      align-items: stretch;
       flex: 1;
+      gap: 0;
+      overflow: hidden;
     }
-    #test-page-back-btn {
-      padding: 6px 14px;
-      border: 1px solid rgba(255,255,255,.3);
-      border-radius: 5px;
-      background: rgba(255,255,255,.1);
-      color: #fff;
-      font-size: 12px;
-      cursor: pointer;
+    .bpt-tab {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: rgba(255,255,255,0.55);
+      font-size: 11.5px;
       font-weight: 500;
+      padding: 0 14px;
+      cursor: pointer;
+      white-space: nowrap;
       display: flex;
       align-items: center;
       gap: 6px;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      font-family: inherit;
     }
-    #test-page-back-btn:hover { background: rgba(255,255,255,.2); }
-
-    /* Wizard step bar */
-    .test-wizard-bar {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0;
-      padding: 16px 24px;
-      background: #f8fafc;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .wizard-step {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 20px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: background .15s;
-    }
-    .wizard-step:hover { background: #f1f5f9; }
-    .wizard-step.ws-active { background: #eff6ff; }
-    .wizard-step.ws-done .wizard-step-num { background: #22c55e; }
-    .wizard-step-num {
-      width: 28px; height: 28px;
+    .bpt-tab:hover { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.06); }
+    .bpt-tab.ws-active { color: #fff; border-bottom-color: var(--usb-red); }
+    .bpt-num {
+      width: 17px; height: 17px;
       border-radius: 50%;
-      background: #e2e8f0;
-      color: #64748b;
-      font-size: 13px;
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.6);
+      font-size: 10px;
       font-weight: 700;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
     }
-    .wizard-step.ws-active .wizard-step-num { background: var(--usb-red); color: #fff; }
-    .wizard-step-label {
-      font-size: 13px;
-      font-weight: 500;
-      color: #64748b;
-      white-space: nowrap;
-    }
-    .wizard-step.ws-active .wizard-step-label { color: var(--usb-blue); font-weight: 600; }
-    .wizard-arrow {
-      color: #cbd5e1;
-      font-size: 16px;
-      padding: 0 4px;
+    .bpt-tab.ws-active .bpt-num { background: var(--usb-red); color: #fff; }
+    .bpt-tabs-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 6px;
       flex-shrink: 0;
     }
+    #test-page-config-name-badge {
+      font-size: 11px;
+      color: rgba(255,255,255,0.45);
+      font-style: italic;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #test-page-back-btn {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.55);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      transition: color 0.15s, background 0.15s;
+    }
+    #test-page-back-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
 
     /* Hidden tab buttons — app.js binds and calls these */
     #test-tab-controls { display: none; }
@@ -417,8 +435,35 @@
     .test-content-area {
       flex: 1;
       overflow: auto;
-      padding: 24px 32px;
+      padding: 12px 16px;
     }
+
+    /* ── VS Code-style layout button group ─────────────────────── */
+    .layout-btn-group {
+      display: flex;
+      align-items: center;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .layout-btn {
+      background: white;
+      border: none;
+      border-right: 1px solid #e2e8f0;
+      padding: 6px 8px;
+      cursor: pointer;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      line-height: 1;
+    }
+    .layout-btn:last-child { border-right: none; }
+    .layout-btn:hover { background: var(--usb-blue-pale); color: var(--usb-blue); }
+    .layout-btn.layout-btn-active { background: #1e293b; color: #fff; }
+    .layout-btn.layout-btn-active:hover { background: #334155; color: #fff; }
     .test-panels { height: 100%; }
     .test-panel { display: none; height: 100%; flex-direction: column; }
     .test-panel.active { display: flex; }
@@ -522,6 +567,38 @@
 
   <!-- ── Right zone: aligns with .studio-props (260 px) ── -->
   <div class="header-zone-right">
+
+    <!-- VS Code-style layout toggle buttons -->
+    <div class="layout-btn-group" id="layout-btn-group" title="Toggle panels">
+      <!-- Left panel toggle -->
+      <button type="button" class="layout-btn layout-btn-active" id="btn-layout-left"
+              title="Toggle left panel" aria-label="Toggle left panel">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="14" height="14" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="5.5" y1="1" x2="5.5" y2="15" stroke="currentColor" stroke-width="1.2"/>
+          <rect x="1.6" y="1.6" width="3.2" height="12.8" rx="0.5" fill="currentColor" opacity="0.55"/>
+        </svg>
+      </button>
+      <!-- Bottom panel toggle -->
+      <button type="button" class="layout-btn" id="btn-layout-bottom"
+              title="Toggle test panel" aria-label="Toggle bottom test panel">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="14" height="14" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="1" y1="10.5" x2="15" y2="10.5" stroke="currentColor" stroke-width="1.2"/>
+          <rect x="1.6" y="11.1" width="12.8" height="3.3" rx="0.5" fill="currentColor" opacity="0.55"/>
+        </svg>
+      </button>
+      <!-- Right panel toggle -->
+      <button type="button" class="layout-btn layout-btn-active" id="btn-layout-right"
+              title="Toggle right panel" aria-label="Toggle right panel">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="14" height="14" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="10.5" y1="1" x2="10.5" y2="15" stroke="currentColor" stroke-width="1.2"/>
+          <rect x="11.1" y="1.6" width="3.3" height="12.8" rx="0.5" fill="currentColor" opacity="0.55"/>
+        </svg>
+      </button>
+    </div>
+
     <a href="/runbook" target="_blank" id="btn-runbook-link" title="Open User Runbook"
        class="header-btn" style="text-decoration:none;color:#374151;">
       <i class="fa-solid fa-book-open"></i> Runbook
@@ -800,6 +877,123 @@
       </div>
     </div>
 
+    <!-- ══════════════════════════════════════════════════════════
+         BOTTOM TEST PANEL — embedded VS Code terminal style
+         app.js calls testPage.classList.remove('hidden') to open.
+         ══════════════════════════════════════════════════════════ -->
+    <div id="test-page" class="hidden">
+
+      <!-- Resize drag handle -->
+      <div id="bottom-panel-resizer"></div>
+
+      <!-- Compact dark tab bar -->
+      <div class="bottom-panel-tabs">
+        <div class="bpt-tabs-left">
+          <button type="button" class="bpt-tab ws-active" data-target="input" id="ws-input">
+            <span class="bpt-num">1</span> Input Datasets
+          </button>
+          <button type="button" class="bpt-tab" data-target="logs" id="ws-logs">
+            <span class="bpt-num">2</span> Running Logs
+          </button>
+          <button type="button" class="bpt-tab" data-target="output" id="ws-output">
+            <span class="bpt-num">3</span> Generated Output
+          </button>
+          <button type="button" class="bpt-tab" data-target="reconciliation" id="ws-reconciliation">
+            <span class="bpt-num">4</span> Reconciliation
+          </button>
+        </div>
+        <div class="bpt-tabs-right">
+          <span id="test-page-config-name" style="display:none"></span><!-- kept for app.js compat -->
+          <span id="test-page-config-name-badge"></span>
+          <button type="button" id="test-page-back-btn" title="Close panel">&times;</button>
+        </div>
+      </div>
+
+      <!-- Hidden tab controls (app.js binds click listeners to these) -->
+      <div id="test-tab-controls">
+        <button class="test-tab active" data-tab="input"          id="test-tab-input"          aria-selected="true"></button>
+        <button class="test-tab"        data-tab="logs"           id="test-tab-logs"           aria-selected="false"></button>
+        <button class="test-tab"        data-tab="output"         id="test-tab-output"         aria-selected="false"></button>
+        <button class="test-tab"        data-tab="reconciliation" id="test-tab-reconciliation" aria-selected="false"></button>
+      </div>
+
+      <!-- Content -->
+      <div class="test-content-area">
+        <div class="test-panels">
+
+          <!-- Step 1 — Input Datasets -->
+          <div id="test-panel-input" class="test-panel active" role="tabpanel">
+            <div class="test-section hidden" id="test-progress-section">
+              <div class="test-progress-bar"><div class="test-progress-fill" id="test-progress-fill"></div></div>
+              <p id="test-progress-text" class="test-progress-text">Generating sample data...</p>
+            </div>
+            <div class="test-section" id="test-source-section">
+              <h3 class="test-panel-title" id="test-input-panel-title">Input Datasets</h3>
+              <p style="font-size:12px;color:#64748b;margin-bottom:12px">
+                Review the sample input data below, then click <strong>Run Dataflow</strong> to execute the transformation pipeline.
+              </p>
+              <div id="test-source-tables" class="test-tables"></div>
+              <div style="margin-top:14px">
+                <button type="button" class="btn btn-primary" id="btn-run-dataflow" style="padding:8px 20px;font-size:13px">
+                  <i class="fa-solid fa-play" style="margin-right:6px"></i>Run Dataflow →
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 — Running Logs -->
+          <div id="test-panel-logs" class="test-panel hidden" role="tabpanel">
+            <div class="test-logs-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <h3 class="test-panel-title" style="margin:0">Running Logs</h3>
+              <button type="button" class="btn btn-outline" id="test-logs-copy-btn" title="Copy logs">
+                <i class="fa-solid fa-copy"></i> Copy
+              </button>
+            </div>
+            <div class="test-logs-wrap">
+              <pre id="test-logs" class="test-logs" data-raw=""></pre>
+              <div class="test-logs-progress hidden" id="test-logs-progress" aria-live="polite">
+                <span class="test-logs-progress-label">Dataflow job is running…</span>
+                <span class="test-logs-progress-bar"></span>
+              </div>
+            </div>
+            <div class="test-logs-output-cta hidden" id="test-logs-output-cta" style="margin-top:12px">
+              <button type="button" class="btn btn-primary" id="btn-show-output" style="padding:8px 20px;font-size:13px">
+                <i class="fa-solid fa-table" style="margin-right:6px"></i>View Generated Output →
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 3 — Output -->
+          <div id="test-panel-output" class="test-panel hidden" role="tabpanel">
+            <h3 class="test-panel-title">Generated Output</h3>
+            <div id="test-output-tables" class="test-tables">
+              <p class="test-output-placeholder" style="color:#64748b;font-size:13px">
+                Run the dataflow from Step 1; results appear here.
+              </p>
+            </div>
+            <div class="test-output-recon-cta hidden" id="test-output-recon-cta" style="margin-top:12px">
+              <p style="color:#64748b;font-size:12px;margin-bottom:8px">Compare the generated output with your expected results.</p>
+              <button type="button" class="btn btn-primary" id="btn-show-reconciliation-output" style="padding:8px 20px;font-size:13px">
+                <i class="fa-solid fa-code-compare" style="margin-right:6px"></i>Compare Results (Reconciliation) →
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 4 — Reconciliation -->
+          <div id="test-panel-reconciliation" class="test-panel hidden" role="tabpanel">
+            <h3 class="test-panel-title">Reconciliation</h3>
+            <p style="font-size:12px;color:#64748b;margin-bottom:12px">
+              Comparing <strong>actual output</strong> (from your expected output files) with
+              <strong>generated output</strong> (from the dataflow run).
+            </p>
+            <div id="test-reconciliation-content" class="test-reconciliation-content"></div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /#test-page -->
+
   </div><!-- /#center-area -->
 
   <!-- ══════════════════════
@@ -948,128 +1142,6 @@
     </button>
   </div>
 </div>
-
-
-<!-- ═══════════════════════════════════════════════════════════
-     TEST OVERLAY  — full-screen wizard (#test-page)
-     app.js calls testPage.classList.remove('hidden') to open.
-     ═══════════════════════════════════════════════════════════ -->
-<div id="test-page" class="hidden">
-
-  <div class="test-overlay-header">
-    <button type="button" id="test-page-back-btn">
-      <i class="fa-solid fa-arrow-left"></i> Close
-    </button>
-    <h1>Testing &mdash; <span id="test-page-config-name" style="font-weight:400;font-style:italic;"></span></h1>
-  </div>
-
-  <!-- Wizard step bar -->
-  <div class="test-wizard-bar">
-    <div class="wizard-step ws-active" data-target="input" id="ws-input">
-      <div class="wizard-step-num">1</div>
-      <div class="wizard-step-label">Input Datasets</div>
-    </div>
-    <i class="fa-solid fa-chevron-right wizard-arrow"></i>
-    <div class="wizard-step" data-target="logs" id="ws-logs">
-      <div class="wizard-step-num">2</div>
-      <div class="wizard-step-label">Running Logs</div>
-    </div>
-    <i class="fa-solid fa-chevron-right wizard-arrow"></i>
-    <div class="wizard-step" data-target="output" id="ws-output">
-      <div class="wizard-step-num">3</div>
-      <div class="wizard-step-label">Generated Output</div>
-    </div>
-    <i class="fa-solid fa-chevron-right wizard-arrow"></i>
-    <div class="wizard-step" data-target="reconciliation" id="ws-reconciliation">
-      <div class="wizard-step-num">4</div>
-      <div class="wizard-step-label">Reconciliation</div>
-    </div>
-  </div>
-
-  <!-- Hidden tab controls (app.js binds click listeners to these) -->
-  <div id="test-tab-controls">
-    <button class="test-tab active" data-tab="input"          id="test-tab-input"          aria-selected="true"></button>
-    <button class="test-tab"        data-tab="logs"           id="test-tab-logs"           aria-selected="false"></button>
-    <button class="test-tab"        data-tab="output"         id="test-tab-output"         aria-selected="false"></button>
-    <button class="test-tab"        data-tab="reconciliation" id="test-tab-reconciliation" aria-selected="false"></button>
-  </div>
-
-  <!-- Content -->
-  <div class="test-content-area">
-    <div class="test-panels">
-
-      <!-- Step 1 — Input Datasets -->
-      <div id="test-panel-input" class="test-panel active" role="tabpanel">
-        <div class="test-section hidden" id="test-progress-section">
-          <div class="test-progress-bar"><div class="test-progress-fill" id="test-progress-fill"></div></div>
-          <p id="test-progress-text" class="test-progress-text">Generating sample data...</p>
-        </div>
-        <div class="test-section" id="test-source-section">
-          <h3 class="test-panel-title" id="test-input-panel-title">Input Datasets</h3>
-          <p style="font-size:12px;color:#64748b;margin-bottom:16px">
-            Review the sample input data below, then click <strong>Run Dataflow</strong> to execute the transformation pipeline.
-          </p>
-          <div id="test-source-tables" class="test-tables"></div>
-          <div style="margin-top:20px">
-            <button type="button" class="btn btn-primary" id="btn-run-dataflow" style="padding:10px 28px;font-size:14px">
-              <i class="fa-solid fa-play" style="margin-right:6px"></i>Run Dataflow →
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Step 2 — Running Logs -->
-      <div id="test-panel-logs" class="test-panel hidden" role="tabpanel">
-        <div class="test-logs-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <h3 class="test-panel-title" style="margin:0">Running Logs</h3>
-          <button type="button" class="btn btn-outline" id="test-logs-copy-btn" title="Copy logs">
-            <i class="fa-solid fa-copy"></i> Copy
-          </button>
-        </div>
-        <div class="test-logs-wrap">
-          <pre id="test-logs" class="test-logs" data-raw=""></pre>
-          <div class="test-logs-progress hidden" id="test-logs-progress" aria-live="polite">
-            <span class="test-logs-progress-label">Dataflow job is running…</span>
-            <span class="test-logs-progress-bar"></span>
-          </div>
-        </div>
-        <div class="test-logs-output-cta hidden" id="test-logs-output-cta" style="margin-top:16px">
-          <button type="button" class="btn btn-primary" id="btn-show-output" style="padding:10px 28px;font-size:14px">
-            <i class="fa-solid fa-table" style="margin-right:6px"></i>View Generated Output →
-          </button>
-        </div>
-      </div>
-
-      <!-- Step 3 — Output -->
-      <div id="test-panel-output" class="test-panel hidden" role="tabpanel">
-        <h3 class="test-panel-title">Generated Output</h3>
-        <div id="test-output-tables" class="test-tables">
-          <p class="test-output-placeholder" style="color:#64748b;font-size:13px">
-            Run the dataflow from Step 1; results appear here.
-          </p>
-        </div>
-        <div class="test-output-recon-cta hidden" id="test-output-recon-cta" style="margin-top:16px">
-          <p style="color:#64748b;font-size:12px;margin-bottom:10px">Compare the generated output with your expected results.</p>
-          <button type="button" class="btn btn-primary" id="btn-show-reconciliation-output" style="padding:10px 28px;font-size:14px">
-            <i class="fa-solid fa-code-compare" style="margin-right:6px"></i>Compare Results (Reconciliation) →
-          </button>
-        </div>
-      </div>
-
-      <!-- Step 4 — Reconciliation -->
-      <div id="test-panel-reconciliation" class="test-panel hidden" role="tabpanel">
-        <h3 class="test-panel-title">Reconciliation</h3>
-        <p style="font-size:12px;color:#64748b;margin-bottom:16px">
-          Comparing <strong>actual output</strong> (from your expected output files) with
-          <strong>generated output</strong> (from the dataflow run).
-        </p>
-        <div id="test-reconciliation-content" class="test-reconciliation-content"></div>
-      </div>
-
-    </div>
-  </div>
-
-</div><!-- /#test-page -->
 
 
 <!-- ═══════════════════════════════════════════════════════════
@@ -1726,6 +1798,116 @@
     if (testPage     && !testPage.classList.contains('hidden'))         { testPage.classList.add('hidden');     return; }
     if (settingsPage && !settingsPage.classList.contains('hidden'))     { settingsPage.classList.add('hidden'); return; }
   });
+
+  /* ══════════════════════════════
+     LAYOUT BUTTONS (VS Code style)
+     ══════════════════════════════ */
+  var btnLayoutLeft   = $('btn-layout-left');
+  var btnLayoutBottom = $('btn-layout-bottom');
+  var btnLayoutRight  = $('btn-layout-right');
+  var propsPanel      = $('props-panel');
+
+  function updateLayoutBtnStates() {
+    if (btnLayoutLeft) {
+      var lActive = !leftPanel || !leftPanel.classList.contains('lp-collapsed');
+      btnLayoutLeft.classList.toggle('layout-btn-active', lActive);
+    }
+    if (btnLayoutBottom) {
+      var bActive = testPage && !testPage.classList.contains('hidden');
+      btnLayoutBottom.classList.toggle('layout-btn-active', bActive);
+    }
+    if (btnLayoutRight) {
+      var rActive = !propsPanel || !propsPanel.classList.contains('rp-collapsed');
+      btnLayoutRight.classList.toggle('layout-btn-active', rActive);
+    }
+    /* Also sync config-badge text */
+    var badge = $('test-page-config-name-badge');
+    var hidden_span = $('test-page-config-name');
+    if (badge && hidden_span) badge.textContent = hidden_span.textContent;
+  }
+
+  if (btnLayoutLeft) {
+    btnLayoutLeft.addEventListener('click', function () {
+      if (leftPanel) leftPanel.classList.toggle('lp-collapsed');
+      updateLayoutBtnStates();
+    });
+  }
+  if (btnLayoutBottom) {
+    btnLayoutBottom.addEventListener('click', function () {
+      if (testPage) testPage.classList.toggle('hidden');
+      updateLayoutBtnStates();
+    });
+  }
+  if (btnLayoutRight) {
+    btnLayoutRight.addEventListener('click', function () {
+      if (propsPanel) propsPanel.classList.toggle('rp-collapsed');
+      updateLayoutBtnStates();
+    });
+  }
+
+  /* Also update sidebar-toggle to still work alongside layout buttons */
+  var sidebarToggle2 = $('sidebar-toggle');
+  if (sidebarToggle2) {
+    sidebarToggle2.addEventListener('click', function () {
+      /* small delay so lp/rp-collapsed has been toggled first */
+      setTimeout(updateLayoutBtnStates, 0);
+    });
+  }
+
+  /* Watch #test-page class changes so layout btn stays in sync when
+     app.js opens/closes the panel programmatically */
+  if (testPage) {
+    new MutationObserver(function () {
+      updateLayoutBtnStates();
+    }).observe(testPage, { attributes: true, attributeFilter: ['class'] });
+
+    /* Also sync config-name badge into bpt-tabs-right */
+    var tpName = $('test-page-config-name');
+    if (tpName) {
+      new MutationObserver(function () {
+        var badge = $('test-page-config-name-badge');
+        if (badge) badge.textContent = tpName.textContent;
+      }).observe(tpName, { childList: true, characterData: true, subtree: true });
+    }
+  }
+
+  /* Initial state */
+  updateLayoutBtnStates();
+
+  /* ══════════════════════════════
+     BOTTOM PANEL RESIZE HANDLE
+     ══════════════════════════════ */
+  var bottomResizer = $('bottom-panel-resizer');
+  if (bottomResizer && testPage) {
+    var _bpResizing = false;
+    var _bpStartY   = 0;
+    var _bpStartH   = 0;
+
+    bottomResizer.addEventListener('mousedown', function (e) {
+      _bpResizing = true;
+      _bpStartY   = e.clientY;
+      _bpStartH   = testPage.offsetHeight;
+      document.body.style.cursor     = 'ns-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', function (e) {
+      if (!_bpResizing) return;
+      var delta = _bpStartY - e.clientY;   /* drag up → bigger panel */
+      var newH  = Math.max(120, Math.min(_bpStartH + delta, window.innerHeight * 0.75));
+      testPage.style.height = newH + 'px';
+    });
+
+    document.addEventListener('mouseup', function () {
+      if (!_bpResizing) return;
+      _bpResizing = false;
+      document.body.style.cursor     = '';
+      document.body.style.userSelect = '';
+      /* Notify canvas that its size changed */
+      window.dispatchEvent(new Event('resize'));
+    });
+  }
 
   /* Clean up stale localStorage */
   localStorage.removeItem('parser-engine-page');
