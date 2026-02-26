@@ -1,0 +1,51 @@
+# ─── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# ─── Virtual Environments ────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# ─── macOS ───────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# ─── IDEs & Editors ──────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.iml
+
+# ─── Logs & Temp ─────────────────────────────────────────
+*.log
+*.tmp
+*.temp
+logs/
+
+# ─── Claude Dev Tools ────────────────────────────────────
+.claude/
+
+# ─── Test / Sample data (optional: comment out if needed) ─
+configs/test_data/
+
+# ─── OS / Misc ───────────────────────────────────────────
+Thumbs.db
+Desktop.ini

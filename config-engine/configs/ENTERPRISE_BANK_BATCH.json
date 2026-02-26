@@ -1,0 +1,171 @@
+{
+  "Inputs": {
+    "TXNCOPY": {
+      "name": "TXNCOPY",
+      "format": "cobol",
+      "copybook": "TXNCOPY",
+      "fields": [
+        {
+          "name": "TXN_ID",
+          "type": "string",
+          "start": 1,
+          "length": 15,
+          "nullable": true
+        },
+        {
+          "name": "TXN_ACCT_NO",
+          "type": "string",
+          "start": 16,
+          "length": 12,
+          "nullable": true
+        },
+        {
+          "name": "TXN_TYPE",
+          "type": "string",
+          "start": 28,
+          "length": 2,
+          "nullable": true
+        },
+        {
+          "name": "TXN_AMT",
+          "type": "double",
+          "start": 30,
+          "length": 11,
+          "nullable": true
+        }
+      ],
+      "s3_path": "file:///Users/Alagushankar/data/input/TXNCOPY",
+      "metadata": {
+        "inferred": "from copybook stems (no JCL/COBOL DDs)"
+      }
+    }
+  },
+  "Outputs": {
+    "SUMCOPY": {
+      "name": "SUMCOPY",
+      "format": "parquet",
+      "copybook": "SUMCOPY",
+      "fields": [
+        {
+          "name": "SUM_CUST_ID",
+          "type": "string",
+          "start": 1,
+          "length": 10,
+          "nullable": true
+        },
+        {
+          "name": "SUM_TOTAL_DEBIT",
+          "type": "double",
+          "start": 11,
+          "length": 13,
+          "nullable": true
+        },
+        {
+          "name": "SUM_TOTAL_CREDIT",
+          "type": "double",
+          "start": 24,
+          "length": 13,
+          "nullable": true
+        },
+        {
+          "name": "SUM_NET",
+          "type": "double",
+          "start": 37,
+          "length": 13,
+          "nullable": true
+        }
+      ],
+      "output_columns": [
+        "SUM_CUST_ID",
+        "SUM_TOTAL_DEBIT",
+        "SUM_TOTAL_CREDIT",
+        "SUM_NET"
+      ],
+      "s3_path": "file:///Users/Alagushankar/data/output/SUMCOPY",
+      "write_mode": "overwrite",
+      "metadata": {
+        "inferred": "from copybook stems (no JCL/COBOL DDs)"
+      }
+    }
+  },
+  "Transformations": {
+    "steps": [
+      {
+        "id": "filter_valid_txn_type",
+        "description": "Filter valid transaction type: DR or CR only",
+        "type": "filter",
+        "source_inputs": [
+          "TXNCOPY"
+        ],
+        "logic": {
+          "conditions": [
+            {
+              "field": "TXN_TYPE",
+              "operation": "in",
+              "value": [
+                "DR",
+                "CR"
+              ]
+            }
+          ],
+          "pyspark_equiv": "filter(col('TXN_TYPE').isin('DR','CR'))"
+        },
+        "output_alias": "valid_txns"
+      },
+      {
+        "id": "categorize_debit_credit",
+        "description": "Sum debit (DR) and credit (CR) transactions into SUM_TOTAL_DEBIT and SUM_TOTAL_CREDIT.",
+        "type": "aggregate",
+        "source_inputs": [
+          "valid_txns"
+        ],
+        "logic": {
+          "group_by": [
+            "TXN_ACCT_NO"
+          ],
+          "aggregations": [
+            {
+              "field": "TXN_AMT",
+              "operation": "sum",
+              "alias": "SUM_TOTAL_DEBIT",
+              "condition": "TXN_TYPE = 'DR'"
+            },
+            {
+              "field": "TXN_AMT",
+              "operation": "sum",
+              "alias": "SUM_TOTAL_CREDIT",
+              "condition": "TXN_TYPE = 'CR'"
+            }
+          ],
+          "note": "IF TXN-TYPE='DR' ADD TXN-AMT TO sum; IF TXN-TYPE='CR' ADD TO sum; then SUM_NET = CREDIT - DEBIT."
+        },
+        "output_alias": "agg_debit_credit"
+      },
+      {
+        "id": "summary_finalize",
+        "description": "Compute SUM_NET and map group key to SUM_CUST_ID for output",
+        "type": "select",
+        "source_inputs": [
+          "agg_debit_credit"
+        ],
+        "logic": {
+          "expressions": [
+            {
+              "target": "SUM_NET",
+              "expression": "SUM_TOTAL_CREDIT - SUM_TOTAL_DEBIT",
+              "operation": "compute"
+            },
+            {
+              "target": "SUM_CUST_ID",
+              "expression": "TXN_ACCT_NO",
+              "operation": "move"
+            }
+          ],
+          "pyspark_equiv": "withColumn(SUM_NET, credit - debit); withColumn(SUM_CUST_ID, group_key)"
+        },
+        "output_alias": "SUMCOPY"
+      }
+    ],
+    "description": ""
+  }
+}

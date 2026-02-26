@@ -1,0 +1,181 @@
+{
+  "Inputs": {
+    "ACCTIN": {
+      "name": "ACCTIN",
+      "format": "fixed",
+      "path": "file:///Users/Alagushankar/data/input/PROD/BANK/ACCOUNT/MASTER",
+      "s3_path": "file:///Users/Alagushankar/data/input/PROD/BANK/ACCOUNT/MASTER",
+      "dataset": "PROD.BANK.ACCOUNT.MASTER"
+    },
+    "CUSTIN": {
+      "name": "CUSTIN",
+      "format": "fixed",
+      "path": "file:///Users/Alagushankar/data/input/PROD/BANK/CUSTOMER/MASTER",
+      "s3_path": "file:///Users/Alagushankar/data/input/PROD/BANK/CUSTOMER/MASTER",
+      "dataset": "PROD.BANK.CUSTOMER.MASTER"
+    },
+    "TXNIN": {
+      "name": "TXNIN",
+      "format": "fixed",
+      "path": "file:///Users/Alagushankar/data/input/PROD/BANK/TRANSACTION/DAILY",
+      "s3_path": "file:///Users/Alagushankar/data/input/PROD/BANK/TRANSACTION/DAILY",
+      "dataset": "PROD.BANK.TRANSACTION.DAILY"
+    }
+  },
+  "Outputs": {
+    "ERROUT": {
+      "name": "ERROUT",
+      "format": "parquet",
+      "path": "file:///Users/Alagushankar/data/output/PROD/BANK/REPORT/ERROR",
+      "write_mode": "overwrite",
+      "s3_path": "file:///Users/Alagushankar/data/output/PROD/BANK/REPORT/ERROR"
+    },
+    "SUMOUT": {
+      "name": "SUMOUT",
+      "format": "parquet",
+      "path": "file:///Users/Alagushankar/data/output/PROD/BANK/REPORT/SUMMARY",
+      "write_mode": "overwrite",
+      "s3_path": "file:///Users/Alagushankar/data/output/PROD/BANK/REPORT/SUMMARY"
+    }
+  },
+  "Transformations": {
+    "description": "Built with Dataflow Studio",
+    "steps": [
+      {
+        "id": "join_txn_acct",
+        "description": "Join TXNIN with ACCTIN on account",
+        "type": "join",
+        "source_inputs": [
+          "TXNIN",
+          "ACCTIN"
+        ],
+        "logic": {
+          "left": "TXNIN",
+          "right": "ACCTIN",
+          "on": [
+            [
+              "TXN_ACCT_NO",
+              "ACCT_NO"
+            ]
+          ],
+          "how": "inner"
+        },
+        "output_alias": "joined_txn_acct"
+      },
+      {
+        "id": "join_with_cust",
+        "description": "Join with CUSTIN on customer",
+        "type": "join",
+        "source_inputs": [
+          "joined_txn_acct",
+          "CUSTIN"
+        ],
+        "logic": {
+          "left": "joined_txn_acct",
+          "right": "CUSTIN",
+          "on": [
+            [
+              "CUST_ID",
+              "CUST_ID"
+            ]
+          ],
+          "how": "inner"
+        },
+        "output_alias": "joined_data"
+      },
+      {
+        "id": "filter_valid_txn_type",
+        "description": "Filter valid transaction type: DR or CR only",
+        "type": "filter",
+        "source_inputs": [
+          "joined_data"
+        ],
+        "logic": {
+          "conditions": [
+            {
+              "field": "TXN_TYPE",
+              "operation": "in",
+              "value": [
+                "DR",
+                "CR"
+              ]
+            }
+          ]
+        },
+        "output_alias": "valid_txns"
+      },
+      {
+        "id": "categorize_debit_credit",
+        "description": "Sum debit (DR) and credit (CR) transactions into SUM_TOTAL_DEBIT and SUM_TOTAL_CREDIT.",
+        "type": "aggregate",
+        "source_inputs": [
+          "valid_txns"
+        ],
+        "logic": {
+          "group_by": [
+            "TXN_ACCT_NO"
+          ],
+          "aggregations": [
+            {
+              "field": "TXN_AMT",
+              "operation": "sum",
+              "alias": "SUM_TOTAL_DEBIT",
+              "condition": "TXN_TYPE = 'DR'"
+            },
+            {
+              "field": "TXN_AMT",
+              "operation": "sum",
+              "alias": "SUM_TOTAL_CREDIT",
+              "condition": "TXN_TYPE = 'CR'"
+            }
+          ]
+        },
+        "output_alias": "agg_debit_credit"
+      },
+      {
+        "id": "summary_finalize",
+        "description": "Compute SUM_NET and map group key to SUM_CUST_ID for output",
+        "type": "select",
+        "source_inputs": [
+          "agg_debit_credit"
+        ],
+        "logic": {
+          "expressions": [
+            {
+              "target": "SUM_NET",
+              "expression": "SUM_TOTAL_CREDIT - SUM_TOTAL_DEBIT",
+              "operation": "compute"
+            },
+            {
+              "target": "SUM_CUST_ID",
+              "expression": "TXN_ACCT_NO",
+              "operation": "move"
+            }
+          ]
+        },
+        "output_alias": "SUMOUT"
+      },
+      {
+        "id": "filter_invalid_to_error",
+        "description": "Filter invalid transaction type \u2192 error output",
+        "type": "filter",
+        "source_inputs": [
+          "joined_data"
+        ],
+        "logic": {
+          "conditions": [
+            {
+              "field": "TXN_TYPE",
+              "operation": "not_in",
+              "value": [
+                "DR",
+                "CR"
+              ]
+            }
+          ]
+        },
+        "output_alias": "ERROUT"
+      }
+    ]
+  }
+}

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parser Engine</title>
+  <script src="/static/vendor/vis-network/vis-network.min.js"></script>
+  <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css" />
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/logic-view.js"></script>
+  <script src="/static/js/diagram.js"></script>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <button type="button" class="btn btn-icon sidebar-toggle" id="sidebar-toggle" title="Show/hide menu" aria-label="Toggle menu">
+        <i class="fa-solid fa-bars" id="sidebar-toggle-icon"></i>
+      </button>
+      <a href="/" class="logo">
+        <span class="logo-icon"></span>
+        <span class="logo-text">Parser Engine</span>
+      </a>
+      <nav class="nav">
+        <a href="#" class="nav-item nav-link active" id="nav-configurations">Configurations</a>
+        <a href="/builder" class="nav-item nav-link">Dataflow Builder</a>
+        <a href="#" class="nav-item nav-link" id="nav-import">Import</a>
+        <a href="#" class="nav-item nav-link" id="nav-settings">Settings</a>
+      </nav>
+      <div class="search-wrap">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="search-input" placeholder="Search configurations..." class="search-input" />
+        <div id="search-results" class="search-results"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout" id="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-section">
+        <h2 class="sidebar-title">Configuration Files</h2>
+        <ul id="config-list" class="config-list"></ul>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="main-header">
+        <h1 id="current-file" class="page-title">Select a configuration</h1>
+        <div class="main-actions">
+          <button type="button" class="btn btn-icon btn-icon-danger" id="btn-delete" style="display:none;" title="Delete configuration"><i class="fa-solid fa-trash-can"></i><span>Delete</span></button>
+          <button type="button" class="btn btn-outline btn-icon btn-icon-secondary" id="btn-rename" style="display:none;" title="Rename configuration"><i class="fa-solid fa-pen-to-square"></i><span>Rename</span></button>
+          <button type="button" class="btn btn-icon btn-icon-primary" id="btn-download-json" style="display:none;" title="Download JSON"><i class="fa-solid fa-download"></i><span>Download</span></button>
+          <button type="button" class="btn btn-outline btn-icon btn-icon-secondary" id="btn-test" style="display:none;" title="Test dataflow"><i class="fa-solid fa-vial"></i><span>Test</span></button>
+        </div>
+      </div>
+
+      <div class="content">
+        <div id="diagram-container" class="diagram-container">
+          <div id="diagram-toolbar-layer" class="diagram-toolbar-layer" aria-label="Diagram controls bar">
+            <div id="diagram-toolbar" class="diagram-toolbar" aria-label="Diagram controls">
+              <div class="diagram-view-toggle" role="tablist" aria-label="View mode">
+                <button type="button" class="diagram-toolbar-item diagram-toolbar-btn diagram-view-tab active" id="diagram-view-tab-diagram" data-view="diagram" role="tab" aria-selected="true" title="Diagram view"><i class="fa-solid fa-diagram-project"></i> Diagram</button>
+                <button type="button" class="diagram-toolbar-item diagram-toolbar-btn diagram-view-tab" id="diagram-view-tab-json" data-view="json" role="tab" aria-selected="false" title="Edit full JSON"><i class="fa-solid fa-code"></i> JSON</button>
+              </div>
+              <button type="button" class="diagram-toolbar-item diagram-toolbar-btn" id="diagram-move-btn" title="Pan mode – click and drag to move view"><i class="fa-solid fa-arrows-up-down-left-right"></i> Move</button>
+              <button type="button" class="diagram-toolbar-item diagram-toolbar-btn" id="diagram-zoom-in-btn" title="Zoom in"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+              <button type="button" class="diagram-toolbar-item diagram-toolbar-btn" id="diagram-zoom-out-btn" title="Zoom out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+              <button type="button" class="diagram-toolbar-item diagram-toolbar-btn" id="diagram-fit-btn" title="Fit to window"><i class="fa-solid fa-maximize"></i> Fit</button>
+              <button type="button" class="diagram-toolbar-item diagram-toolbar-btn" id="diagram-edit-btn" title="Toggle edit mode"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+              <button type="button" class="diagram-toolbar-item diagram-toolbar-btn" id="diagram-hover-popups-btn" title="Hover popups"><i class="fa-solid fa-hand-pointer"></i></button>
+            </div>
+          </div>
+          <div class="diagram-scroll-wrap diagram-view-panel" id="diagram-view-panel" role="tabpanel" aria-labelledby="diagram-view-tab-diagram">
+            <div id="network"></div>
+          </div>
+          <div id="json-editor-wrap" class="json-editor-wrap diagram-view-panel hidden" role="tabpanel" aria-labelledby="diagram-view-tab-json" aria-hidden="true">
+            <div class="json-editor-toolbar" role="toolbar" aria-label="JSON editor">
+              <span id="json-editor-status" class="json-editor-status" aria-live="polite"></span>
+            </div>
+            <div class="json-editor-toolbar-secondary" role="toolbar" aria-label="JSON tree options">
+              <span class="json-editor-toolbar-secondary-spacer"></span>
+              <div class="json-editor-toolbar-secondary-right">
+                <button type="button" class="json-editor-toolbar-icon" id="json-editor-font-decrease" title="Decrease font size"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                <button type="button" class="json-editor-toolbar-icon" id="json-editor-font-increase" title="Increase font size"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                <span class="json-editor-toolbar-sep"></span>
+                <button type="button" class="json-editor-toolbar-icon" id="json-editor-search-toggle" title="Search in JSON"><i class="fa-solid fa-magnifying-glass"></i></button>
+                <input type="text" class="json-editor-search-input hidden" id="json-editor-search-input" placeholder="Search…" aria-label="Search in JSON" />
+                <span class="json-editor-toolbar-sep"></span>
+                <button type="button" class="btn btn-primary btn-sm json-editor-save-btn hidden" id="json-editor-apply-btn" title="Save configuration">Save</button>
+              </div>
+            </div>
+            <div class="json-editor-body">
+              <div id="json-tree-view" class="json-tree-view" aria-label="JSON tree view"></div>
+              <div id="json-viewer" class="json-viewer hidden" aria-label="JSON code view (read-only)"></div>
+              <textarea id="json-editor-text" class="json-editor-text hidden" spellcheck="false" placeholder="Full configuration JSON…" aria-label="Edit configuration JSON"></textarea>
+            </div>
+          </div>
+          <div id="step-hover-popup" class="step-hover-popup hidden" aria-hidden="true">
+            <div class="step-hover-popup-inner"></div>
+          </div>
+        </div>
+        <div id="empty-state" class="empty-state">
+          <p>Select a config from the left or search to view its dataflow diagram.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="test-page" class="import-page hidden">
+    <div class="import-page-inner">
+      <div class="test-page-header">
+        <h1 class="import-page-title">Test dataflow</h1>
+        <button type="button" class="btn btn-primary btn-icon test-page-back" id="test-page-back-btn" title="Back to configuration"><i class="fa-solid fa-arrow-left"></i><span>Back to config</span></button>
+      </div>
+      <h2 id="test-page-config-name" class="test-page-config-name"></h2>
+      <p class="import-hint">Use the tabs below: verify input data, run the dataflow, then check logs and output. If your ZIP had <code>input/</code> and <code>output/</code> (or <code>expected_output/</code>), the import success message listed those file names — use the <strong>Reconciliation</strong> tab after a run to compare generated vs expected. If the ZIP had no <code>input/</code> folder, sample data is generated for testing.</p>
+      <div class="test-tabs" role="tablist">
+        <button type="button" class="test-tab active" data-tab="input" role="tab" aria-selected="true" id="test-tab-input"><i class="fa-solid fa-database" aria-hidden="true"></i> Input datasets</button>
+        <button type="button" class="test-tab" data-tab="logs" role="tab" aria-selected="false" id="test-tab-logs"><i class="fa-solid fa-terminal" aria-hidden="true"></i> Logs</button>
+        <button type="button" class="test-tab" data-tab="output" role="tab" aria-selected="false" id="test-tab-output"><i class="fa-solid fa-table" aria-hidden="true"></i> Output dataset</button>
+        <button type="button" class="test-tab" data-tab="reconciliation" role="tab" aria-selected="false" id="test-tab-reconciliation"><i class="fa-solid fa-code-compare" aria-hidden="true"></i> Reconciliation</button>
+      </div>
+      <div class="test-panels">
+        <div id="test-panel-input" class="test-panel active" role="tabpanel" aria-labelledby="test-tab-input">
+          <div class="test-section hidden" id="test-progress-section">
+            <div class="test-progress-bar">
+              <div class="test-progress-fill" id="test-progress-fill"></div>
+            </div>
+            <p id="test-progress-text" class="test-progress-text">Generating sample data...</p>
+          </div>
+          <div class="test-section" id="test-source-section">
+            <h3 class="test-panel-title" id="test-input-panel-title">Input datasets</h3>
+            <div id="test-source-tables" class="test-tables"></div>
+            <button type="button" class="btn btn-primary btn-import" id="btn-run-dataflow">Run dataflow</button>
+          </div>
+        </div>
+        <div id="test-panel-logs" class="test-panel hidden" role="tabpanel" aria-labelledby="test-tab-logs">
+          <div class="test-logs-header">
+            <h3 class="test-panel-title">Logs</h3>
+            <button type="button" class="btn btn-icon test-logs-copy" id="test-logs-copy-btn" title="Copy logs to clipboard"><i class="fa-solid fa-copy"></i></button>
+          </div>
+          <div class="test-logs-wrap">
+            <pre id="test-logs" class="test-logs" data-raw=""></pre>
+            <div class="test-logs-progress hidden" id="test-logs-progress" aria-hidden="true" aria-live="polite">
+              <span class="test-logs-progress-label">Dataflow job is running</span>
+              <span class="test-logs-progress-bar"></span>
+            </div>
+          </div>
+          <div class="test-logs-output-cta hidden" id="test-logs-output-cta">
+            <button type="button" class="btn btn-primary btn-import" id="btn-show-output"><i class="fa-solid fa-table" aria-hidden="true"></i> Output</button>
+          </div>
+        </div>
+        <div id="test-panel-output" class="test-panel hidden" role="tabpanel" aria-labelledby="test-tab-output">
+          <h3 class="test-panel-title">Output dataset (sample)</h3>
+          <div id="test-output-tables" class="test-tables">
+            <p class="test-output-placeholder">Run the dataflow from the Input datasets tab; results appear here. Use the <strong>Reconciliation</strong> button below to compare with expected output from your ZIP.</p>
+          </div>
+          <div class="test-output-recon-cta hidden" id="test-output-recon-cta">
+            <p class="test-output-recon-next">Next: Compare generated output with expected from your ZIP.</p>
+            <button type="button" class="btn btn-primary btn-import" id="btn-show-reconciliation-output" title="Compare actual output (from ZIP) with generated output"><i class="fa-solid fa-code-compare" aria-hidden="true"></i> Reconciliation</button>
+          </div>
+        </div>
+        <div id="test-panel-reconciliation" class="test-panel hidden" role="tabpanel" aria-labelledby="test-tab-reconciliation">
+          <h3 class="test-panel-title">Reconciliation</h3>
+          <p class="import-hint test-recon-hint">Compare <strong>actual output</strong> (from your ZIP’s <code>output/</code> or <code>expected_output/</code> folder) with <strong>generated output</strong> (from the dataflow run). When your ZIP contains <code>input/</code> and <code>output/</code> folders, the test uses your uploaded input to run the dataflow; use the Reconciliation button after a successful run to see differences here.</p>
+          <div id="test-reconciliation-content" class="test-reconciliation-content"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="import-page" class="import-page hidden">
+    <div class="import-page-inner">
+      <div class="import-page-content">
+      <h1 class="import-page-title">Import (JCL, COBOL, copybooks in one ZIP)</h1>
+      <div class="import-tabs" role="tablist">
+        <button type="button" class="import-tab active" data-tab="zip" role="tab" aria-selected="true">From mainframe (ZIP)</button>
+        <button type="button" class="import-tab" data-tab="json-file" role="tab" aria-selected="false">Import JSON file</button>
+        <button type="button" class="import-tab" data-tab="paste" role="tab" aria-selected="false">Paste JSON</button>
+        <button type="button" class="import-tab" data-tab="import-json" role="tab" aria-selected="false">Import Datasets</button>
+      </div>
+      <div class="import-panels">
+        <div id="import-panel-zip" class="import-panel import-panel-zip active" role="tabpanel">
+          <div class="import-zip-left import-panel-form">
+            <p class="import-hint">Upload one ZIP with JCL, COBOL, and copybook (.cpy) files. Optionally include <code>input/</code> and <code>output/</code> (or <code>expected_output/</code>) folders with CSV/Parquet files named to match your config. Parsing uses either <strong>LLM</strong> or <strong>simple Python parser</strong> as set in <a href="#" id="import-link-settings">Settings</a>.</p>
+            <p id="import-parsing-mode" class="import-parsing-mode" aria-live="polite"></p>
+            <div class="import-form-row">
+              <input type="file" id="zip-file" accept=".zip" class="import-file-input" aria-label="Select ZIP file" />
+            </div>
+            <div class="import-form-row">
+              <input type="text" id="import-config-name" placeholder="Config name (e.g. my_flow)" class="import-name-input" />
+            </div>
+            <div class="import-form-row">
+              <button type="button" class="btn btn-primary btn-import" id="btn-import-zip">Generate config</button>
+            </div>
+            <div id="import-message" class="import-message"></div>
+          </div>
+          <div class="import-zip-right">
+            <div class="import-logs-header">
+              <h3 class="import-logs-title">Import logs</h3>
+              <button type="button" class="btn btn-icon import-logs-copy" id="import-logs-copy-btn" title="Copy logs to clipboard"><i class="fa-solid fa-copy"></i></button>
+            </div>
+            <div class="import-logs-wrap">
+              <pre id="import-logs" class="import-logs" data-raw="">Import logs will appear here when you run Generate config.</pre>
+              <div class="import-logs-progress hidden" id="import-logs-progress" aria-hidden="true" aria-live="polite">
+                <div class="import-logs-progress-top">
+                  <span class="import-logs-progress-label">Generating config…</span>
+                  <span id="import-logs-timer" class="import-logs-timer" aria-live="polite">0:00</span>
+                </div>
+                <span class="import-logs-progress-bar"></span>
+              </div>
+            </div>
+<!--            <p class="import-logs-note">LLM server (Ollama) logs appear in the terminal where Ollama is running.</p>-->
+          </div>
+        </div>
+        <div id="import-panel-json-file" class="import-panel import-panel-form hidden" role="tabpanel">
+          <p class="import-hint">Upload a dataflow configuration JSON file to add it to the system.</p>
+          <div class="import-form-row">
+            <input type="file" id="import-json-file" accept=".json" class="import-file-input" aria-label="Select JSON file" />
+          </div>
+          <div class="import-form-row">
+            <input type="text" id="import-json-name" placeholder="Config name (e.g. my_config)" class="import-name-input" />
+          </div>
+          <div class="import-form-row">
+            <button type="button" class="btn btn-primary btn-import" id="btn-import-json-file">Import JSON</button>
+          </div>
+          <div id="import-json-message" class="import-message"></div>
+          <div id="import-json-validation" class="import-validation-errors hidden" role="alert"></div>
+        </div>
+        <div id="import-panel-paste" class="import-panel import-panel-form hidden" role="tabpanel">
+          <p class="import-hint">Paste configuration JSON below and save it with a name. Expected format: <code>Inputs</code>, <code>Outputs</code>, <code>Transformations</code>.</p>
+          <div class="import-form-row import-form-row-paste">
+            <textarea id="import-json-paste" class="import-json-paste" placeholder='Paste JSON here (e.g. { "Inputs": {}, "Outputs": {}, "Transformations": {} })' aria-label="Paste configuration JSON"></textarea>
+          </div>
+          <div class="import-form-row">
+            <input type="text" id="import-json-paste-name" placeholder="Config name (e.g. my_config)" class="import-name-input" />
+          </div>
+          <div class="import-form-row">
+            <button type="button" class="btn btn-primary btn-import" id="btn-save-paste-json">Save to config</button>
+          </div>
+          <div id="import-paste-message" class="import-message"></div>
+          <div id="import-paste-validation" class="import-validation-errors hidden" role="alert"></div>
+        </div>
+        <div id="import-panel-import-json" class="import-panel import-panel-json hidden" role="tabpanel">
+          <p class="import-hint">Select an existing dataflow configuration and upload data files for each dataset to run testing and compare outputs.</p>
+          
+          <div class="import-json-layout">
+            <!-- Left side: Existing Configuration -->
+            <div class="import-json-left">
+              <div class="import-section">
+                <h3 class="import-section-title">Existing Dataflow Configuration</h3>
+                <div class="import-form-row">
+                  <select id="existing-config-select" class="import-select" aria-label="Select existing configuration">
+                    <option value="">-- Select existing configuration --</option>
+                  </select>
+                  <span class="import-file-hint">Choose a configuration to map its source and target datasets</span>
+                </div>
+                <div id="selected-config-info" class="selected-config-info hidden">
+                  <h4>Configuration Details:</h4>
+                  <div id="config-inputs-list" class="config-mapping-list">
+                    <h5>Input Datasets (Sources):</h5>
+                    <div id="config-inputs-content"></div>
+                  </div>
+                  <div id="config-outputs-list" class="config-mapping-list">
+                    <h5>Output Datasets (Targets):</h5>
+                    <div id="config-outputs-content"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right side: Data File Uploads -->
+            <div class="import-json-right">
+              <div class="import-section">
+                <h3 class="import-section-title">Upload Data Files</h3>
+                <div id="file-upload-section" class="file-upload-section">
+                  <p style="color: var(--text-secondary); font-size: 12px;">Select a configuration to see dataset upload options</p>
+                </div>
+                <div id="start-testing-container" class="start-testing-container hidden">
+                  <div class="import-form-row">
+                    <button type="button" class="btn btn-primary btn-import" id="btn-start-testing">Start Dataflow Testing</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div id="import-json-message" class="import-message"></div>
+          <div id="import-json-validation" class="import-validation-errors hidden" role="alert"></div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-page" class="settings-page hidden">
+    <div class="settings-page-inner">
+      <h1 class="import-page-title">Settings</h1>
+      <p class="import-hint">Configure application behavior at runtime. These values are stored in <code>config/settings.json</code> on the server.</p>
+      <form id="settings-form" class="settings-form">
+        <section class="settings-section settings-section-mainframe">
+          <h2 class="settings-section-title">Mainframe parsing</h2>
+          <div class="settings-mainframe-row">
+            <div class="settings-llm-toggle">
+              <label class="settings-row">
+                <span class="settings-label">Use LLM for parsing</span>
+                <input type="checkbox" id="settings-use-llm" />
+                <span class="settings-hint">When enabled, mainframe ZIP import uses the LLM (Lambda/OpenAI-compatible) to generate config. When disabled, the simple Python (rule-based) parser is used.</span>
+              </label>
+            </div>
+            <div id="settings-llm-panel" class="settings-llm-panel hidden">
+              <h3 class="settings-llm-panel-title">LLM configuration</h3>
+              <label class="settings-row settings-row-input">
+                <span class="settings-label">LLM API base URL</span>
+                <input type="text" id="settings-llm-base-url" placeholder="http://localhost:11434/v1" class="settings-input" />
+                <span class="settings-hint">e.g. http://localhost:11434/v1 for Ollama</span>
+              </label>
+              <label class="settings-row settings-row-input">
+                <span class="settings-label">LLM model</span>
+                <input type="text" id="settings-llm-model" placeholder="llama3.2:1b or phi3" class="settings-input" />
+                <span class="settings-hint">Model name (e.g. llama3.2:1b, phi3, codellama)</span>
+              </label>
+              <label class="settings-row settings-row-input">
+                <span class="settings-label">LLM request timeout (seconds)</span>
+                <input type="number" id="settings-llm-timeout" min="60" max="3600" step="30" placeholder="600" class="settings-input" />
+                <span class="settings-hint">60–3600. Use 600+ for slow local models.</span>
+              </label>
+            </div>
+          </div>
+        </section>
+        <section class="settings-section">
+          <h2 class="settings-section-title">Dataset paths</h2>
+          <p class="settings-hint settings-hint-block">These prefixes are applied to input and output paths in the generated config JSON. For <strong>local files</strong>, use <code>file:///</code> paths (e.g. <code>file:///Users/you/data/input</code>). For S3, use <code>s3://bucket-name/path</code>.</p>
+          <label class="settings-row settings-row-input">
+            <span class="settings-label">Input dataset prefix</span>
+            <input type="text" id="settings-input-dataset-prefix" placeholder="file:///tmp/parser-engine/input or s3://my-bucket/input" class="settings-input" />
+            <span class="settings-hint">Prefix for input dataset paths in config (e.g. <code>file:///Users/me/data/input</code> for local).</span>
+          </label>
+          <label class="settings-row settings-row-input">
+            <span class="settings-label">Output dataset prefix</span>
+            <input type="text" id="settings-output-dataset-prefix" placeholder="file:///tmp/parser-engine/output or s3://my-bucket/output" class="settings-input" />
+            <span class="settings-hint">Prefix for output dataset paths in config (e.g. <code>file:///Users/me/data/output</code> for local).</span>
+          </label>
+          <label class="settings-row settings-row-input">
+            <span class="settings-label">Legacy: single path prefix (fallback)</span>
+            <input type="text" id="settings-input-output-path-prefix" placeholder="s3://my-bucket/data" class="settings-input" />
+            <span class="settings-hint">Used only when the two prefixes above are empty.</span>
+          </label>
+        </section>
+        <section class="settings-section">
+          <h2 class="settings-section-title">Other</h2>
+          <label class="settings-row settings-row-input">
+            <span class="settings-label">Config directory override</span>
+            <input type="text" id="settings-config-dir" placeholder="(optional) path to config JSON folder" class="settings-input" />
+            <span class="settings-hint">Leave empty to use default <code>configs/</code>. Set to override where configuration files are stored.</span>
+          </label>
+        </section>
+        <div class="settings-actions">
+          <button type="submit" class="btn btn-primary">Save settings</button>
+          <span id="settings-message" class="import-message"></span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="detail-drawer" class="detail-drawer">
+    <div class="detail-drawer-backdrop" id="detail-drawer-backdrop"></div>
+    <div class="detail-drawer-panel">
+      <div class="detail-drawer-header">
+        <h2 id="logic-modal-title">Details</h2>
+        <button type="button" class="detail-drawer-close" id="logic-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="detail-drawer-body">
+        <div id="logic-view-step" class="logic-view">
+          <div class="view-row"><span class="view-label">ID</span><span class="view-value" id="logic-view-id"></span></div>
+          <div class="view-row"><span class="view-label">Description</span><span class="view-value" id="logic-view-description"></span></div>
+          <div class="view-row"><span class="view-label">Type</span><span class="view-value" id="logic-view-type"></span></div>
+          <div class="view-row"><span class="view-label">Source inputs</span><span class="view-value" id="logic-view-source-inputs"></span></div>
+          <div class="view-row"><span class="view-label">Output alias</span><span class="view-value" id="logic-view-output-alias"></span></div>
+          <div class="view-row view-row-block logic-section">
+            <span class="view-label">Logic</span>
+            <div class="view-value logic-section-right">
+              <div class="logic-tabs" role="tablist">
+                <button type="button" class="logic-tab" id="logic-toggle-visual" data-logic-tab="visual" role="tab" aria-selected="false">Visual</button>
+                <button type="button" class="logic-tab active" id="logic-toggle-kv" data-logic-tab="kv" role="tab" aria-selected="true">Key-Value</button>
+                <button type="button" class="logic-tab" id="logic-toggle-json" data-logic-tab="json" role="tab" aria-selected="false">Complete JSON</button>
+              </div>
+              <div id="logic-view-logic-visual-wrap" class="logic-content-panel hidden">
+                <div id="logic-view-logic-visual" class="logic-visual-panel"></div>
+              </div>
+              <div id="logic-view-logic-wrap" class="logic-content-panel">
+                <div class="logic-kv-list" id="logic-view-logic"></div>
+              </div>
+              <div id="logic-view-logic-json-wrap" class="logic-content-panel hidden">
+                <pre id="logic-view-logic-json" class="logic-json-pre"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="logic-view-io" class="logic-view" style="display:none;">
+          <div class="view-row"><span class="view-label">Summary</span><span class="view-value view-tags-wrap" id="logic-view-io-tags"></span></div>
+          <div class="view-row view-row-block">
+            <span class="view-label">Schema</span>
+            <div class="view-value logic-io-schema-wrap">
+              <div id="logic-view-io-schema-table" class="schema-table-wrap"></div>
+              <p id="logic-view-io-schema-empty" class="schema-empty hidden">No schema fields defined.</p>
+            </div>
+          </div>
+          <div class="view-row view-row-block"><span class="view-label">Details</span><pre class="view-value view-logic" id="logic-view-io-body"></pre></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right-side step edit panel (replaces modal) -->
+  <div id="step-edit-panel" class="step-edit-panel">
+    <div class="step-edit-panel-backdrop" id="step-edit-panel-backdrop"></div>
+    <div class="step-edit-panel-drawer">
+      <div class="step-edit-panel-header">
+        <h2>Edit transformation</h2>
+        <button type="button" class="step-edit-panel-close" id="step-edit-panel-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="step-edit-panel-body">
+        <div class="form-group">
+          <label>ID</label>
+          <input type="text" id="edit-id" />
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" id="edit-description" />
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select id="edit-type">
+            <option value="filter">filter</option>
+            <option value="join">join</option>
+            <option value="aggregate">aggregate</option>
+            <option value="select">select</option>
+            <option value="union">union</option>
+            <option value="custom">custom</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Logic (JSON)</label>
+          <textarea id="edit-logic" rows="10"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Source inputs (comma-separated)</label>
+          <input type="text" id="edit-source-inputs" placeholder="e.g. CUSTOMER, joined_data" />
+        </div>
+        <div class="form-group">
+          <label>Output alias</label>
+          <input type="text" id="edit-output-alias" />
+        </div>
+        <div class="step-edit-panel-actions">
+          <button type="button" class="btn btn-danger" id="edit-delete">Delete step</button>
+          <button type="button" class="btn btn-primary" id="edit-save">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="rename-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Rename configuration</h2>
+        <button type="button" class="modal-close" id="rename-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="rename-input">New name</label>
+          <input type="text" id="rename-input" placeholder="e.g. my_flow.json" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" id="rename-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="rename-submit">Rename</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="delete-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Delete configuration</h2>
+        <button type="button" class="modal-close" id="delete-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="delete-message" class="delete-message">Delete this file? This cannot be undone.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" id="delete-cancel">Cancel</button>
+          <button type="button" class="btn btn-danger" id="delete-confirm">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="overwrite-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Overwrite configuration?</h2>
+        <button type="button" class="modal-close" id="overwrite-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="overwrite-message" class="overwrite-message">A configuration with this name already exists. Overwrite?</p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" id="overwrite-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="overwrite-confirm">Overwrite</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="message-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header message-modal-header" id="message-modal-header">
+        <h2 id="message-modal-title">Message</h2>
+        <button type="button" class="modal-close" id="message-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="message-modal-body" class="message-modal-body"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-primary" id="message-modal-close-btn">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="error-modal" class="modal">
+    <div class="modal-content modal-wide">
+      <div class="modal-header error-modal-header">
+        <h2 id="error-modal-title">Error</h2>
+        <button type="button" class="modal-close" id="error-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="error-modal-message" class="error-modal-message"></p>
+        <pre id="error-modal-details" class="error-modal-details"></pre>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-primary" id="error-modal-close-btn">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

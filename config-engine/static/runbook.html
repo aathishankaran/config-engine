@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Config Engine – Runbook | U.S. Bank</title>
+
+  <!-- FontAwesome (same vendor as main app) -->
+  <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css" />
+
+  <style>
+    /* ═══════════════════════════════════════════════
+       TOKENS & RESET
+    ═══════════════════════════════════════════════ */
+    :root {
+      --usb-red:       #CF2A36;
+      --usb-red-dark:  #A31F29;
+      --usb-navy:      #0A2240;
+      --usb-navy-mid:  #1a3a5c;
+      --usb-navy-light:#e8f0f8;
+      --usb-blue-link: #0057A8;
+      --text-primary:  #1a1a2e;
+      --text-muted:    #5a6375;
+      --border:        #d8dee6;
+      --bg-page:       #f5f7fa;
+      --bg-card:       #ffffff;
+      --sidebar-w:     270px;
+      --content-max:   860px;
+      --radius:        8px;
+      --shadow-sm:     0 1px 4px rgba(0,0,0,.08);
+      --shadow-md:     0 4px 16px rgba(0,0,0,.12);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      color: var(--text-primary);
+      background: var(--bg-page);
+    }
+    a { color: var(--usb-blue-link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    img { max-width: 100%; height: auto; display: block; border-radius: var(--radius); }
+
+    /* ═══════════════════════════════════════════════
+       TOP HEADER BAR
+    ═══════════════════════════════════════════════ */
+    .rb-header {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--usb-navy);
+      border-bottom: 3px solid var(--usb-red);
+      display: flex; align-items: center; gap: 16px;
+      padding: 0 28px; height: 58px;
+    }
+    .rb-header img.logo { height: 30px; }
+    .rb-header .divider {
+      width: 1px; height: 24px;
+      background: rgba(255,255,255,0.25);
+    }
+    .rb-header .title {
+      font-size: 16px; font-weight: 600;
+      color: #fff; letter-spacing: .2px;
+    }
+    .rb-header .badge {
+      margin-left: auto;
+      font-size: 11px; font-weight: 700;
+      background: var(--usb-red);
+      color: #fff;
+      padding: 3px 9px; border-radius: 20px;
+      letter-spacing: .5px; text-transform: uppercase;
+    }
+    .rb-header .back-link {
+      margin-left: auto;
+      font-size: 13px;
+      color: rgba(255,255,255,.75);
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px;
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 20px;
+      transition: background .15s;
+    }
+    .rb-header .back-link:hover {
+      background: rgba(255,255,255,.1);
+      text-decoration: none;
+      color: #fff;
+    }
+
+    /* ═══════════════════════════════════════════════
+       LAYOUT
+    ═══════════════════════════════════════════════ */
+    .rb-shell {
+      display: flex;
+      min-height: calc(100vh - 58px);
+    }
+
+    /* ── Sidebar ─────────────────────────────────── */
+    .rb-sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      position: sticky;
+      top: 58px;
+      height: calc(100vh - 58px);
+      overflow-y: auto;
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      padding: 24px 0 40px;
+    }
+    .rb-sidebar::-webkit-scrollbar { width: 4px; }
+    .rb-sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .sb-section-label {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1.2px;
+      color: var(--text-muted);
+      padding: 18px 22px 6px;
+    }
+    .sb-link {
+      display: flex; align-items: center; gap: 9px;
+      padding: 8px 22px;
+      font-size: 13.5px;
+      color: var(--text-primary);
+      border-left: 3px solid transparent;
+      transition: background .12s, border-color .12s;
+      cursor: pointer;
+    }
+    .sb-link:hover {
+      background: var(--usb-navy-light);
+      text-decoration: none;
+    }
+    .sb-link.active {
+      border-left-color: var(--usb-red);
+      background: #fff3f4;
+      color: var(--usb-red-dark);
+      font-weight: 600;
+    }
+    .sb-link .sb-icon {
+      width: 18px; text-align: center;
+      font-size: 13px; color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .sb-link.active .sb-icon { color: var(--usb-red); }
+    .sb-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--border);
+      font-size: 11px; font-weight: 700; color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .sb-link.active .sb-num {
+      background: var(--usb-red);
+      color: #fff;
+    }
+
+    /* ── Content ─────────────────────────────────── */
+    .rb-content {
+      flex: 1;
+      min-width: 0;
+      padding: 48px 60px 80px;
+    }
+
+    /* ═══════════════════════════════════════════════
+       HERO BANNER
+    ═══════════════════════════════════════════════ */
+    .rb-hero {
+      background: linear-gradient(135deg, var(--usb-navy) 0%, var(--usb-navy-mid) 100%);
+      border-radius: var(--radius);
+      padding: 40px 44px;
+      margin-bottom: 48px;
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+    }
+    .rb-hero::after {
+      content: '';
+      position: absolute;
+      right: -40px; top: -40px;
+      width: 260px; height: 260px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.04);
+    }
+    .rb-hero .hero-eyebrow {
+      font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+      text-transform: uppercase; color: rgba(255,255,255,.55);
+      margin-bottom: 10px;
+    }
+    .rb-hero h1 {
+      font-size: 28px; font-weight: 700; line-height: 1.2;
+      margin-bottom: 12px;
+    }
+    .rb-hero p {
+      font-size: 15px; color: rgba(255,255,255,.78);
+      max-width: 640px; line-height: 1.6;
+    }
+    .rb-hero .hero-meta {
+      margin-top: 20px;
+      display: flex; gap: 24px; flex-wrap: wrap;
+    }
+    .rb-hero .hero-chip {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 12px; color: rgba(255,255,255,.65);
+    }
+    .rb-hero .hero-chip i { color: rgba(255,255,255,.45); }
+
+    /* ═══════════════════════════════════════════════
+       SECTION HEADERS
+    ═══════════════════════════════════════════════ */
+    .rb-section { margin-bottom: 64px; }
+    .rb-section:last-child { margin-bottom: 0; }
+
+    .section-header {
+      display: flex; align-items: center; gap: 14px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid var(--usb-red);
+      margin-bottom: 28px;
+    }
+    .section-number {
+      display: flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--usb-red);
+      color: #fff; font-size: 15px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .section-header h2 {
+      font-size: 21px; font-weight: 700;
+      color: var(--usb-navy);
+    }
+
+    /* ═══════════════════════════════════════════════
+       STEPS
+    ═══════════════════════════════════════════════ */
+    .step-list { list-style: none; counter-reset: step-counter; }
+    .step-item {
+      counter-increment: step-counter;
+      display: flex; gap: 18px;
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .step-item:last-child { border-bottom: none; }
+    .step-bullet {
+      flex-shrink: 0;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: var(--usb-navy);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+      margin-top: 2px;
+    }
+    .step-bullet::before { content: counter(step-counter); }
+    .step-body h4 {
+      font-size: 15px; font-weight: 600;
+      color: var(--usb-navy); margin-bottom: 5px;
+    }
+    .step-body p { color: var(--text-muted); font-size: 14px; }
+
+    /* ═══════════════════════════════════════════════
+       SCREENSHOT FIGURES
+    ═══════════════════════════════════════════════ */
+    .rb-figure {
+      margin: 28px 0;
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border);
+    }
+    .rb-figure img {
+      width: 100%; border-radius: 0;
+      display: block;
+    }
+    .rb-figure figcaption {
+      background: var(--usb-navy);
+      color: rgba(255,255,255,.75);
+      font-size: 12px; padding: 9px 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .rb-figure figcaption i { color: var(--usb-red); }
+
+    /* ═══════════════════════════════════════════════
+       INFO / WARNING / TIP CALLOUTS
+    ═══════════════════════════════════════════════ */
+    .callout {
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin: 20px 0;
+      display: flex; gap: 12px;
+      align-items: flex-start;
+      font-size: 14px;
+    }
+    .callout i { margin-top: 2px; flex-shrink: 0; font-size: 15px; }
+    .callout.info    { background: #e8f4fd; border-left: 4px solid #0057A8; }
+    .callout.info i  { color: #0057A8; }
+    .callout.tip     { background: #eafaf1; border-left: 4px solid #1a8a4a; }
+    .callout.tip i   { color: #1a8a4a; }
+    .callout.warn    { background: #fff8e1; border-left: 4px solid #f59e0b; }
+    .callout.warn i  { color: #f59e0b; }
+    .callout p { margin: 0; }
+    .callout strong { color: var(--text-primary); }
+
+    /* ═══════════════════════════════════════════════
+       CODE BLOCKS
+    ═══════════════════════════════════════════════ */
+    pre {
+      background: #0d1117;
+      color: #c9d1d9;
+      padding: 18px 22px;
+      border-radius: var(--radius);
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 16px 0;
+      border: 1px solid #21262d;
+    }
+    code { font-family: 'Menlo', 'Consolas', 'Monaco', monospace; }
+    p code, li code {
+      background: #f0f2f4;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--usb-red-dark);
+    }
+
+    /* ═══════════════════════════════════════════════
+       COMPONENT TABLE
+    ═══════════════════════════════════════════════ */
+    .rb-table {
+      width: 100%; border-collapse: collapse;
+      margin: 20px 0; font-size: 14px;
+    }
+    .rb-table th {
+      background: var(--usb-navy);
+      color: #fff;
+      padding: 10px 14px; text-align: left;
+      font-weight: 600; font-size: 13px;
+    }
+    .rb-table th:first-child { border-radius: 6px 0 0 0; }
+    .rb-table th:last-child  { border-radius: 0 6px 0 0; }
+    .rb-table td {
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+    .rb-table tr:nth-child(even) td { background: var(--bg-page); }
+    .rb-table tr:last-child td { border-bottom: none; }
+    .type-badge {
+      display: inline-block;
+      font-size: 10px; font-weight: 700; letter-spacing: .6px;
+      text-transform: uppercase;
+      padding: 2px 8px; border-radius: 12px;
+    }
+    .badge-input   { background: #e8f5e9; color: #2e7d32; }
+    .badge-output  { background: #fff3e0; color: #ef6c00; }
+    .badge-transform { background: #e3f2fd; color: #1565c0; }
+
+    /* ═══════════════════════════════════════════════
+       KEYBOARD SHORTCUTS TABLE
+    ═══════════════════════════════════════════════ */
+    kbd {
+      display: inline-block;
+      background: #f0f2f4;
+      border: 1px solid #c6cbd1;
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #24292e;
+    }
+
+    /* ═══════════════════════════════════════════════
+       FOOTER
+    ═══════════════════════════════════════════════ */
+    .rb-footer {
+      background: var(--usb-navy);
+      color: rgba(255,255,255,.5);
+      text-align: center;
+      padding: 28px;
+      font-size: 13px;
+    }
+    .rb-footer strong { color: rgba(255,255,255,.8); }
+
+    /* ═══════════════════════════════════════════════
+       RESPONSIVE
+    ═══════════════════════════════════════════════ */
+    @media (max-width: 900px) {
+      .rb-sidebar { display: none; }
+      .rb-content { padding: 28px 20px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     TOP HEADER
+══════════════════════════════════════════════ -->
+<header class="rb-header">
+  <img class="logo" src="/static/images/usbank-logo.png" alt="U.S. Bank" />
+  <div class="divider"></div>
+  <span class="title">Config Engine – User Runbook</span>
+  <a class="back-link" href="/">
+    <i class="fa-solid fa-arrow-left"></i> Back to App
+  </a>
+</header>
+
+<!-- ══════════════════════════════════════════════
+     SHELL
+══════════════════════════════════════════════ -->
+<div class="rb-shell">
+
+  <!-- ── SIDEBAR ────────────────────────────────── -->
+  <aside class="rb-sidebar">
+    <div class="sb-section-label">Getting Started</div>
+    <a class="sb-link active" href="#overview">
+      <span class="sb-num">1</span> Overview
+    </a>
+    <a class="sb-link" href="#prerequisites">
+      <span class="sb-num">2</span> Prerequisites
+    </a>
+    <a class="sb-link" href="#launch">
+      <span class="sb-num">3</span> Launching the App
+    </a>
+
+    <div class="sb-section-label">Core Workflow</div>
+    <a class="sb-link" href="#interface">
+      <span class="sb-num">4</span> Interface Overview
+    </a>
+    <a class="sb-link" href="#load-config">
+      <span class="sb-num">5</span> Load a Configuration
+    </a>
+    <a class="sb-link" href="#canvas">
+      <span class="sb-num">6</span> Studio Canvas
+    </a>
+    <a class="sb-link" href="#node-props">
+      <span class="sb-num">7</span> Node Properties
+    </a>
+    <a class="sb-link" href="#json-editor">
+      <span class="sb-num">8</span> JSON Editor
+    </a>
+
+    <div class="sb-section-label">Data Operations</div>
+    <a class="sb-link" href="#import-export">
+      <span class="sb-num">9</span> Import &amp; Export JSON
+    </a>
+    <a class="sb-link" href="#new-config">
+      <span class="sb-num">10</span> Create New Configuration
+    </a>
+    <a class="sb-link" href="#components">
+      <span class="sb-num">11</span> Component Reference
+    </a>
+
+    <div class="sb-section-label">Advanced</div>
+    <a class="sb-link" href="#settings">
+      <span class="sb-num">12</span> Settings
+    </a>
+    <a class="sb-link" href="#shortcuts">
+      <span class="sb-num">13</span> Keyboard Shortcuts
+    </a>
+    <a class="sb-link" href="#troubleshooting">
+      <span class="sb-num">14</span> Troubleshooting
+    </a>
+  </aside>
+
+  <!-- ── MAIN CONTENT ───────────────────────────── -->
+  <main class="rb-content">
+
+    <!-- HERO ──────────────────────────────────────── -->
+    <div class="rb-hero">
+      <div class="hero-eyebrow">U.S. Bank · Internal Developer Tools</div>
+      <h1>Config Engine — User Runbook</h1>
+      <p>
+        A visual dataflow configuration builder for mainframe transformation pipelines.
+        Design, edit, and validate COBOL/JCL dataflow configurations using the drag-and-drop canvas
+        or the built-in JSON editor.
+      </p>
+      <div class="hero-meta">
+        <span class="hero-chip"><i class="fa-solid fa-circle-check"></i> Current Version</span>
+        <span class="hero-chip"><i class="fa-solid fa-flask"></i> Flask · Python</span>
+        <span class="hero-chip"><i class="fa-solid fa-code-branch"></i> Internal Use Only</span>
+        <span class="hero-chip"><i class="fa-solid fa-clock"></i> Updated Feb 2026</span>
+      </div>
+    </div>
+
+    <!-- ─────────────────────────────────────────────
+         1. OVERVIEW
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="overview">
+      <div class="section-header">
+        <span class="section-number">1</span>
+        <h2>Overview</h2>
+      </div>
+
+      <p>
+        <strong>Config Engine</strong> is a browser-based tool for creating and managing <em>dataflow configurations</em>
+        — structured JSON files that describe how mainframe batch data moves through transformation steps
+        (Inputs → Transformations → Outputs).
+      </p>
+
+      <p style="margin-top:14px;">
+        Configurations are used by the <strong>Dataflow Engine</strong> to execute real data pipelines
+        against COBOL/fixed-width/Parquet source files. Config Engine lets engineers design
+        these pipelines visually without hand-editing complex JSON.
+      </p>
+
+      <div class="callout info" style="margin-top:18px;">
+        <i class="fa-solid fa-circle-info"></i>
+        <p><strong>Dual Interface:</strong> Every configuration can be edited both as a visual node graph
+        (<em>Studio Canvas</em>) and as raw JSON (<em>JSON Editor</em>). Changes in either view are kept in sync.</p>
+      </div>
+
+      <figure class="rb-figure">
+        <img src="/static/images/runbook/sc01-main.png" alt="Config Engine – main screen" />
+        <figcaption>
+          <i class="fa-solid fa-camera"></i>
+          Fig 1.1 — Config Engine landing page: config list (left), empty canvas (center), component palette (right)
+        </figcaption>
+      </figure>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         2. PREREQUISITES
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="prerequisites">
+      <div class="section-header">
+        <span class="section-number">2</span>
+        <h2>Prerequisites</h2>
+      </div>
+
+      <table class="rb-table">
+        <thead>
+          <tr>
+            <th>Requirement</th>
+            <th>Version</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><i class="fa-brands fa-python"></i> Python</td>
+            <td>3.10+</td>
+            <td>Virtual environment (<code>.venv</code>) recommended</td>
+          </tr>
+          <tr>
+            <td><i class="fa-solid fa-fire"></i> Flask</td>
+            <td>3.x</td>
+            <td>Listed in <code>requirements.txt</code></td>
+          </tr>
+          <tr>
+            <td><i class="fa-solid fa-globe"></i> Browser</td>
+            <td>Chrome 100+ / Safari 16+ / Edge 100+</td>
+            <td>JavaScript must be enabled</td>
+          </tr>
+          <tr>
+            <td><i class="fa-brands fa-java"></i> Java (optional)</td>
+            <td>JDK 11</td>
+            <td>Required only for COBOL parsing features</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <p><strong>Java Version Note:</strong> If you see <code>UnsupportedOperationException: getSubject is not supported</code>,
+        your JVM version is &gt; 17. Switch to <strong>JDK 11</strong> or add
+        <code>-Djava.security.manager=allow</code> to your JVM arguments.</p>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         3. LAUNCHING
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="launch">
+      <div class="section-header">
+        <span class="section-number">3</span>
+        <h2>Launching the App</h2>
+      </div>
+
+      <ol class="step-list">
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Clone / navigate to the project</h4>
+            <pre><code>cd cloude-engine/config-engine</code></pre>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Activate the virtual environment</h4>
+            <pre><code># macOS / Linux
+source .venv/bin/activate
+
+# Windows
+.venv\Scripts\activate</code></pre>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Install dependencies (first run only)</h4>
+            <pre><code>pip install -r requirements.txt</code></pre>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Start the Flask server</h4>
+            <pre><code>python app.py</code></pre>
+            <p>The server starts on <code>http://localhost:5000</code> by default.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Open the app in your browser</h4>
+            <p>Navigate to <a href="http://localhost:5000" target="_blank">http://localhost:5000</a></p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         4. INTERFACE OVERVIEW
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="interface">
+      <div class="section-header">
+        <span class="section-number">4</span>
+        <h2>Interface Overview</h2>
+      </div>
+
+      <p>The Config Engine UI has four main regions:</p>
+
+      <table class="rb-table" style="margin-top:16px;">
+        <thead>
+          <tr><th>Region</th><th>Location</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Toolbar</strong></td>
+            <td>Top bar</td>
+            <td>New, Load, Import JSON, Export JSON, Save, zoom controls, mode buttons</td>
+          </tr>
+          <tr>
+            <td><strong>Config List</strong></td>
+            <td>Left sidebar</td>
+            <td>Lists all saved <code>.json</code> configurations; click to load</td>
+          </tr>
+          <tr>
+            <td><strong>Studio Canvas</strong></td>
+            <td>Center panel</td>
+            <td>Drag-and-drop visual pipeline builder</td>
+          </tr>
+          <tr>
+            <td><strong>Components Palette</strong></td>
+            <td>Right sidebar</td>
+            <td>Draggable node types: Input, Output, Select, Filter, Join, Aggregate, Union, Custom</td>
+          </tr>
+          <tr>
+            <td><strong>Properties Panel</strong></td>
+            <td>Right drawer (opens on node click)</td>
+            <td>Edit properties of the selected node</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <figure class="rb-figure">
+        <img src="/static/images/runbook/sc02-canvas.png" alt="Canvas with loaded config" />
+        <figcaption>
+          <i class="fa-solid fa-camera"></i>
+          Fig 4.1 — Config loaded: 11-node pipeline shown on the Studio Canvas
+        </figcaption>
+      </figure>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         5. LOAD A CONFIGURATION
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="load-config">
+      <div class="section-header">
+        <span class="section-number">5</span>
+        <h2>Load a Configuration</h2>
+      </div>
+
+      <ol class="step-list">
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Find your config in the left panel</h4>
+            <p>All saved <code>.json</code> configs in the <code>configs/</code> folder appear in the list. Use the search box to filter by name.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Click the config name</h4>
+            <p>The canvas loads the dataflow pipeline automatically. Nodes and connections are rendered in the Studio Canvas.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Fit the view</h4>
+            <p>Press <kbd>F</kbd> or click the <strong>Fit</strong> button in the toolbar to fit all nodes into view.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Or load from toolbar</h4>
+            <p>Click <strong>Load</strong> in the top toolbar and pick any config file from the server.</p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="callout tip">
+        <i class="fa-solid fa-lightbulb"></i>
+        <p><strong>Tip:</strong> After loading, the toolbar shows <strong>Test</strong>, <strong>Download</strong>,
+        <strong>Rename</strong>, and <strong>Delete</strong> action buttons for the active configuration.</p>
+      </div>
+
+      <figure class="rb-figure">
+        <img src="/static/images/runbook/sc07-canvas-fit.png" alt="Canvas fit to view" />
+        <figcaption>
+          <i class="fa-solid fa-camera"></i>
+          Fig 5.1 — BANK_BATCH_SYSTEM.json loaded and fit to view — 11 nodes, 10 connections
+        </figcaption>
+      </figure>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         6. STUDIO CANVAS
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="canvas">
+      <div class="section-header">
+        <span class="section-number">6</span>
+        <h2>Studio Canvas</h2>
+      </div>
+
+      <p>The canvas is a <strong>pan-and-zoom</strong> workspace where you build your dataflow by connecting nodes.</p>
+
+      <h3 style="margin:24px 0 12px; font-size:16px; color:var(--usb-navy);">Adding Nodes</h3>
+      <ol class="step-list">
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Drag from the Component Palette</h4>
+            <p>In the right panel, drag any component (Input, Select, Filter, etc.) onto the canvas.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Name the node</h4>
+            <p>A dialog prompts for a node name. Enter a unique identifier (e.g., <code>TXNIN</code>).</p>
+          </div>
+        </li>
+      </ol>
+
+      <h3 style="margin:24px 0 12px; font-size:16px; color:var(--usb-navy);">Connecting Nodes</h3>
+      <ol class="step-list">
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Switch to Connect mode</h4>
+            <p>Press <kbd>C</kbd> or click <strong>Connect</strong> in the toolbar. The cursor changes to a crosshair.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Draw a connection</h4>
+            <p>Click the <em>source</em> node, then click the <em>target</em> node. An arrow appears.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Return to Select mode</h4>
+            <p>Press <kbd>V</kbd> or click <strong>Select</strong> to go back to the default mode.</p>
+          </div>
+        </li>
+      </ol>
+
+      <h3 style="margin:24px 0 12px; font-size:16px; color:var(--usb-navy);">Canvas Controls</h3>
+      <table class="rb-table">
+        <thead><tr><th>Action</th><th>How</th></tr></thead>
+        <tbody>
+          <tr><td>Pan</td><td>Click and drag on the empty canvas background</td></tr>
+          <tr><td>Zoom</td><td>Scroll wheel, or <kbd>+</kbd> / <kbd>-</kbd> toolbar buttons</td></tr>
+          <tr><td>Fit all nodes</td><td><kbd>F</kbd> key or Fit button</td></tr>
+          <tr><td>Auto-layout</td><td><kbd>A</kbd> key or Auto-arrange button</td></tr>
+          <tr><td>Delete node/edge</td><td>Select it, press <kbd>Del</kbd></td></tr>
+          <tr><td>Deselect</td><td><kbd>Esc</kbd></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         7. NODE PROPERTIES
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="node-props">
+      <div class="section-header">
+        <span class="section-number">7</span>
+        <h2>Node Properties</h2>
+      </div>
+
+      <p>Click any node on the canvas to open its <strong>Properties Panel</strong> on the right side.</p>
+
+      <ol class="step-list">
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Click a node</h4>
+            <p>The node highlights and the Properties Panel slides in from the right.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Edit fields</h4>
+            <p>Each node type has different fields:
+              <code>Input</code> nodes have <em>format</em>, <em>path</em>, <em>schema</em>;
+              <code>Join</code> nodes have <em>left/right source</em>, <em>join key</em>;
+              <code>Filter</code> has <em>condition</em>, etc.
+            </p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Click Apply</h4>
+            <p>Press the <strong>Apply</strong> button to save changes to the node and auto-sync to the server.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Switch nodes safely</h4>
+            <p>When you click another node, unsaved changes are <strong>auto-saved silently</strong> — you won't lose edits.</p>
+          </div>
+        </li>
+      </ol>
+
+      <figure class="rb-figure">
+        <img src="/static/images/runbook/sc03-props.png" alt="Node properties panel" />
+        <figcaption>
+          <i class="fa-solid fa-camera"></i>
+          Fig 7.1 — Properties panel open for a selected node. Edit fields and click Apply to save.
+        </figcaption>
+      </figure>
+
+      <div class="callout tip">
+        <i class="fa-solid fa-lightbulb"></i>
+        <p><strong>Auto-save on switch:</strong> Clicking a different node automatically applies your current
+        edits first, so you never lose changes when navigating between nodes.</p>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         8. JSON EDITOR
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="json-editor">
+      <div class="section-header">
+        <span class="section-number">8</span>
+        <h2>JSON Editor</h2>
+      </div>
+
+      <p>
+        Switch to the full-screen <strong>JSON Editor</strong> for direct JSON manipulation.
+        The editor uses the <a href="https://github.com/josdejong/jsoneditor" target="_blank">JSONEditor</a>
+        library with a VS Code–inspired dark theme.
+      </p>
+
+      <ol class="step-list">
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Open the JSON Editor</h4>
+            <p>Click <strong>JSON Editor</strong> in the center mode bar (appears after loading a config).</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Navigate the tree</h4>
+            <p>Expand / collapse sections using the triangle arrows. The breadcrumb at the top shows your position.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Switch modes</h4>
+            <p>Use the <strong>Tree</strong> / <strong>Code</strong> mode toggle in the editor toolbar to switch between
+            visual tree view and raw JSON code view.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Apply changes</h4>
+            <p>Click <strong>Apply to Canvas</strong> (green button, top-right of the editor) to push JSON changes back to the visual canvas.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Close without applying</h4>
+            <p>Click <strong>Close</strong> to dismiss the editor and return to the canvas without applying changes.</p>
+          </div>
+        </li>
+      </ol>
+
+      <figure class="rb-figure">
+        <img src="/static/images/runbook/sc04-jsoneditor.png" alt="JSON Editor overlay" />
+        <figcaption>
+          <i class="fa-solid fa-camera"></i>
+          Fig 8.1 — JSON Editor overlay in Tree mode. Keys in blue, strings in orange, numbers in green.
+        </figcaption>
+      </figure>
+
+      <div class="callout info">
+        <i class="fa-solid fa-circle-info"></i>
+        <p><strong>Color Coding:</strong> Keys are <span style="color:#9cdcfe;font-weight:600">blue</span>,
+        string values are <span style="color:#ce9178;font-weight:600">orange</span>,
+        numbers are <span style="color:#b5cea8;font-weight:600">green</span>,
+        booleans are <span style="color:#569cd6;font-weight:600">blue-grey</span>.</p>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         9. IMPORT & EXPORT JSON
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="import-export">
+      <div class="section-header">
+        <span class="section-number">9</span>
+        <h2>Import &amp; Export JSON</h2>
+      </div>
+
+      <h3 style="margin:0 0 14px; font-size:16px; color:var(--usb-navy);">Importing a JSON file</h3>
+      <ol class="step-list">
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Click "Import JSON" in the toolbar</h4>
+            <p>A modal dialog opens with a file upload area and a text paste area.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Upload or paste JSON</h4>
+            <p>Either drag a <code>.json</code> file onto the upload area, or paste raw JSON into the text field.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Click Import</h4>
+            <p>The pipeline is validated and rendered on the canvas immediately.</p>
+          </div>
+        </li>
+      </ol>
+
+      <figure class="rb-figure">
+        <img src="/static/images/runbook/sc05-import.png" alt="Import JSON modal" />
+        <figcaption>
+          <i class="fa-solid fa-camera"></i>
+          Fig 9.1 — Import JSON modal: paste or upload a configuration file
+        </figcaption>
+      </figure>
+
+      <h3 style="margin:28px 0 14px; font-size:16px; color:var(--usb-navy);">Exporting a JSON file</h3>
+      <ol class="step-list">
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Click "Export JSON" in the toolbar</h4>
+            <p>The current canvas configuration is downloaded as a <code>.json</code> file.</p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="callout tip">
+        <i class="fa-solid fa-lightbulb"></i>
+        <p><strong>Download button:</strong> After loading a config, the <strong>Download</strong> button (red, in toolbar)
+        also exports the current configuration file directly.</p>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         10. CREATE NEW CONFIGURATION
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="new-config">
+      <div class="section-header">
+        <span class="section-number">10</span>
+        <h2>Create New Configuration</h2>
+      </div>
+
+      <ol class="step-list">
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Click "New" in the toolbar</h4>
+            <p>If a config is loaded, you are prompted to save changes first.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Enter a config name</h4>
+            <p>Type a name in the config name field (e.g., <code>MY_PIPELINE.json</code>).</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Drag components from the right palette</h4>
+            <p>Build your pipeline by adding Input, Transformation, and Output nodes.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Connect nodes in Connect mode (<kbd>C</kbd>)</h4>
+            <p>Draw arrows from source to target nodes to define data flow.</p>
+          </div>
+        </li>
+        <li class="step-item">
+          <div class="step-bullet"></div>
+          <div class="step-body">
+            <h4>Click Save</h4>
+            <p>Press <strong>Save</strong> in the toolbar. The config is saved to <code>configs/</code> on the server and appears in the left list.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         11. COMPONENT REFERENCE
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="components">
+      <div class="section-header">
+        <span class="section-number">11</span>
+        <h2>Component Reference</h2>
+      </div>
+
+      <table class="rb-table">
+        <thead>
+          <tr><th>Component</th><th>Type</th><th>Description</th><th>Key Properties</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Input</strong></td>
+            <td><span class="type-badge badge-input">Source</span></td>
+            <td>Read data from CSV, Parquet, COBOL fixed-width, or JCL files</td>
+            <td><code>format</code>, <code>path</code>, <code>schema</code>, <code>header</code></td>
+          </tr>
+          <tr>
+            <td><strong>Output</strong></td>
+            <td><span class="type-badge badge-output">Sink</span></td>
+            <td>Write results to Parquet, CSV, or COBOL files</td>
+            <td><code>format</code>, <code>path</code>, <code>partition</code></td>
+          </tr>
+          <tr>
+            <td><strong>Select</strong></td>
+            <td><span class="type-badge badge-transform">Transform</span></td>
+            <td>Map, rename, or compute columns (SQL-like expressions)</td>
+            <td><code>columns[]</code> with <code>alias</code> and <code>expr</code></td>
+          </tr>
+          <tr>
+            <td><strong>Filter</strong></td>
+            <td><span class="type-badge badge-transform">Transform</span></td>
+            <td>Row-level filtering using a boolean condition string</td>
+            <td><code>condition</code></td>
+          </tr>
+          <tr>
+            <td><strong>Join</strong></td>
+            <td><span class="type-badge badge-transform">Transform</span></td>
+            <td>Merge two datasets on a common key</td>
+            <td><code>left</code>, <code>right</code>, <code>on</code>, <code>how</code></td>
+          </tr>
+          <tr>
+            <td><strong>Aggregate</strong></td>
+            <td><span class="type-badge badge-transform">Transform</span></td>
+            <td>Group and aggregate (SUM, COUNT, AVG, etc.)</td>
+            <td><code>group_by[]</code>, <code>aggregations[]</code></td>
+          </tr>
+          <tr>
+            <td><strong>Union</strong></td>
+            <td><span class="type-badge badge-transform">Transform</span></td>
+            <td>Stack two datasets vertically (UNION ALL)</td>
+            <td><code>inputs[]</code></td>
+          </tr>
+          <tr>
+            <td><strong>Custom</strong></td>
+            <td><span class="type-badge badge-transform">Transform</span></td>
+            <td>Raw JSON logic for advanced or unsupported operations</td>
+            <td><code>logic</code> (raw JSON object)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         12. SETTINGS
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="settings">
+      <div class="section-header">
+        <span class="section-number">12</span>
+        <h2>Settings</h2>
+      </div>
+
+      <p>Click the <strong><i class="fa-solid fa-gear"></i> Settings</strong> icon in the top-right corner to open application settings.</p>
+
+      <figure class="rb-figure">
+        <img src="/static/images/runbook/sc06-settings.png" alt="Settings modal" />
+        <figcaption>
+          <i class="fa-solid fa-camera"></i>
+          Fig 12.1 — Settings modal: configure LLM endpoint, API key, and other preferences
+        </figcaption>
+      </figure>
+
+      <table class="rb-table" style="margin-top:20px;">
+        <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>LLM API Endpoint</strong></td>
+            <td>URL of the local or remote LLM service for AI-assisted config generation</td>
+          </tr>
+          <tr>
+            <td><strong>API Key</strong></td>
+            <td>Authentication token for the LLM service (stored in <code>static/config/settings.json</code>)</td>
+          </tr>
+          <tr>
+            <td><strong>Model Name</strong></td>
+            <td>The LLM model identifier to use (e.g., <code>gpt-4</code>, <code>llama3</code>)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         13. KEYBOARD SHORTCUTS
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="shortcuts">
+      <div class="section-header">
+        <span class="section-number">13</span>
+        <h2>Keyboard Shortcuts</h2>
+      </div>
+
+      <table class="rb-table">
+        <thead><tr><th>Key</th><th>Action</th><th>Mode</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>V</kbd></td><td>Switch to Select mode</td><td>Canvas</td></tr>
+          <tr><td><kbd>C</kbd></td><td>Switch to Connect mode (draw connections)</td><td>Canvas</td></tr>
+          <tr><td><kbd>F</kbd></td><td>Fit all nodes to viewport</td><td>Canvas</td></tr>
+          <tr><td><kbd>A</kbd></td><td>Auto-arrange layout</td><td>Canvas</td></tr>
+          <tr><td><kbd>Del</kbd></td><td>Delete selected node or connection</td><td>Canvas</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Deselect / close overlays</td><td>Global</td></tr>
+          <tr><td><kbd>+</kbd></td><td>Zoom in</td><td>Canvas</td></tr>
+          <tr><td><kbd>-</kbd></td><td>Zoom out</td><td>Canvas</td></tr>
+          <tr><td><kbd>Ctrl</kbd> <kbd>Z</kbd></td><td>Undo (JSON Editor)</td><td>JSON Editor</td></tr>
+          <tr><td><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Z</kbd></td><td>Redo (JSON Editor)</td><td>JSON Editor</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         14. TROUBLESHOOTING
+    ───────────────────────────────────────────────── -->
+    <section class="rb-section" id="troubleshooting">
+      <div class="section-header">
+        <span class="section-number">14</span>
+        <h2>Troubleshooting</h2>
+      </div>
+
+      <table class="rb-table">
+        <thead><tr><th>Problem</th><th>Likely Cause</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>App not loading at <code>localhost:5000</code></td>
+            <td>Flask server not running</td>
+            <td>Run <code>python app.py</code> in the <code>config-engine</code> directory</td>
+          </tr>
+          <tr>
+            <td><code>UnsupportedOperationException: getSubject</code></td>
+            <td>Java version &gt; 11</td>
+            <td>Use JDK 11 or add <code>-Djava.security.manager=allow</code> to JVM args</td>
+          </tr>
+          <tr>
+            <td>Config not saving</td>
+            <td>Empty config name field</td>
+            <td>Enter a name in the config name text box before clicking Save</td>
+          </tr>
+          <tr>
+            <td>JSON Editor not opening</td>
+            <td>No config loaded</td>
+            <td>Load or create a configuration first; the mode bar appears only when a config is active</td>
+          </tr>
+          <tr>
+            <td>Nodes disappeared after Apply</td>
+            <td>Invalid JSON in editor</td>
+            <td>Check the JSON editor for red validation errors before applying</td>
+          </tr>
+          <tr>
+            <td>Can't connect nodes</td>
+            <td>Not in Connect mode</td>
+            <td>Press <kbd>C</kbd> or click <strong>Connect</strong> in the toolbar first</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout info" style="margin-top:24px;">
+        <i class="fa-solid fa-circle-info"></i>
+        <p>For additional help, check the <code>README.md</code> in the project root or the
+        <code>DATAFLOW_ENGINE_SCHEMA.md</code> for the full configuration schema reference.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════ -->
+<footer class="rb-footer">
+  <strong>U.S. Bank Config Engine</strong> &nbsp;·&nbsp; Internal Developer Tools &nbsp;·&nbsp;
+  <a href="/" style="color:rgba(255,255,255,.5);">← Back to App</a>
+</footer>
+
+<!-- ══════════════════════════════════════════════
+     SIDEBAR ACTIVE HIGHLIGHT ON SCROLL
+══════════════════════════════════════════════ -->
+<script>
+(function () {
+  var sections = Array.from(document.querySelectorAll('.rb-section[id]'));
+  var links    = Array.from(document.querySelectorAll('.sb-link[href^="#"]'));
+
+  function setActive(id) {
+    links.forEach(function(l) {
+      l.classList.toggle('active', l.getAttribute('href') === '#' + id);
+    });
+  }
+
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) setActive(e.target.id);
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function(s) { io.observe(s); });
+})();
+</script>
+</body>
+</html>

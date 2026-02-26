@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dataflow Builder - Parser Engine</title>
+  <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css" />
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="stylesheet" href="/static/css/dataflow-builder.css">
+</head>
+<body class="builder-page">
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo">
+        <span class="logo-icon"></span>
+        <span class="logo-text">Parser Engine</span>
+      </a>
+      <nav class="nav">
+        <a href="/" class="nav-item nav-link">Configurations</a>
+        <a href="/builder" class="nav-item nav-link active">Dataflow Builder</a>
+        <a href="/" id="nav-import-link" class="nav-item nav-link">Import</a>
+        <a href="/" id="nav-settings-link" class="nav-item nav-link">Settings</a>
+      </nav>
+      <div class="builder-toolbar">
+        <button type="button" class="btn btn-outline btn-sm" id="builder-mode-select" title="Select mode">
+          <i class="fa-solid fa-mouse-pointer"></i> Select
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" id="builder-mode-connect" title="Connect nodes (click source then target)">
+          <i class="fa-solid fa-link"></i> Connect
+        </button>
+        <span class="builder-sep">|</span>
+        <button type="button" class="btn btn-outline btn-sm" id="builder-zoom-in" title="Zoom in"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+        <button type="button" class="btn btn-outline btn-sm" id="builder-zoom-out" title="Zoom out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+        <button type="button" class="btn btn-outline btn-sm" id="builder-fit" title="Fit canvas"><i class="fa-solid fa-maximize"></i></button>
+        <span class="builder-sep">|</span>
+        <button type="button" class="btn btn-primary btn-sm" id="builder-export-json" title="Export JSON">
+          <i class="fa-solid fa-download"></i> Export JSON
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" id="builder-load" title="Load existing config">
+          <i class="fa-solid fa-folder-open"></i> Load
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" id="builder-save" title="Save to config">
+          <i class="fa-solid fa-floppy-disk"></i> Save
+        </button>
+        <input type="text" id="builder-config-name" placeholder="Config name (e.g. my_dataflow)" class="builder-config-input" />
+      </div>
+    </div>
+  </header>
+
+  <div class="builder-layout">
+    <!-- Left palette - draw.io style -->
+    <aside class="builder-palette">
+      <h3 class="palette-title">Shapes</h3>
+      <p class="palette-hint">Drag onto canvas to add</p>
+      <div class="palette-section">
+        <h4>Data</h4>
+        <div class="palette-item" draggable="true" data-type="input" data-label="Input">
+          <span class="palette-icon input-icon"><i class="fa-solid fa-database"></i></span>
+          <span>Input</span>
+        </div>
+        <div class="palette-item" draggable="true" data-type="output" data-label="Output">
+          <span class="palette-icon output-icon"><i class="fa-solid fa-floppy-disk"></i></span>
+          <span>Output</span>
+        </div>
+      </div>
+      <div class="palette-section">
+        <h4>Transformations</h4>
+        <div class="palette-item" draggable="true" data-type="select" data-label="Select">
+          <span class="palette-icon select-icon"><i class="fa-solid fa-arrows-up-down-left-right"></i></span>
+          <span>Select</span>
+        </div>
+        <div class="palette-item" draggable="true" data-type="filter" data-label="Filter">
+          <span class="palette-icon filter-icon"><i class="fa-solid fa-filter"></i></span>
+          <span>Filter</span>
+        </div>
+        <div class="palette-item" draggable="true" data-type="join" data-label="Join">
+          <span class="palette-icon join-icon"><i class="fa-solid fa-code-merge"></i></span>
+          <span>Join</span>
+        </div>
+        <div class="palette-item" draggable="true" data-type="aggregate" data-label="Aggregate">
+          <span class="palette-icon aggregate-icon"><i class="fa-solid fa-calculator"></i></span>
+          <span>Aggregate</span>
+        </div>
+        <div class="palette-item" draggable="true" data-type="union" data-label="Union">
+          <span class="palette-icon union-icon"><i class="fa-solid fa-layer-group"></i></span>
+          <span>Union</span>
+        </div>
+        <div class="palette-item" draggable="true" data-type="custom" data-label="Custom">
+          <span class="palette-icon custom-icon"><i class="fa-solid fa-puzzle-piece"></i></span>
+          <span>Custom</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center canvas -->
+    <main class="builder-main">
+      <div class="builder-canvas-wrap" id="canvas-wrap">
+        <div class="builder-canvas" id="canvas" data-zoom="1" data-pan-x="0" data-pan-y="0">
+          <svg class="builder-connections" id="connections-svg">
+            <defs>
+              <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+              </marker>
+            </defs>
+          </svg>
+          <div class="builder-nodes" id="nodes-container"></div>
+          <div class="canvas-drop-hint" id="drop-hint">Drop shapes here</div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right properties panel -->
+    <aside class="builder-props" id="props-panel">
+      <div class="props-empty" id="props-empty">
+        <p>Select a node to edit its properties</p>
+      </div>
+      <div class="props-form hidden" id="props-form">
+        <h3>Node Properties</h3>
+        <div class="form-group">
+          <label>ID / Name</label>
+          <input type="text" id="prop-id" placeholder="e.g. SRCIN, step_1" />
+        </div>
+        <div class="form-group" id="prop-description-group">
+          <label>Description</label>
+          <input type="text" id="prop-description" placeholder="Step description" />
+        </div>
+        <div class="form-group" id="prop-type-group">
+          <label>Type</label>
+          <select id="prop-type">
+            <option value="select">select</option>
+            <option value="filter">filter</option>
+            <option value="join">join</option>
+            <option value="aggregate">aggregate</option>
+            <option value="union">union</option>
+            <option value="custom">custom</option>
+          </select>
+        </div>
+        <div class="form-group" id="prop-source-inputs-group">
+          <label>Source inputs (comma-separated)</label>
+          <input type="text" id="prop-source-inputs" placeholder="e.g. SRCIN, validated_data" />
+        </div>
+        <div class="form-group" id="prop-output-alias-group">
+          <label>Output alias</label>
+          <input type="text" id="prop-output-alias" placeholder="e.g. OUTPUT1, joined_data" />
+        </div>
+        <div class="form-group" id="prop-format-group">
+          <label>Format</label>
+          <select id="prop-format">
+            <option value="parquet">parquet</option>
+            <option value="csv">csv</option>
+            <option value="cobol">cobol</option>
+            <option value="fixed">fixed</option>
+          </select>
+        </div>
+        <div class="form-group" id="prop-path-group">
+          <label>Path</label>
+          <input type="text" id="prop-path" placeholder="e.g. data/input/file.parquet" />
+        </div>
+        <div class="form-group" id="prop-dataset-group">
+          <label>Dataset</label>
+          <input type="text" id="prop-dataset" placeholder="e.g. MAINFRAME.DATASET.NAME" />
+        </div>
+        <div class="form-group" id="prop-copybook-group">
+          <label>Copybook</label>
+          <input type="text" id="prop-copybook" placeholder="e.g. copybook_name" />
+        </div>
+        <div class="form-group" id="prop-write-mode-group">
+          <label>Write mode</label>
+          <select id="prop-write-mode">
+            <option value="overwrite">overwrite</option>
+            <option value="append">append</option>
+          </select>
+        </div>
+        <div class="form-group" id="prop-fields-group">
+          <label>Fields (JSON)</label>
+          <textarea id="prop-fields" rows="4" placeholder='[{"name": "FIELD", "type": "string", "start": 1, "length": 10}]'></textarea>
+          <span class="props-field-hint">Array of {name, type, start?, length?}. Types: string, int, double, date</span>
+        </div>
+        <div class="form-group" id="prop-logic-group">
+          <label>Logic (JSON)</label>
+          <textarea id="prop-logic" rows="6" placeholder='{"columns": ["*"]} or {"conditions": [...]}'></textarea>
+        </div>
+        <div class="props-actions">
+          <button type="button" class="btn btn-danger btn-sm" id="prop-delete">Delete node</button>
+          <button type="button" class="btn btn-primary btn-sm" id="prop-save">Apply</button>
+        </div>
+        <p class="props-apply-hint">Edit values above and click <strong>Apply</strong> to save changes to the node.</p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- JSON export modal -->
+  <div id="builder-json-modal" class="modal builder-json-modal">
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <h2>Dataflow Configuration JSON</h2>
+        <button type="button" class="modal-close" id="builder-json-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="import-hint">Copy or save this JSON. It is compatible with the dataflow-engine.</p>
+        <pre id="builder-json-output" class="builder-json-output"></pre>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" id="builder-json-copy">Copy</button>
+          <button type="button" class="btn btn-primary" id="builder-json-download">Download</button>
+          <button type="button" class="btn btn-outline" id="builder-json-modal-close-btn">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load existing config -->
+  <div id="builder-load-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Load Configuration</h2>
+        <button type="button" class="modal-close" id="builder-load-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="import-hint">Load an existing config to edit in the builder, or start fresh.</p>
+        <div class="form-group">
+          <label>Config file</label>
+          <select id="builder-load-select">
+            <option value="">-- Start empty --</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" id="builder-load-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="builder-load-apply">Load</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/dataflow-builder.js"></script>
+</body>
+</html>
