@@ -32,6 +32,62 @@ def _dataflow_engine_dir() -> Path | None:
     return None
 
 
+def _has_pyspark(python_exe: str) -> bool:
+    """Return True if the given Python interpreter has pyspark importable."""
+    try:
+        result = subprocess.run(
+            [python_exe, "-c", "import pyspark"],
+            capture_output=True,
+            timeout=10,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def _find_python_with_pyspark(engine_dir: Path | None = None) -> str:
+    """
+    Return a Python executable that has PySpark installed.
+
+    Resolution order:
+      1. DATAFLOW_ENGINE_PYTHON env var (explicit override)
+      2. venv inside the dataflow-engine directory (.venv/bin/python or venv/bin/python)
+      3. sys.executable (current interpreter — fast path when already has pyspark)
+      4. 'python3' / 'python' on PATH
+    Falls back to sys.executable so the error surfaces at the subprocess level.
+    """
+    # 1. Explicit override
+    env_py = os.environ.get("DATAFLOW_ENGINE_PYTHON", "").strip()
+    if env_py and _has_pyspark(env_py):
+        return env_py
+
+    # 2. venv inside dataflow-engine project
+    if engine_dir:
+        for rel in (".venv/bin/python", "venv/bin/python",
+                    ".venv/Scripts/python.exe", "venv/Scripts/python.exe"):
+            candidate = engine_dir / rel
+            if candidate.exists() and _has_pyspark(str(candidate)):
+                return str(candidate)
+
+    # 3. Current interpreter (fast path — works when running inside the right venv)
+    if _has_pyspark(sys.executable):
+        return sys.executable
+
+    # 4. Generic python3 / python on PATH
+    for name in ("python3", "python"):
+        try:
+            full = subprocess.run(
+                ["which", name], capture_output=True, text=True, timeout=5
+            ).stdout.strip()
+            if full and _has_pyspark(full):
+                return full
+        except Exception:
+            pass
+
+    # Nothing found — return sys.executable so the error is clear
+    return sys.executable
+
+
 def generate_sample_data(config: dict, num_rows: int = 5) -> dict[str, list[dict]]:
     """
     Generate minimal sample input data from config schema (Inputs.fields).
@@ -197,9 +253,11 @@ def run_dataflow_test(
     if not run_script.exists():
         return {"error": f"run_dataflow.py not found at {run_script}", "outputs": {}, "logs": ""}
 
+    python_exe = _find_python_with_pyspark(engine_dir)
+
     try:
         proc = subprocess.run(
-            [sys.executable, str(run_script), str(config_path), "--base-path", str(run_base), "--no-cobrix"],
+            [python_exe, str(run_script), str(config_path), "--base-path", str(run_base), "--no-cobrix"],
             cwd=str(engine_dir),
             capture_output=True,
             text=True,
@@ -264,10 +322,12 @@ def run_dataflow_test_stream(
         yield "RESULT: " + json.dumps({"error": "run_dataflow.py not found", "outputs": {}}) + "\n"
         return
 
+    python_exe = _find_python_with_pyspark(engine_dir)
+
     proc = None
     try:
         proc = subprocess.Popen(
-            [sys.executable, str(run_script), str(config_path), "--base-path", str(run_base), "--no-cobrix"],
+            [python_exe, str(run_script), str(config_path), "--base-path", str(run_base), "--no-cobrix"],
             cwd=str(engine_dir),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
