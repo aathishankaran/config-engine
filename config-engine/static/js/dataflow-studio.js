@@ -151,6 +151,20 @@
     document.getElementById('drop-hint').classList.toggle('hidden', nodes.length > 0);
   }
 
+  /* setMode is defined at module scope so it's accessible from any handler
+     (bindNodeEvents, setupCanvasEvents, setupKeyboard, setupToolbar …) */
+  function setMode(m) {
+    mode = m;
+    var selBtn = document.getElementById('tb-mode-select');
+    var conBtn = document.getElementById('tb-mode-connect');
+    if (selBtn) selBtn.classList.toggle('active', m === 'select');
+    if (conBtn) conBtn.classList.toggle('active', m === 'connect');
+    var wrap = document.getElementById('canvas-wrap');
+    if (wrap) wrap.classList.toggle('connect-mode', m === 'connect');
+    if (m !== 'connect') { connectFrom = null; hideTempConn(); }
+    updateStatus();
+  }
+
   /* ================================================================
      DEFAULT LOGIC per type
   ================================================================ */
@@ -276,8 +290,17 @@
       if (e.target.classList.contains('node-port')) return;
       e.stopPropagation();
 
+      // If a connection is in progress from another node, clicking this node body completes it
+      if (connectFrom && connectFrom !== nodeId) {
+        addConnection(connectFrom, nodeId);
+        hideTempConn();
+        setMode('select');
+        selectNode(nodeId);
+        return;
+      }
+
       if (mode === 'connect') {
-        // in connect mode, clicking the node (not a port) does nothing special
+        // in connect mode, clicking the node body (not a port) does nothing special
         return;
       }
 
@@ -301,21 +324,23 @@
       showContextMenu(e.clientX, e.clientY, nodeId);
     });
 
-    // Port events for connection
+    // Port events for connection — clicking a port always works (no mode-switch needed)
     el.querySelectorAll('.node-port').forEach(function(port) {
       port.addEventListener('mousedown', function(e) {
         e.stopPropagation();
         var portType = port.getAttribute('data-port');
-        if (mode !== 'connect') return;
 
         if (portType === 'out') {
+          // Clicking the output port starts a connection regardless of current mode
           connectFrom = nodeId;
           tempConnMouse = null;
+          if (mode !== 'connect') setMode('connect');
         } else if (portType === 'in') {
+          // Clicking the input port completes a pending connection
           if (connectFrom && connectFrom !== nodeId) {
             addConnection(connectFrom, nodeId);
-            connectFrom = null;
             hideTempConn();
+            setMode('select'); // Return to select mode after completing connection
           }
         }
       });
@@ -335,9 +360,11 @@
       if (e.target.classList.contains('node-port')) return;
       if (e.target.closest('.df-node')) return;
 
-      if (mode === 'connect') {
+      // Cancel any active connection attempt when clicking empty canvas
+      if (connectFrom || mode === 'connect') {
         connectFrom = null;
         hideTempConn();
+        setMode('select');
         return;
       }
 
@@ -384,8 +411,8 @@
         }
       }
 
-      // ── Temp connection line ─────────────────────────────────────
-      if (mode === 'connect' && connectFrom) {
+      // ── Temp connection line — draw whenever a connection is in progress ────
+      if (connectFrom) {
         var wrapRect = wrap.getBoundingClientRect();
         var mx = (e.clientX - wrapRect.left - panX) / zoom;
         var my = (e.clientY - wrapRect.top  - panY) / zoom;
@@ -402,11 +429,30 @@
         panning = null;
         wrap.classList.remove('pan-mode');
       }
-      if (mode === 'connect' && connectFrom) {
-        if (!e.target.classList.contains('node-port')) {
+      // Handle drag-to-connect: user pressed output port, dragged, then released
+      if (connectFrom) {
+        var tPort   = e.target.closest ? e.target.closest('.node-port') : null;
+        var tNodeEl = e.target.closest ? e.target.closest('.df-node')   : null;
+        var tNodeId = tNodeEl ? tNodeEl.getAttribute('data-node-id') : null;
+
+        if (tPort && tNodeId && tNodeId !== connectFrom && tPort.getAttribute('data-port') === 'in') {
+          // Released on an input port of a different node
+          addConnection(connectFrom, tNodeId);
+          hideTempConn();
+          setMode('select');
+        } else if (tNodeEl && tNodeId && tNodeId !== connectFrom && !tPort) {
+          // Released on the body of a different node
+          addConnection(connectFrom, tNodeId);
+          hideTempConn();
+          setMode('select');
+          selectNode(tNodeId);
+        } else if (!tNodeEl) {
+          // Released on empty canvas — cancel
           connectFrom = null;
           hideTempConn();
+          setMode('select');
         }
+        // (Released on same node or output-port of other node: wait for next click)
       }
     });
 
@@ -593,15 +639,96 @@
   /* ================================================================
      CONNECTIONS
   ================================================================ */
+
+  /* ── Schema → ValidateRules helpers ──────────────────────────────
+     Used to pre-populate a Validate node's rules from a source input's field schema.
+  ─────────────────────────────────────────────────────────────────── */
+  function mapTypeToValidateDtype(type) {
+    var t = (type || '').toLowerCase();
+    if (t === 'int' || t === 'integer')       return 'int';
+    if (t === 'long' || t === 'bigint')       return 'long';
+    if (t === 'double' || t === 'float')      return 'double';
+    if (t === 'decimal' || t === 'number')    return 'decimal';
+    if (t === 'date')                         return 'date';
+    if (t === 'timestamp' || t === 'datetime') return 'timestamp';
+    return 'string';
+  }
+
+  function getFieldsForAlias(alias) {
+    var a = (alias || '').trim();
+    var srcNode = nodes.find(function(n) {
+      return (n.name        || n.id           || '').trim() === a ||
+             (n.output_alias || n.step_id || n.id || '').trim() === a;
+    });
+    return srcNode && Array.isArray(srcNode.fields) ? srcNode.fields : [];
+  }
+
+  function fieldsToValidateRules(fields) {
+    return fields.map(function(f) {
+      return {
+        field:       f.name  || '',
+        data_type:   mapTypeToValidateDtype(f.type),
+        nullable:    f.nullable !== false,
+        max_length:  f.length ? String(f.length) : '',
+        format:      'any',
+        date_format: '',
+        pattern:     ''
+      };
+    });
+  }
+
+  /* Only pre-populates when rules are currently empty */
+  function tryPrePopulateValidateRules(node) {
+    if (!node || node.type !== 'validate') return;
+    if (node.validate_rules && node.validate_rules.length > 0) return;
+    var fields = [];
+    (node.source_inputs || []).some(function(alias) {
+      var f = getFieldsForAlias(alias);
+      if (f.length) { fields = f; return true; }
+      return false;
+    });
+    if (!fields.length) return;
+    node.validate_rules = fieldsToValidateRules(fields);
+  }
+
+  /* Re-render only the rules list-editor inside the open props panel */
+  function refreshValidateRulesUI(node) {
+    var ruleEditor = document.getElementById('pv-rules-editor');
+    if (!ruleEditor) return;
+    var container = ruleEditor.closest('.list-editor');
+    if (!container) return;
+    var temp = document.createElement('div');
+    temp.innerHTML = buildValidationRulesEditor('pv-rules', node.validate_rules || []);
+    container.replaceWith(temp.firstChild);
+    // Re-attach format-change listener
+    var newEditor = document.getElementById('pv-rules-editor');
+    if (newEditor) {
+      newEditor.addEventListener('change', function(e) {
+        if (e.target && e.target.classList.contains('vr-fmt')) {
+          var item  = e.target.closest('.validate-rule-item');
+          var patEl = item && item.querySelector('.vr-pattern');
+          var show  = (e.target.value === 'date' || e.target.value === 'regex');
+          if (patEl) {
+            patEl.style.display = show ? '' : 'none';
+            patEl.placeholder   = e.target.value === 'date' ? 'yyyy-MM-dd' : 'regex pattern';
+          }
+        }
+      });
+    }
+    rebindPropsApply(node);
+  }
+
   function addConnection(fromId, toId) {
     if (connections.some(function(c){ return c.from===fromId && c.to===toId; })) return;
     var id = 'conn_' + (_connCounter++);
     connections.push({ id: id, from: fromId, to: toId });
-    // Auto-populate source_inputs on target step node
+    // Auto-populate source_inputs on the target step node
     var toNode = getNode(toId);
     if (toNode && toNode.source_inputs !== undefined) {
       var srcAlias = getNodeOutputAlias(fromId);
       if (toNode.source_inputs.indexOf(srcAlias) < 0) toNode.source_inputs.push(srcAlias);
+      // Pre-populate validate rules from the source schema (only when rules are empty)
+      if (toNode.type === 'validate') tryPrePopulateValidateRules(toNode);
       if (selectedNodeId === toId) showPropsPanel(toNode);
     }
     renderConnections();
@@ -1159,7 +1286,10 @@
         formRow('On Failure', selectInput('pv-fail-mode', FAIL_MODES, node.fail_mode || 'flag')) +
       '</div>' +
       '<div class="props-section">' +
-        '<div class="props-section-title">Validation Rules</div>' +
+        '<div class="props-section-title props-section-title-row">' +
+          'Validation Rules' +
+          '<button class="btn-from-schema" id="btn-load-schema-rules" title="Pre-populate rules from source input schema">↻ From Schema</button>' +
+        '</div>' +
         buildValidationRulesEditor('pv-rules', node.validate_rules || []) +
       '</div>';
     rebindPropsApply(node);
@@ -1175,6 +1305,50 @@
           if (patEl) {
             patEl.style.display = showPat ? '' : 'none';
             patEl.placeholder = e.target.value === 'date' ? 'yyyy-MM-dd' : 'regex pattern';
+          }
+        }
+      });
+    }
+
+    /* "From Schema" button — always loads rules from the source input's field schema */
+    var btnSchema = document.getElementById('btn-load-schema-rules');
+    if (btnSchema) {
+      btnSchema.addEventListener('click', function() {
+        // Sync source_inputs from the current text in pv-src
+        var pvSrcEl = document.getElementById('pv-src');
+        if (pvSrcEl && pvSrcEl.value.trim()) {
+          node.source_inputs = pvSrcEl.value.split(',')
+            .map(function(s){ return s.trim(); }).filter(Boolean);
+        }
+        var fields = [];
+        (node.source_inputs || []).some(function(alias) {
+          var f = getFieldsForAlias(alias);
+          if (f.length) { fields = f; return true; }
+          return false;
+        });
+        if (!fields.length) {
+          toast('No schema found for the selected source input(s). Make sure the source has fields defined.', 'error');
+          return;
+        }
+        node.validate_rules = fieldsToValidateRules(fields);
+        refreshValidateRulesUI(node);
+        toast('Loaded ' + fields.length + ' rule(s) from schema.', 'success');
+      });
+    }
+
+    /* pv-src blur: auto-populate rules when source changes and rules are empty */
+    var pvSrcInput = document.getElementById('pv-src');
+    if (pvSrcInput) {
+      pvSrcInput.addEventListener('blur', function() {
+        var v = pvSrcInput.value.trim();
+        if (!v) return;
+        node.source_inputs = v.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+        // Only auto-populate when the rules editor is currently empty
+        var existingRules = document.querySelectorAll('#pv-rules-editor .validate-rule-item');
+        if (existingRules.length === 0) {
+          tryPrePopulateValidateRules(node);
+          if (node.validate_rules && node.validate_rules.length > 0) {
+            refreshValidateRulesUI(node);
           }
         }
       });
@@ -2069,16 +2243,6 @@
     document.getElementById('tb-mode-connect').addEventListener('click', function() {
       setMode('connect');
     });
-
-    function setMode(m) {
-      mode = m;
-      document.getElementById('tb-mode-select').classList.toggle('active', m==='select');
-      document.getElementById('tb-mode-connect').classList.toggle('active', m==='connect');
-      var wrap = document.getElementById('canvas-wrap');
-      wrap.classList.toggle('connect-mode', m==='connect');
-      if (m !== 'connect') { connectFrom = null; hideTempConn(); }
-      updateStatus();
-    }
 
     // Zoom
     document.getElementById('tb-zoom-in').addEventListener('click', function() {
