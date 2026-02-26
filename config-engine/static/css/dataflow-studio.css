@@ -688,10 +688,26 @@ html, body {
   gap: 8px;
   flex: 1;
 }
-.json-overlay-titlebar .dot { width: 11px; height: 11px; border-radius: 50%; }
-.json-overlay-titlebar .dot-red    { background: #ff5f57; }
-.json-overlay-titlebar .dot-yellow { background: #ffbd2e; }
-.json-overlay-titlebar .dot-green  { background: #28ca41; }
+/* Font-size zoom controls — A− size A+ */
+.json-font-size-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 4px;
+}
+.json-font-btn {
+  padding: 4px 8px !important;  /* smaller than regular btn-json-format */
+  font-size: 13px !important;
+  line-height: 1;
+}
+#json-font-size-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.70);
+  min-width: 34px;
+  text-align: center;
+  letter-spacing: 0.2px;
+}
 .json-file-label {
   color: rgba(255,255,255,0.75);
   font-size: 13px;
@@ -813,6 +829,15 @@ html, body {
 #studio-jsoneditor-container .jsoneditor-null    { color: #94a3b8; font-style: italic; }
 #studio-jsoneditor-container .jsoneditor-object,
 #studio-jsoneditor-container .jsoneditor-array   { color: #64748b; }
+
+/* Values are editable — text cursor signals that to users */
+#studio-jsoneditor-container .jsoneditor-value {
+  cursor: text;
+}
+/* Hovering a value row: subtle underline hint that it's editable */
+#studio-jsoneditor-container .jsoneditor-tree tr:hover .jsoneditor-value {
+  text-decoration: underline dotted rgba(27,58,107,0.3);
+}
 
 /* Value input highlight when being edited */
 #studio-jsoneditor-container .jsoneditor-value[contenteditable="true"]:focus {

@@ -750,13 +750,20 @@
         <!-- macOS-style title bar -->
         <div class="json-overlay-titlebar">
           <div class="json-overlay-titlebar-left">
-            <span class="dot dot-red"></span>
-            <span class="dot dot-yellow"></span>
-            <span class="dot dot-green"></span>
             <span class="json-file-label" id="json-file-label">config.json</span>
             <span class="json-readonly-badge">
               <i class="fa-solid fa-lock" style="font-size:10px"></i> Keys locked
             </span>
+          </div>
+          <!-- Font size zoom controls -->
+          <div class="json-font-size-ctrl">
+            <button class="btn-json-format json-font-btn" id="json-font-dec" title="Decrease font size (zoom out)">
+              <i class="fa-solid fa-magnifying-glass-minus"></i>
+            </button>
+            <span id="json-font-size-label">13px</span>
+            <button class="btn-json-format json-font-btn" id="json-font-inc" title="Increase font size (zoom in)">
+              <i class="fa-solid fa-magnifying-glass-plus"></i>
+            </button>
           </div>
           <button class="btn-json-apply" id="json-overlay-apply-btn">
             <i class="fa-solid fa-check"></i> Apply to Canvas
@@ -1445,9 +1452,15 @@
       enableTransform: false,
       indentation: 2,
       /* ── Key-name protection ──────────────────────────────────────
-         Allow editing VALUES only. Key names are read-only so users
-         cannot accidentally rename fields and break the dataflow job. */
+         Allow editing VALUES only (strings, numbers, booleans).
+         Key names are always read-only so users cannot accidentally
+         rename fields and break the dataflow job.
+         Object/array nodes have no inline value to edit — return
+         false for those so JSONEditor doesn't try to inline-edit them. */
       onEditable: function (node) {
+        if (node.type === 'object' || node.type === 'array') {
+          return { field: false, value: false };
+        }
         return { field: false, value: true };
       },
       onChangeJSON: function () { /* live edits tracked by editor */ },
@@ -1521,6 +1534,31 @@
   /* JSON overlay — Close (discard edits) */
   var jsonCloseBtn = $('json-overlay-close-btn');
   if (jsonCloseBtn) jsonCloseBtn.addEventListener('click', showCanvasMode);
+
+  /* ── JSON Editor font-size zoom controls ─────────────────────────
+     A− and A+ buttons let users grow/shrink the editor text so they
+     can read long values comfortably. Range: 10px – 22px, step 1px. */
+  var _jsonFontSize = 13;
+  var JSON_FONT_MIN = 10;
+  var JSON_FONT_MAX = 22;
+
+  function applyJsonFontSize(sz) {
+    _jsonFontSize = Math.min(JSON_FONT_MAX, Math.max(JSON_FONT_MIN, sz));
+    var container = $('studio-jsoneditor-container');
+    if (container) container.style.fontSize = _jsonFontSize + 'px';
+    var lbl = $('json-font-size-label');
+    if (lbl) lbl.textContent = _jsonFontSize + 'px';
+    /* Dim dec button at min, inc button at max */
+    var dec = $('json-font-dec');
+    var inc = $('json-font-inc');
+    if (dec) dec.style.opacity = (_jsonFontSize <= JSON_FONT_MIN) ? '0.35' : '';
+    if (inc) inc.style.opacity = (_jsonFontSize >= JSON_FONT_MAX) ? '0.35' : '';
+  }
+
+  var jsonFontInc = $('json-font-inc');
+  var jsonFontDec = $('json-font-dec');
+  if (jsonFontInc) jsonFontInc.addEventListener('click', function () { applyJsonFontSize(_jsonFontSize + 1); });
+  if (jsonFontDec) jsonFontDec.addEventListener('click', function () { applyJsonFontSize(_jsonFontSize - 1); });
 
   /* ══════════════════════════════
      NODE PROPERTIES DRAWER
