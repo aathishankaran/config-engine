@@ -1,0 +1,216 @@
+{
+  "input_data": {
+    "INP_6": [
+      {
+        "Record #": "1",
+        "TXN-ID (15)": "TXN20260000001",
+        "TXN-ACCT-NO (12)": "123456789001",
+        "TXN-TYPE (2)": "CR",
+        "TXN-AMT (11V99)": "00000001500.00"
+      },
+      {
+        "Record #": "2",
+        "TXN-ID (15)": "TXN20260000002",
+        "TXN-ACCT-NO (12)": "123456789001",
+        "TXN-TYPE (2)": "DR",
+        "TXN-AMT (11V99)": "00000000200.50"
+      },
+      {
+        "Record #": "3",
+        "TXN-ID (15)": "TXN20260000003",
+        "TXN-ACCT-NO (12)": "987654321099",
+        "TXN-TYPE (2)": "CR",
+        "TXN-AMT (11V99)": "00000005000.00"
+      },
+      {
+        "Record #": "4",
+        "TXN-ID (15)": "TXN20260000004",
+        "TXN-ACCT-NO (12)": "123456789001",
+        "TXN-TYPE (2)": "DR",
+        "TXN-AMT (11V99)": "00000000300.00"
+      },
+      {
+        "Record #": "5",
+        "TXN-ID (15)": "TXN20260000005",
+        "TXN-ACCT-NO (12)": "987654321099",
+        "TXN-TYPE (2)": "DR",
+        "TXN-AMT (11V99)": "00000001200.00"
+      },
+      {
+        "Record #": "6",
+        "TXN-ID (15)": "TXN20260000006",
+        "TXN-ACCT-NO (12)": "555444333211",
+        "TXN-TYPE (2)": "CR",
+        "TXN-AMT (11V99)": "00000000100.25"
+      },
+      {
+        "Record #": "7",
+        "TXN-ID (15)": "TXN20260000007",
+        "TXN-ACCT-NO (12)": "123456789001",
+        "TXN-TYPE (2)": "CR",
+        "TXN-AMT (11V99)": "00000000050.75"
+      },
+      {
+        "Record #": "8",
+        "TXN-ID (15)": "TXN20260000008",
+        "TXN-ACCT-NO (12)": "555444333211",
+        "TXN-TYPE (2)": "DR",
+        "TXN-AMT (11V99)": "00000000040.00"
+      },
+      {
+        "Record #": "9",
+        "TXN-ID (15)": "TXN20260000009",
+        "TXN-ACCT-NO (12)": "987654321099",
+        "TXN-TYPE (2)": "CR",
+        "TXN-AMT (11V99)": "00000000750.00"
+      },
+      {
+        "Record #": "10",
+        "TXN-ID (15)": "TXN20260000010",
+        "TXN-ACCT-NO (12)": "123456789001",
+        "TXN-TYPE (2)": "DR",
+        "TXN-AMT (11V99)": "00000000100.00"
+      }
+    ],
+    "TXN_IN": [
+      {
+        "Record #": "1",
+        "TXN-ID (15)": "TXN20260000001",
+        "TXN-ACCT-NO (12)": "123456789001",
+        "TXN-TYPE (2)": "CR",
+        "TXN-AMT (11V99)": "00000001500.00"
+      },
+      {
+        "Record #": "2",
+        "TXN-ID (15)": "TXN20260000002",
+        "TXN-ACCT-NO (12)": "123456789001",
+        "TXN-TYPE (2)": "DR",
+        "TXN-AMT (11V99)": "00000000200.50"
+      },
+      {
+        "Record #": "3",
+        "TXN-ID (15)": "TXN20260000003",
+        "TXN-ACCT-NO (12)": "987654321099",
+        "TXN-TYPE (2)": "CR",
+        "TXN-AMT (11V99)": "00000005000.00"
+      },
+      {
+        "Record #": "4",
+        "TXN-ID (15)": "TXN20260000004",
+        "TXN-ACCT-NO (12)": "123456789001",
+        "TXN-TYPE (2)": "DR",
+        "TXN-AMT (11V99)": "00000000300.00"
+      },
+      {
+        "Record #": "5",
+        "TXN-ID (15)": "TXN20260000005",
+        "TXN-ACCT-NO (12)": "987654321099",
+        "TXN-TYPE (2)": "DR",
+        "TXN-AMT (11V99)": "00000001200.00"
+      },
+      {
+        "Record #": "6",
+        "TXN-ID (15)": "TXN20260000006",
+        "TXN-ACCT-NO (12)": "555444333211",
+        "TXN-TYPE (2)": "CR",
+        "TXN-AMT (11V99)": "00000000100.25"
+      },
+      {
+        "Record #": "7",
+        "TXN-ID (15)": "TXN20260000007",
+        "TXN-ACCT-NO (12)": "123456789001",
+        "TXN-TYPE (2)": "CR",
+        "TXN-AMT (11V99)": "00000000050.75"
+      },
+      {
+        "Record #": "8",
+        "TXN-ID (15)": "TXN20260000008",
+        "TXN-ACCT-NO (12)": "555444333211",
+        "TXN-TYPE (2)": "DR",
+        "TXN-AMT (11V99)": "00000000040.00"
+      },
+      {
+        "Record #": "9",
+        "TXN-ID (15)": "TXN20260000009",
+        "TXN-ACCT-NO (12)": "987654321099",
+        "TXN-TYPE (2)": "CR",
+        "TXN-AMT (11V99)": "00000000750.00"
+      },
+      {
+        "Record #": "10",
+        "TXN-ID (15)": "TXN20260000010",
+        "TXN-ACCT-NO (12)": "123456789001",
+        "TXN-TYPE (2)": "DR",
+        "TXN-AMT (11V99)": "00000000100.00"
+      }
+    ]
+  },
+  "expected_output": {
+    "OUT_7": [
+      {
+        "SUM-CUST-ID": "123456789001",
+        "SUM-TOTAL-DEBIT": "0000000000600.50",
+        "SUM-TOTAL-CREDIT": "0000000001550.75",
+        "SUM-NET": "+0000000000950.25"
+      },
+      {
+        "SUM-CUST-ID": "987654321099",
+        "SUM-TOTAL-DEBIT": "0000000001200.00",
+        "SUM-TOTAL-CREDIT": "0000000005750.00",
+        "SUM-NET": "+0000000004550.00"
+      },
+      {
+        "SUM-CUST-ID": "555444333211",
+        "SUM-TOTAL-DEBIT": "0000000000040.00",
+        "SUM-TOTAL-CREDIT": "0000000000100.25",
+        "SUM-NET": "+0000000000061.25"
+      }
+    ],
+    "SUM_OUT": [
+      {
+        "SUM-CUST-ID": "123456789001",
+        "SUM-TOTAL-DEBIT": "0000000000600.50",
+        "SUM-TOTAL-CREDIT": "0000000001550.75",
+        "SUM-NET": "+0000000000950.25"
+      },
+      {
+        "SUM-CUST-ID": "987654321099",
+        "SUM-TOTAL-DEBIT": "0000000001200.00",
+        "SUM-TOTAL-CREDIT": "0000000005750.00",
+        "SUM-NET": "+0000000004550.00"
+      },
+      {
+        "SUM-CUST-ID": "555444333211",
+        "SUM-TOTAL-DEBIT": "0000000000040.00",
+        "SUM-TOTAL-CREDIT": "0000000000100.25",
+        "SUM-NET": "+0000000000061.25"
+      }
+    ]
+  },
+  "file_meta": {
+    "INP_6": {
+      "test_file": "TXNCOPY.csv",
+      "rows": 10,
+      "type": "input",
+      "copybook_file": "TXNCOPY.cpy",
+      "fields": 4
+    },
+    "OUT_7": {
+      "test_file": "SUMCOPY.csv",
+      "rows": 3,
+      "type": "output",
+      "copybook_file": "SUMCOPY.cpy",
+      "fields": 4
+    },
+    "TXN_IN": {
+      "test_file": "TXNCOPY.csv",
+      "rows": 10,
+      "type": "input"
+    },
+    "SUM_OUT": {
+      "test_file": "SUMCOPY.csv",
+      "rows": 3,
+      "type": "output"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "use_llm": false,
+  "input_output_path_prefix": "s3://migration-bucket/data",
+  "input_dataset_prefix": "file:///Users/Alagushankar/data/input",
+  "output_dataset_prefix": "file:///Users/Alagushankar/data/output",
+  "llm_base_url": "http://localhost:11434/v1",
+  "llm_model": "qwen2.5-coder:7b",
+  "llm_timeout_seconds": 900,
+  "config_dir": ""
+}

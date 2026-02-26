@@ -1,0 +1,11 @@
+{
+  "input_data": {},
+  "expected_output": {},
+  "file_meta": {
+    "ACCTIN": {
+      "copybook_file": "CUSTOMER.cbl",
+      "fields": 4,
+      "type": "input"
+    }
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "Inputs": {
+    "TXN_IN": {
+      "name": "TXN_IN",
+      "format": "csv",
+      "path": "data/input/inp_6.csv",
+      "fields": [
+        {
+          "name": "TXN-ID",
+          "type": "string",
+          "length": 15
+        },
+        {
+          "name": "TXN-ACCT-NO",
+          "type": "string",
+          "length": 12
+        },
+        {
+          "name": "TXN-TYPE",
+          "type": "string",
+          "length": 2
+        },
+        {
+          "name": "TXN-AMT",
+          "type": "double",
+          "length": 11
+        }
+      ]
+    }
+  },
+  "Outputs": {
+    "SUM_OUT": {
+      "name": "SUM_OUT",
+      "format": "parquet",
+      "path": "data/output/out_7",
+      "write_mode": "overwrite",
+      "fields": [
+        {
+          "name": "SUM-CUST-ID",
+          "type": "string"
+        },
+        {
+          "name": "SUM-TOTAL-DEBIT",
+          "type": "double"
+        },
+        {
+          "name": "SUM-TOTAL-CREDIT",
+          "type": "double"
+        },
+        {
+          "name": "SUM-NET",
+          "type": "double"
+        }
+      ]
+    }
+  },
+  "Transformations": {
+    "description": "Built with Dataflow Studio",
+    "steps": [
+      {
+        "id": "cr_dr_depit_step",
+        "description": "",
+        "type": "filter",
+        "source_inputs": [
+          "TXN_IN"
+        ],
+        "logic": {
+          "conditions": [
+            {
+              "field": "TXN-TYPE",
+              "operation": "==",
+              "value": "DR"
+            },
+            {
+              "field": "TXN-TYPE",
+              "operation": "==",
+              "value": "CR"
+            }
+          ]
+        },
+        "output_alias": "cr_dr_depit_filter"
+      },
+      {
+        "id": "agg_4",
+        "description": "",
+        "type": "aggregate",
+        "source_inputs": [
+          "cr_dr_depit_filter"
+        ],
+        "logic": {
+          "group_by": [
+            "TXN_ACCT_NO"
+          ],
+          "aggregations": [
+            {
+              "field": "TXN_AMT",
+              "operation": "sum",
+              "alias": "SUM_TOTAL_DEBIT",
+              "condition": "TXN_TYPE = 'DR'"
+            },
+            {
+              "field": "TXN_AMT",
+              "operation": "sum",
+              "alias": "SUM_TOTAL_CREDIT",
+              "condition": "TXN_TYPE = 'CR'"
+            }
+          ]
+        },
+        "output_alias": "agg_4"
+      }
+    ]
+  }
+}

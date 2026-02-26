@@ -1,0 +1,1633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Config Engine</title>
+  <script src="/static/vendor/vis-network/vis-network.min.js"></script>
+  <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css" />
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="stylesheet" href="/static/css/dataflow-studio.css">
+  <link rel="stylesheet" href="/static/vendor/jsoneditor/jsoneditor.min.css" />
+  <style>
+    /* ══════════════════════════════════════════════════════════════
+       GLOBAL RESETS
+    ══════════════════════════════════════════════════════════════ */
+    html, body { overflow: hidden; height: 100%; margin: 0; }
+    .hidden { display: none !important; }
+    /* Suppress original nav / search wrap */
+    .nav, .search-wrap { display: none !important; }
+
+    /* ══════════════════════════════════════════════════════════════
+       HEADER  — slim 48 px, USB Bank red left border
+    ══════════════════════════════════════════════════════════════ */
+    .header {
+      height: 48px;
+      min-height: 48px;
+      padding: 0 14px;
+      border-bottom: 3px solid var(--usb-red);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .header-inner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+    }
+    .logo-text { font-size: 16px; font-weight: 800; color: var(--usb-blue); letter-spacing: -0.3px; }
+    .logo-text .logo-red { color: var(--usb-red); }
+    .logo-sub { font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 2px; }
+    .header-spacer { flex: 1; }
+    #btn-settings-icon {
+      padding: 7px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      font-size: 13px;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    #btn-settings-icon:hover { background: var(--usb-blue-pale); border-color: var(--usb-blue); color: var(--usb-blue); }
+
+    /* ══════════════════════════════════════════════════════════════
+       MAIN TOOLBAR
+    ══════════════════════════════════════════════════════════════ */
+    .main-toolbar {
+      background: var(--usb-blue);
+      padding: 5px 10px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      border-bottom: 2px solid var(--usb-red);
+    }
+    .main-toolbar .tb-btn {
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .main-toolbar .tb-btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
+    .main-toolbar .tb-btn.active { background: var(--usb-red); color: #fff; border-color: var(--usb-red); }
+    .main-toolbar .tb-btn-primary { background: var(--usb-red); color: #fff; border-color: #b01f2c; }
+    .main-toolbar .tb-btn-danger  { background: rgba(207,42,54,.7); color: #fff; border-color: rgba(207,42,54,.9); }
+    .main-toolbar .tb-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.2); margin: 0 3px; flex-shrink: 0; }
+    .main-toolbar .toolbar-config-name {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 13px;
+      width: 200px;
+    }
+    .main-toolbar .toolbar-config-name:focus { outline: none; background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.5); }
+    .main-toolbar .toolbar-config-name::placeholder { color: rgba(255,255,255,0.45); }
+    .main-toolbar .toolbar-zoom-display {
+      font-size: 12px; color: rgba(255,255,255,0.8); min-width: 40px; text-align: center; font-weight: 600;
+    }
+    /* Config-specific buttons — shown by app.js */
+    #config-action-group { display: flex; align-items: center; gap: 3px; }
+
+    /* ══════════════════════════════════════════════════════════════
+       APP SHELL — fills remaining height via flex
+    ══════════════════════════════════════════════════════════════ */
+    .header       { flex-shrink: 0; }
+    .main-toolbar { flex-shrink: 0; }
+    #app-shell {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       LEFT PANEL  — configs list (340 px)
+    ══════════════════════════════════════════════════════════════ */
+    #left-panel {
+      width: 340px;
+      min-width: 340px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: width .2s ease, min-width .2s ease;
+    }
+    #left-panel.lp-collapsed { width: 0; min-width: 0; }
+
+    .lp-header {
+      padding: 12px 16px 10px;
+      border-bottom: 3px solid var(--usb-red);
+      background: var(--usb-blue);
+      flex-shrink: 0;
+    }
+    .lp-header h3 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: rgba(255,255,255,.9);
+    }
+    .lp-header p {
+      margin: 2px 0 0;
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+    }
+    .lp-search {
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      position: relative;
+    }
+    .lp-search .search-icon {
+      position: absolute;
+      left: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #94a3b8;
+      font-size: 13px;
+      pointer-events: none;
+    }
+    .lp-search-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 7px 10px 7px 30px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .lp-search-input:focus { outline: none; border-color: var(--usb-red); box-shadow: 0 0 0 3px rgba(207,42,54,0.1); }
+    .lp-search .search-results {
+      position: absolute;
+      top: calc(100% - 10px);
+      left: 10px; right: 10px;
+      z-index: 200;
+    }
+    #left-panel .config-list { flex: 1; overflow-y: auto; margin: 0; padding: 4px 0; }
+    /* Config list items — US Bank card style */
+    #left-panel .config-list-item {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.12s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      border-left: 3px solid transparent;
+    }
+    #left-panel .config-list-item:hover { background: var(--usb-blue-pale); border-left-color: var(--usb-red); color: var(--usb-blue); }
+    #left-panel .config-list-item.active { background: var(--usb-blue-pale); border-left-color: var(--usb-red); color: var(--usb-blue); font-weight: 700; }
+    #left-panel .config-list-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+
+    /* ══════════════════════════════════════════════════════════════
+       CENTER  — diagram / studio canvas
+    ══════════════════════════════════════════════════════════════ */
+    #center-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    /* Mode-bar: Studio ↔ JSON Editor toggle */
+    #center-mode-bar {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 14px;
+      background: #fff;
+      border-bottom: 2px solid var(--border);
+      flex-shrink: 0;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    #center-mode-bar h2 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--usb-blue);
+      margin: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 360px;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #center-mode-bar h2::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 18px;
+      background: var(--usb-red);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .center-mode-btn {
+      padding: 6px 16px;
+      font-size: 13px;
+      border: 1.5px solid var(--border-dark);
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      color: #64748b;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .center-mode-btn:hover { background: var(--usb-blue-pale); border-color: var(--usb-blue); color: var(--usb-blue); }
+    .center-mode-btn.active { background: var(--usb-red); color: white; border-color: var(--usb-red); font-weight: 600; }
+
+    /* Diagram view area */
+    #diagram-view-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    #diagram-view-area #diagram-container { flex: 1; }
+
+    /* Canvas view area */
+    #canvas-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      display: none;
+    }
+    #canvas-wrap.cv-active { display: flex; flex-direction: column; }
+    #canvas-wrap .studio-canvas { flex: 1; }
+
+    /* Studio status bar inside center — always visible (always in Studio mode) */
+    #studio-status-bar {
+      display: flex;
+      flex-shrink: 0;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       RIGHT PANEL  — properties (320 px)
+    ══════════════════════════════════════════════════════════════ */
+    /* .studio-props is already 320px in dataflow-studio.css */
+
+    /* ══════════════════════════════════════════════════════════════
+       TEST OVERLAY  — full-screen wizard
+    ══════════════════════════════════════════════════════════════ */
+    #test-page {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .test-overlay-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 20px;
+      background: var(--usb-blue);
+      border-bottom: 3px solid var(--usb-red);
+      flex-shrink: 0;
+    }
+    .test-overlay-header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      margin: 0;
+      flex: 1;
+    }
+    #test-page-back-btn {
+      padding: 6px 14px;
+      border: 1px solid rgba(255,255,255,.3);
+      border-radius: 5px;
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #test-page-back-btn:hover { background: rgba(255,255,255,.2); }
+
+    /* Wizard step bar */
+    .test-wizard-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      padding: 16px 24px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .wizard-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .wizard-step:hover { background: #f1f5f9; }
+    .wizard-step.ws-active { background: #eff6ff; }
+    .wizard-step.ws-done .wizard-step-num { background: #22c55e; }
+    .wizard-step-num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .wizard-step.ws-active .wizard-step-num { background: var(--usb-red); color: #fff; }
+    .wizard-step-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #64748b;
+      white-space: nowrap;
+    }
+    .wizard-step.ws-active .wizard-step-label { color: var(--usb-blue); font-weight: 600; }
+    .wizard-arrow {
+      color: #cbd5e1;
+      font-size: 16px;
+      padding: 0 4px;
+      flex-shrink: 0;
+    }
+
+    /* Hidden tab buttons — app.js binds and calls these */
+    #test-tab-controls { display: none; }
+
+    /* Test content area */
+    .test-content-area {
+      flex: 1;
+      overflow: auto;
+      padding: 24px 32px;
+    }
+    .test-panels { height: 100%; }
+    .test-panel { display: none; height: 100%; flex-direction: column; }
+    .test-panel.active { display: flex; }
+    .test-panel-title { font-size: 15px; font-weight: 700; color: var(--usb-blue); margin: 0 0 14px; }
+    .test-tables { overflow-x: auto; }
+    .test-table { font-size: 12px; border-collapse: collapse; }
+    .test-table th, .test-table td { padding: 6px 12px; border: 1px solid #e2e8f0; }
+    .test-table th { background: #f8fafc; font-weight: 600; }
+
+    /* Progress section */
+    #test-progress-section { margin-bottom: 16px; }
+
+    /* Logs */
+    .test-logs { max-height: 420px; overflow: auto; }
+
+    /* ══════════════════════════════════════════════════════════════
+       SETTINGS MODAL
+    ══════════════════════════════════════════════════════════════ */
+    #settings-page {
+      position: fixed;
+      inset: 0;
+      z-index: 600;
+      background: rgba(0,0,0,.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .settings-modal-box {
+      background: #fff;
+      border-radius: 10px;
+      width: 640px;
+      max-width: 95vw;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+    .settings-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 3px solid var(--usb-red);
+      background: var(--usb-blue);
+      flex-shrink: 0;
+    }
+    .settings-modal-header h2 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+    #settings-modal-close {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,.8);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 4px;
+    }
+    #settings-modal-close:hover { color: #fff; }
+    .settings-modal-body { flex: 1; overflow: auto; padding: 20px; }
+
+    /* ══════════════════════════════════════════════════════════════
+       PALETTE (left panel components)
+    ══════════════════════════════════════════════════════════════ */
+    /* Already defined in dataflow-studio.css */
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     HEADER — USB Bank logo + "Config Engine" + Settings gear
+     ═══════════════════════════════════════════════════════════ -->
+<header class="header">
+  <div class="header-inner">
+    <button type="button" class="btn btn-icon sidebar-toggle" id="sidebar-toggle"
+            title="Toggle config list" aria-label="Toggle config list">
+      <i class="fa-solid fa-bars"></i>
+    </button>
+    <a href="/" class="logo" style="text-decoration:none;display:flex;align-items:center;gap:10px">
+      <img src="/static/images/usbank-logo.png" class="logo-icon" alt="US Bank" />
+      <span class="logo-text">
+        <span class="logo-red">Config</span> Engine
+      </span>
+    </a>
+
+    <!-- Hidden nav anchors — app.js attaches click listeners to these -->
+    <a href="#" id="nav-configurations" aria-hidden="true" style="display:none"></a>
+    <a href="#" id="nav-import"         aria-hidden="true" style="display:none"></a>
+    <a href="#" id="nav-settings"       aria-hidden="true" style="display:none"></a>
+
+    <div class="header-spacer"></div>
+
+    <a href="/runbook" target="_blank" id="btn-runbook-link" title="Open User Runbook"
+       style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;font-size:13px;font-weight:500;color:#374151;text-decoration:none;transition:all .15s;margin-right:6px;">
+      <i class="fa-solid fa-book-open"></i> Runbook
+    </a>
+    <button type="button" id="btn-settings-icon" title="Application settings">
+      <i class="fa-solid fa-gear"></i> Settings
+    </button>
+  </div>
+</header>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN TOOLBAR
+     ═══════════════════════════════════════════════════════════ -->
+<div class="main-toolbar">
+
+  <!-- Studio file ops -->
+  <button class="tb-btn" id="tb-new" title="New canvas (Ctrl+N)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    New
+  </button>
+  <button class="tb-btn" id="tb-load" title="Load config from server">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    Load
+  </button>
+  <button class="tb-btn" id="tb-import-json" title="Import config JSON onto canvas">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    Import JSON
+  </button>
+  <button class="tb-btn tb-btn-primary" id="tb-export-json" title="Export JSON (Ctrl+E)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export JSON
+  </button>
+  <button class="tb-btn" id="tb-save" title="Save to server">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+    Save
+  </button>
+  <input class="toolbar-config-name" id="toolbar-config-name" type="text" placeholder="config-name.json" />
+
+  <div class="tb-sep"></div>
+
+  <!-- Canvas mode -->
+  <button class="tb-btn active" id="tb-mode-select" title="Select / Move (V)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><path d="M5 3l14 9-7 1-3 6z"/></svg>
+    Select
+  </button>
+  <button class="tb-btn" id="tb-mode-connect" title="Connect nodes (C)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    Connect
+  </button>
+
+  <div class="tb-sep"></div>
+
+  <!-- Zoom -->
+  <button class="tb-btn" id="tb-zoom-in" title="Zoom In (+)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+  </button>
+  <span class="toolbar-zoom-display" id="zoom-display">100%</span>
+  <button class="tb-btn" id="tb-zoom-out" title="Zoom Out (-)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+  </button>
+  <button class="tb-btn" id="tb-fit" title="Fit to view (F)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+  </button>
+  <button class="tb-btn" id="tb-auto-layout" title="Auto-arrange (A)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><line x1="12" y1="2" x2="12" y2="22"/><path d="M5 9l7-7 7 7"/><path d="M5 15l7 7 7-7"/></svg>
+  </button>
+
+  <div class="tb-sep"></div>
+
+  <!-- Config-specific actions (shown by app.js when a config is loaded) -->
+  <div id="config-action-group" style="display:flex;align-items:center;gap:3px">
+    <button type="button" class="tb-btn" id="btn-test" style="display:none" title="Test dataflow for selected config">
+      <i class="fa-solid fa-vial" style="margin-right:3px"></i>Test
+    </button>
+    <button type="button" class="tb-btn tb-btn-primary" id="btn-download-json" style="display:none" title="Download JSON">
+      <i class="fa-solid fa-download" style="margin-right:3px"></i>Download
+    </button>
+    <button type="button" class="tb-btn" id="btn-rename" style="display:none" title="Rename configuration">
+      <i class="fa-solid fa-pen-to-square" style="margin-right:3px"></i>Rename
+    </button>
+    <button type="button" class="tb-btn tb-btn-danger" id="btn-delete" style="display:none" title="Delete configuration">
+      <i class="fa-solid fa-trash-can" style="margin-right:3px"></i>Delete
+    </button>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <button class="tb-btn tb-btn-danger" id="tb-clear" title="Clear canvas">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
+    Clear
+  </button>
+
+</div><!-- /.main-toolbar -->
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     APP SHELL  — Left | Center | Right
+     ═══════════════════════════════════════════════════════════ -->
+<div id="app-shell">
+
+  <!-- ══════════════════════
+       LEFT PANEL — Configs
+       ══════════════════════ -->
+  <div id="left-panel">
+    <div class="lp-header">
+      <h3><i class="fa-solid fa-layer-group" style="margin-right:7px;font-size:11px;opacity:.8"></i>Configurations</h3>
+      <p>Select or create a dataflow config</p>
+    </div>
+    <div class="lp-search">
+      <i class="fa-solid fa-magnifying-glass search-icon"></i>
+      <input type="text" id="search-input" class="lp-search-input"
+             placeholder="Search configurations…" autocomplete="off" />
+      <div id="search-results" class="search-results"></div>
+    </div>
+    <ul id="config-list" class="config-list"></ul>
+    <!-- current-file hidden label (app.js updates this) -->
+    <span id="current-file" aria-hidden="true" style="display:none">Select a configuration</span>
+  </div>
+
+  <!-- ══════════════════════
+       CENTER — Diagram / Canvas
+       ══════════════════════ -->
+  <div id="center-area">
+
+    <!-- Mode toggle bar (revealed when a config is selected) -->
+    <div id="center-mode-bar">
+      <h2 id="center-config-title">—</h2>
+      <!-- JSON editor toggle: canvas ↔ JSON text editor -->
+      <button class="center-mode-btn active" id="btn-studio-canvas" title="Visual canvas editor">
+        <i class="fa-solid fa-diagram-project"></i> Studio
+      </button>
+      <button class="center-mode-btn" id="btn-studio-json" title="Edit raw JSON">
+        <i class="fa-solid fa-code"></i> JSON Editor
+      </button>
+    </div>
+
+    <!-- Diagram view (hidden — kept for app.js compatibility) -->
+    <div id="diagram-view-area" style="display:none;position:absolute;width:1px;height:1px;overflow:hidden;pointer-events:none;opacity:0">
+
+      <div id="diagram-container" class="diagram-container">
+
+        <div id="diagram-toolbar-layer" class="diagram-toolbar-layer">
+          <div id="diagram-toolbar" class="diagram-toolbar">
+            <div class="diagram-view-toggle" role="tablist">
+              <button type="button" class="diagram-toolbar-item diagram-toolbar-btn diagram-view-tab active"
+                      id="diagram-view-tab-diagram" data-view="diagram" role="tab" title="Diagram view">
+                <i class="fa-solid fa-diagram-project"></i> Diagram
+              </button>
+              <button type="button" class="diagram-toolbar-item diagram-toolbar-btn diagram-view-tab"
+                      id="diagram-view-tab-json" data-view="json" role="tab" title="Edit JSON">
+                <i class="fa-solid fa-code"></i> JSON
+              </button>
+            </div>
+            <button type="button" class="diagram-toolbar-item diagram-toolbar-btn" id="diagram-move-btn" title="Pan mode">
+              <i class="fa-solid fa-arrows-up-down-left-right"></i> Move
+            </button>
+            <button type="button" class="diagram-toolbar-item diagram-toolbar-btn" id="diagram-zoom-in-btn">
+              <i class="fa-solid fa-magnifying-glass-plus"></i>
+            </button>
+            <button type="button" class="diagram-toolbar-item diagram-toolbar-btn" id="diagram-zoom-out-btn">
+              <i class="fa-solid fa-magnifying-glass-minus"></i>
+            </button>
+            <button type="button" class="diagram-toolbar-item diagram-toolbar-btn" id="diagram-fit-btn" title="Fit">
+              <i class="fa-solid fa-maximize"></i> Fit
+            </button>
+            <button type="button" class="diagram-toolbar-item diagram-toolbar-btn" id="diagram-edit-btn" title="Edit mode">
+              <i class="fa-solid fa-pen-to-square"></i> Edit
+            </button>
+            <button type="button" class="diagram-toolbar-item diagram-toolbar-btn" id="diagram-hover-popups-btn">
+              <i class="fa-solid fa-hand-pointer"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="diagram-scroll-wrap diagram-view-panel" id="diagram-view-panel"
+             role="tabpanel" aria-labelledby="diagram-view-tab-diagram">
+          <div id="network"></div>
+        </div>
+
+        <div id="json-editor-wrap" class="json-editor-wrap diagram-view-panel hidden" aria-hidden="true">
+          <div class="json-editor-toolbar">
+            <span id="json-editor-status" class="json-editor-status" aria-live="polite"></span>
+          </div>
+          <div class="json-editor-toolbar-secondary">
+            <span class="json-editor-toolbar-secondary-spacer"></span>
+            <div class="json-editor-toolbar-secondary-right">
+              <button type="button" class="json-editor-toolbar-icon" id="json-editor-font-decrease"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+              <button type="button" class="json-editor-toolbar-icon" id="json-editor-font-increase"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+              <span class="json-editor-toolbar-sep"></span>
+              <button type="button" class="json-editor-toolbar-icon" id="json-editor-search-toggle"><i class="fa-solid fa-magnifying-glass"></i></button>
+              <input type="text" class="json-editor-search-input hidden" id="json-editor-search-input" placeholder="Search…" />
+              <span class="json-editor-toolbar-sep"></span>
+              <button type="button" class="btn btn-primary btn-sm json-editor-save-btn hidden" id="json-editor-apply-btn">Save</button>
+            </div>
+          </div>
+          <div class="json-editor-body">
+            <div id="json-tree-view" class="json-tree-view"></div>
+            <div id="json-viewer" class="json-viewer hidden"></div>
+            <textarea id="json-editor-text" class="json-editor-text hidden" spellcheck="false" placeholder="Full configuration JSON…"></textarea>
+          </div>
+        </div>
+
+        <div id="step-hover-popup" class="step-hover-popup hidden" aria-hidden="true">
+          <div class="step-hover-popup-inner"></div>
+        </div>
+
+      </div><!-- /#diagram-container -->
+
+      <div id="empty-state" class="empty-state">
+        <p>Select a configuration from the left panel to view its dataflow diagram.</p>
+      </div>
+
+    </div><!-- /#diagram-view-area -->
+
+    <!-- Studio / Canvas view (always visible) -->
+    <div id="canvas-wrap" class="studio-canvas-wrap cv-active">
+
+      <!-- JSON Editor Overlay (overlays canvas when active) -->
+      <div id="studio-json-overlay">
+        <!-- macOS-style title bar -->
+        <div class="json-overlay-titlebar">
+          <div class="json-overlay-titlebar-left">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+            <span class="json-file-label" id="json-file-label">config.json</span>
+          </div>
+          <button class="btn-json-apply" id="json-overlay-apply-btn">
+            <i class="fa-solid fa-check"></i> Apply to Canvas
+          </button>
+          <button class="btn-json-format" id="json-overlay-close-btn" style="margin-left:4px">
+            <i class="fa-solid fa-xmark"></i> Close
+          </button>
+        </div>
+        <!-- jsoneditor container — fills remaining height -->
+        <div id="studio-jsoneditor-container"></div>
+      </div>
+
+      <div class="studio-canvas" id="canvas">
+        <svg class="canvas-connections" id="canvas-svg" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow-default" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+              <polygon points="0 0, 7 2.5, 0 5" fill="#94a3b8"/>
+            </marker>
+            <marker id="arrow-selected" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+              <polygon points="0 0, 7 2.5, 0 5" fill="#CF2A36"/>
+            </marker>
+            <marker id="arrow-temp" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+              <polygon points="0 0, 7 2.5, 0 5" fill="#CF2A36"/>
+            </marker>
+          </defs>
+          <g id="connections-group"></g>
+          <path id="temp-connection" class="conn-temp hidden" d=""/>
+        </svg>
+        <div class="canvas-nodes" id="canvas-nodes"></div>
+        <div class="canvas-drop-hint" id="drop-hint">
+          <div class="canvas-drop-hint-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 5v14M5 12l7-7 7 7"/><path d="M5 19h14" stroke-dasharray="3 2"/>
+            </svg>
+          </div>
+          <div class="canvas-drop-hint-text">Canvas is empty</div>
+          <div class="canvas-drop-hint-sub">Use Load to open a config, or drag components from the palette in the Import panel</div>
+        </div>
+      </div>
+    </div><!-- /#canvas-view-area -->
+
+    <!-- Studio status bar (only shown in Studio mode) -->
+    <div id="studio-status-bar" class="studio-status">
+      <div class="status-item">Nodes: <b id="status-nodes">0</b></div>
+      <div class="status-item">Connections: <b id="status-conns">0</b></div>
+      <div class="status-item" id="status-mode">Mode: <b>Select</b></div>
+      <div class="status-item ml-auto">
+        <b>V</b> Select &nbsp; <b>C</b> Connect &nbsp; <b>A</b> Layout &nbsp;
+        <b>F</b> Fit &nbsp; <b>Del</b> Delete &nbsp; <b>Esc</b> Deselect
+      </div>
+    </div>
+
+  </div><!-- /#center-area -->
+
+  <!-- ══════════════════════
+       RIGHT PANEL — Component Palette only
+       (Properties slide in as a drawer when node clicked)
+       ══════════════════════ -->
+  <aside class="studio-props" id="props-panel">
+
+    <!-- Palette — always shown in right sidebar -->
+    <div id="palette-section">
+      <div class="palette-header">
+        <h3>Components</h3>
+        <p>Drag onto canvas</p>
+      </div>
+      <div class="palette-body">
+
+        <div class="palette-section-title">Data Sources</div>
+        <div class="palette-item pi-input" draggable="true" data-type="input" title="Input">
+          <div class="palette-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <ellipse cx="12" cy="5" rx="9" ry="3"/>
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+            </svg>
+          </div>
+          <div class="palette-item-info">
+            <span class="palette-item-label">Input</span>
+            <span class="palette-item-desc">CSV / Parquet / COBOL</span>
+          </div>
+        </div>
+        <div class="palette-item pi-output" draggable="true" data-type="output" title="Output">
+          <div class="palette-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </div>
+          <div class="palette-item-info">
+            <span class="palette-item-label">Output</span>
+            <span class="palette-item-desc">Parquet / CSV / COBOL</span>
+          </div>
+        </div>
+
+        <div class="palette-section-title">Transformations</div>
+        <div class="palette-item pi-select" draggable="true" data-type="select">
+          <div class="palette-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/>
+            </svg>
+          </div>
+          <div class="palette-item-info"><span class="palette-item-label">Select</span><span class="palette-item-desc">Map / compute columns</span></div>
+        </div>
+        <div class="palette-item pi-filter" draggable="true" data-type="filter">
+          <div class="palette-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+            </svg>
+          </div>
+          <div class="palette-item-info"><span class="palette-item-label">Filter</span><span class="palette-item-desc">Row conditions</span></div>
+        </div>
+        <div class="palette-item pi-join" draggable="true" data-type="join">
+          <div class="palette-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="8" cy="12" r="5"/><circle cx="16" cy="12" r="5"/>
+            </svg>
+          </div>
+          <div class="palette-item-info"><span class="palette-item-label">Join</span><span class="palette-item-desc">Merge datasets</span></div>
+        </div>
+        <div class="palette-item pi-aggregate" draggable="true" data-type="aggregate">
+          <div class="palette-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H6l6 8-6 8h12"/></svg>
+          </div>
+          <div class="palette-item-info"><span class="palette-item-label">Aggregate</span><span class="palette-item-desc">SUM / COUNT / AVG</span></div>
+        </div>
+        <div class="palette-item pi-union" draggable="true" data-type="union">
+          <div class="palette-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+              <polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+            </svg>
+          </div>
+          <div class="palette-item-info"><span class="palette-item-label">Union</span><span class="palette-item-desc">Combine rows</span></div>
+        </div>
+        <div class="palette-item pi-custom" draggable="true" data-type="custom">
+          <div class="palette-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            </svg>
+          </div>
+          <div class="palette-item-info"><span class="palette-item-label">Custom</span><span class="palette-item-desc">Raw JSON logic</span></div>
+        </div>
+
+      </div><!-- /palette-body -->
+    </div><!-- /#palette-section -->
+
+    <!-- hint to click a node -->
+    <div style="padding:16px 12px;color:#94a3b8;font-size:11px;text-align:center;border-top:1px solid var(--border);margin-top:auto">
+      <i class="fa-solid fa-hand-pointer" style="display:block;font-size:22px;margin-bottom:8px;opacity:.35"></i>
+      Click any node on the canvas to edit its properties
+    </div>
+
+  </aside><!-- /#props-panel -->
+
+</div><!-- /#app-shell -->
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     NODE PROPERTIES DRAWER
+     Slides in from the right when a canvas node is clicked.
+     dataflow-studio.js adds/removes .drawer-open.
+     ═══════════════════════════════════════════════════════════ -->
+<div id="node-props-drawer">
+  <div class="drawer-header">
+    <div class="drawer-header-left">
+      <span id="props-title" class="drawer-title">Properties</span>
+      <span id="props-type-badge" class="props-type-badge"></span>
+    </div>
+    <button type="button" id="drawer-close-btn" class="drawer-close-btn" title="Close">&times;</button>
+  </div>
+  <div class="drawer-body" id="props-body">
+    <!-- content injected by showPropsPanel() in dataflow-studio.js -->
+  </div>
+  <div class="drawer-footer">
+    <button type="button" class="btn btn-danger" id="prop-delete-btn">
+      <i class="fa-solid fa-trash-can" style="margin-right:4px"></i>Delete
+    </button>
+    <button type="button" class="btn btn-primary" id="prop-apply-btn">
+      <i class="fa-solid fa-check" style="margin-right:4px"></i>Apply
+    </button>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     TEST OVERLAY  — full-screen wizard (#test-page)
+     app.js calls testPage.classList.remove('hidden') to open.
+     ═══════════════════════════════════════════════════════════ -->
+<div id="test-page" class="hidden">
+
+  <div class="test-overlay-header">
+    <button type="button" id="test-page-back-btn">
+      <i class="fa-solid fa-arrow-left"></i> Close
+    </button>
+    <h1>Testing &mdash; <span id="test-page-config-name" style="font-weight:400;font-style:italic;"></span></h1>
+  </div>
+
+  <!-- Wizard step bar -->
+  <div class="test-wizard-bar">
+    <div class="wizard-step ws-active" data-target="input" id="ws-input">
+      <div class="wizard-step-num">1</div>
+      <div class="wizard-step-label">Input Datasets</div>
+    </div>
+    <i class="fa-solid fa-chevron-right wizard-arrow"></i>
+    <div class="wizard-step" data-target="logs" id="ws-logs">
+      <div class="wizard-step-num">2</div>
+      <div class="wizard-step-label">Running Logs</div>
+    </div>
+    <i class="fa-solid fa-chevron-right wizard-arrow"></i>
+    <div class="wizard-step" data-target="output" id="ws-output">
+      <div class="wizard-step-num">3</div>
+      <div class="wizard-step-label">Generated Output</div>
+    </div>
+    <i class="fa-solid fa-chevron-right wizard-arrow"></i>
+    <div class="wizard-step" data-target="reconciliation" id="ws-reconciliation">
+      <div class="wizard-step-num">4</div>
+      <div class="wizard-step-label">Reconciliation</div>
+    </div>
+  </div>
+
+  <!-- Hidden tab controls (app.js binds click listeners to these) -->
+  <div id="test-tab-controls">
+    <button class="test-tab active" data-tab="input"          id="test-tab-input"          aria-selected="true"></button>
+    <button class="test-tab"        data-tab="logs"           id="test-tab-logs"           aria-selected="false"></button>
+    <button class="test-tab"        data-tab="output"         id="test-tab-output"         aria-selected="false"></button>
+    <button class="test-tab"        data-tab="reconciliation" id="test-tab-reconciliation" aria-selected="false"></button>
+  </div>
+
+  <!-- Content -->
+  <div class="test-content-area">
+    <div class="test-panels">
+
+      <!-- Step 1 — Input Datasets -->
+      <div id="test-panel-input" class="test-panel active" role="tabpanel">
+        <div class="test-section hidden" id="test-progress-section">
+          <div class="test-progress-bar"><div class="test-progress-fill" id="test-progress-fill"></div></div>
+          <p id="test-progress-text" class="test-progress-text">Generating sample data...</p>
+        </div>
+        <div class="test-section" id="test-source-section">
+          <h3 class="test-panel-title" id="test-input-panel-title">Input Datasets</h3>
+          <p style="font-size:12px;color:#64748b;margin-bottom:16px">
+            Review the sample input data below, then click <strong>Run Dataflow</strong> to execute the transformation pipeline.
+          </p>
+          <div id="test-source-tables" class="test-tables"></div>
+          <div style="margin-top:20px">
+            <button type="button" class="btn btn-primary" id="btn-run-dataflow" style="padding:10px 28px;font-size:14px">
+              <i class="fa-solid fa-play" style="margin-right:6px"></i>Run Dataflow →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2 — Running Logs -->
+      <div id="test-panel-logs" class="test-panel hidden" role="tabpanel">
+        <div class="test-logs-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <h3 class="test-panel-title" style="margin:0">Running Logs</h3>
+          <button type="button" class="btn btn-outline" id="test-logs-copy-btn" title="Copy logs">
+            <i class="fa-solid fa-copy"></i> Copy
+          </button>
+        </div>
+        <div class="test-logs-wrap">
+          <pre id="test-logs" class="test-logs" data-raw=""></pre>
+          <div class="test-logs-progress hidden" id="test-logs-progress" aria-live="polite">
+            <span class="test-logs-progress-label">Dataflow job is running…</span>
+            <span class="test-logs-progress-bar"></span>
+          </div>
+        </div>
+        <div class="test-logs-output-cta hidden" id="test-logs-output-cta" style="margin-top:16px">
+          <button type="button" class="btn btn-primary" id="btn-show-output" style="padding:10px 28px;font-size:14px">
+            <i class="fa-solid fa-table" style="margin-right:6px"></i>View Generated Output →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3 — Output -->
+      <div id="test-panel-output" class="test-panel hidden" role="tabpanel">
+        <h3 class="test-panel-title">Generated Output</h3>
+        <div id="test-output-tables" class="test-tables">
+          <p class="test-output-placeholder" style="color:#64748b;font-size:13px">
+            Run the dataflow from Step 1; results appear here.
+          </p>
+        </div>
+        <div class="test-output-recon-cta hidden" id="test-output-recon-cta" style="margin-top:16px">
+          <p style="color:#64748b;font-size:12px;margin-bottom:10px">Compare the generated output with your expected results.</p>
+          <button type="button" class="btn btn-primary" id="btn-show-reconciliation-output" style="padding:10px 28px;font-size:14px">
+            <i class="fa-solid fa-code-compare" style="margin-right:6px"></i>Compare Results (Reconciliation) →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 4 — Reconciliation -->
+      <div id="test-panel-reconciliation" class="test-panel hidden" role="tabpanel">
+        <h3 class="test-panel-title">Reconciliation</h3>
+        <p style="font-size:12px;color:#64748b;margin-bottom:16px">
+          Comparing <strong>actual output</strong> (from your expected output files) with
+          <strong>generated output</strong> (from the dataflow run).
+        </p>
+        <div id="test-reconciliation-content" class="test-reconciliation-content"></div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /#test-page -->
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SETTINGS MODAL  (#settings-page)
+     app.js calls settingsPage.classList.remove('hidden') to show.
+     ═══════════════════════════════════════════════════════════ -->
+<div id="settings-page" class="hidden">
+  <div class="settings-modal-box">
+    <div class="settings-modal-header">
+      <h2><i class="fa-solid fa-gear" style="margin-right:8px"></i>Application Settings</h2>
+      <button type="button" id="settings-modal-close">&times;</button>
+    </div>
+    <div class="settings-modal-body">
+      <p class="import-hint" style="margin-bottom:16px">Settings are stored in <code>config/settings.json</code> on the server.</p>
+      <form id="settings-form" class="settings-form">
+        <section class="settings-section settings-section-mainframe">
+          <h2 class="settings-section-title">Mainframe parsing</h2>
+          <div class="settings-mainframe-row">
+            <div class="settings-llm-toggle">
+              <label class="settings-row">
+                <span class="settings-label">Use LLM for parsing</span>
+                <input type="checkbox" id="settings-use-llm" />
+                <span class="settings-hint">When enabled, COBOL import uses the LLM to generate config.</span>
+              </label>
+            </div>
+            <div id="settings-llm-panel" class="settings-llm-panel hidden">
+              <h3 class="settings-llm-panel-title">LLM configuration</h3>
+              <label class="settings-row settings-row-input">
+                <span class="settings-label">LLM API base URL</span>
+                <input type="text" id="settings-llm-base-url" placeholder="http://localhost:11434/v1" class="settings-input" />
+                <span class="settings-hint">e.g. http://localhost:11434/v1 for Ollama</span>
+              </label>
+              <label class="settings-row settings-row-input">
+                <span class="settings-label">LLM model</span>
+                <input type="text" id="settings-llm-model" placeholder="llama3.2:1b or phi3" class="settings-input" />
+              </label>
+              <label class="settings-row settings-row-input">
+                <span class="settings-label">LLM timeout (seconds)</span>
+                <input type="number" id="settings-llm-timeout" min="60" max="3600" step="30" placeholder="600" class="settings-input" />
+                <span class="settings-hint">60–3600. Use 600+ for slow local models.</span>
+              </label>
+            </div>
+          </div>
+        </section>
+        <section class="settings-section">
+          <h2 class="settings-section-title">Dataset paths</h2>
+          <label class="settings-row settings-row-input">
+            <span class="settings-label">Input dataset prefix</span>
+            <input type="text" id="settings-input-dataset-prefix" placeholder="file:///tmp/config-engine/input" class="settings-input" />
+          </label>
+          <label class="settings-row settings-row-input">
+            <span class="settings-label">Output dataset prefix</span>
+            <input type="text" id="settings-output-dataset-prefix" placeholder="file:///tmp/config-engine/output" class="settings-input" />
+          </label>
+          <label class="settings-row settings-row-input">
+            <span class="settings-label">Legacy single prefix</span>
+            <input type="text" id="settings-input-output-path-prefix" placeholder="s3://my-bucket/data" class="settings-input" />
+            <span class="settings-hint">Used only when the two prefixes above are empty.</span>
+          </label>
+        </section>
+        <section class="settings-section">
+          <h2 class="settings-section-title">Other</h2>
+          <label class="settings-row settings-row-input">
+            <span class="settings-label">Config directory override</span>
+            <input type="text" id="settings-config-dir" placeholder="(optional) path to config JSON folder" class="settings-input" />
+            <span class="settings-hint">Leave empty to use default <code>configs/</code>.</span>
+          </label>
+        </section>
+        <div class="settings-actions">
+          <button type="submit" class="btn btn-primary">Save settings</button>
+          <span id="settings-message" class="import-message"></span>
+        </div>
+      </form>
+    </div>
+  </div>
+</div><!-- /#settings-page -->
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     HIDDEN LEGACY ELEMENTS — app.js hooks these IDs; keep them
+     invisible so no JS errors are thrown.
+     ═══════════════════════════════════════════════════════════ -->
+<div style="display:none" aria-hidden="true">
+  <input type="file" id="zip-file" accept=".zip" />
+  <input type="text"  id="import-config-name" />
+  <button id="btn-import-zip">Generate Config</button>
+  <div id="import-message"></div>
+  <pre  id="import-logs" data-raw=""></pre>
+  <div id="import-logs-progress"></div>
+  <span id="import-logs-timer"></span>
+  <p   id="import-parsing-mode"></p>
+  <select id="existing-config-select"></select>
+  <div id="selected-config-info"></div>
+  <div id="config-inputs-content"></div>
+  <div id="config-outputs-content"></div>
+  <div id="file-upload-section"></div>
+  <div id="start-testing-container"><button id="btn-start-testing"></button></div>
+  <input type="file" id="import-json-file" accept=".json" />
+  <input type="text"  id="import-json-name" />
+  <button id="btn-import-json-file"></button>
+  <div id="import-json-message"></div>
+  <div id="import-json-validation"></div>
+  <textarea id="import-json-paste"></textarea>
+  <input type="text" id="import-json-paste-name" />
+  <button id="btn-save-paste-json"></button>
+  <div id="import-paste-message"></div>
+  <div id="import-paste-validation"></div>
+  <button id="import-logs-copy-btn"></button>
+  <a href="#" id="import-link-settings"></a>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     COMPATIBILITY SHELLS
+     app.js manipulates classList on #layout and #import-page;
+     they are kept as invisible empty divs.
+     ═══════════════════════════════════════════════════════════ -->
+<div id="layout"      style="display:none" aria-hidden="true"></div>
+<div id="import-page" style="display:none" aria-hidden="true"></div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     DETAIL DRAWER — step / I/O popup
+     ═══════════════════════════════════════════════════════════ -->
+<div id="detail-drawer" class="detail-drawer">
+  <div class="detail-drawer-backdrop" id="detail-drawer-backdrop"></div>
+  <div class="detail-drawer-panel">
+    <div class="detail-drawer-header">
+      <h2 id="logic-modal-title">Details</h2>
+      <button type="button" class="detail-drawer-close" id="logic-modal-close">&times;</button>
+    </div>
+    <div class="detail-drawer-body">
+      <div id="logic-view-step" class="logic-view">
+        <div class="view-row"><span class="view-label">ID</span><span class="view-value" id="logic-view-id"></span></div>
+        <div class="view-row"><span class="view-label">Description</span><span class="view-value" id="logic-view-description"></span></div>
+        <div class="view-row"><span class="view-label">Type</span><span class="view-value" id="logic-view-type"></span></div>
+        <div class="view-row"><span class="view-label">Source inputs</span><span class="view-value" id="logic-view-source-inputs"></span></div>
+        <div class="view-row"><span class="view-label">Output alias</span><span class="view-value" id="logic-view-output-alias"></span></div>
+        <div class="view-row view-row-block logic-section">
+          <span class="view-label">Logic</span>
+          <div class="view-value logic-section-right">
+            <div class="logic-tabs" role="tablist">
+              <button type="button" class="logic-tab" id="logic-toggle-visual" data-logic-tab="visual">Visual</button>
+              <button type="button" class="logic-tab active" id="logic-toggle-kv" data-logic-tab="kv">Key-Value</button>
+              <button type="button" class="logic-tab" id="logic-toggle-json" data-logic-tab="json">Complete JSON</button>
+            </div>
+            <div id="logic-view-logic-visual-wrap" class="logic-content-panel hidden">
+              <div id="logic-view-logic-visual" class="logic-visual-panel"></div>
+            </div>
+            <div id="logic-view-logic-wrap" class="logic-content-panel">
+              <div class="logic-kv-list" id="logic-view-logic"></div>
+            </div>
+            <div id="logic-view-logic-json-wrap" class="logic-content-panel hidden">
+              <pre id="logic-view-logic-json" class="logic-json-pre"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="logic-view-io" class="logic-view" style="display:none;">
+        <div class="view-row"><span class="view-label">Summary</span><span class="view-value view-tags-wrap" id="logic-view-io-tags"></span></div>
+        <div class="view-row view-row-block">
+          <span class="view-label">Schema</span>
+          <div class="view-value logic-io-schema-wrap">
+            <div id="logic-view-io-schema-table" class="schema-table-wrap"></div>
+            <p id="logic-view-io-schema-empty" class="schema-empty hidden">No schema fields defined.</p>
+          </div>
+        </div>
+        <div class="view-row view-row-block">
+          <span class="view-label">Details</span>
+          <pre class="view-value view-logic" id="logic-view-io-body"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     STEP EDIT PANEL
+     ═══════════════════════════════════════════════════════════ -->
+<div id="step-edit-panel" class="step-edit-panel">
+  <div class="step-edit-panel-backdrop" id="step-edit-panel-backdrop"></div>
+  <div class="step-edit-panel-drawer">
+    <div class="step-edit-panel-header">
+      <h2>Edit transformation</h2>
+      <button type="button" class="step-edit-panel-close" id="step-edit-panel-close">&times;</button>
+    </div>
+    <div class="step-edit-panel-body">
+      <div class="form-group"><label>ID</label><input type="text" id="edit-id" /></div>
+      <div class="form-group"><label>Description</label><input type="text" id="edit-description" /></div>
+      <div class="form-group">
+        <label>Type</label>
+        <select id="edit-type">
+          <option value="filter">filter</option><option value="join">join</option>
+          <option value="aggregate">aggregate</option><option value="select">select</option>
+          <option value="union">union</option><option value="custom">custom</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Logic (JSON)</label><textarea id="edit-logic" rows="10"></textarea></div>
+      <div class="form-group">
+        <label>Source inputs (comma-separated)</label>
+        <input type="text" id="edit-source-inputs" placeholder="e.g. CUSTOMER, joined_data" />
+      </div>
+      <div class="form-group"><label>Output alias</label><input type="text" id="edit-output-alias" /></div>
+      <div class="step-edit-panel-actions">
+        <button type="button" class="btn btn-danger" id="edit-delete">Delete step</button>
+        <button type="button" class="btn btn-primary" id="edit-save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     APP MODALS
+     ═══════════════════════════════════════════════════════════ -->
+<div id="rename-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header"><h2>Rename configuration</h2><button type="button" class="modal-close" id="rename-modal-close">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label for="rename-input">New name</label><input type="text" id="rename-input" placeholder="e.g. my_flow.json" /></div>
+      <div class="modal-actions"><button type="button" class="btn btn-outline" id="rename-cancel">Cancel</button><button type="button" class="btn btn-primary" id="rename-submit">Rename</button></div>
+    </div>
+  </div>
+</div>
+<div id="delete-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header"><h2>Delete configuration</h2><button type="button" class="modal-close" id="delete-modal-close">&times;</button></div>
+    <div class="modal-body">
+      <p id="delete-message" class="delete-message">Delete this file? This cannot be undone.</p>
+      <div class="modal-actions"><button type="button" class="btn btn-outline" id="delete-cancel">Cancel</button><button type="button" class="btn btn-danger" id="delete-confirm">Delete</button></div>
+    </div>
+  </div>
+</div>
+<div id="overwrite-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header"><h2>Overwrite configuration?</h2><button type="button" class="modal-close" id="overwrite-modal-close">&times;</button></div>
+    <div class="modal-body">
+      <p id="overwrite-message" class="overwrite-message">A configuration with this name already exists. Overwrite?</p>
+      <div class="modal-actions"><button type="button" class="btn btn-outline" id="overwrite-cancel">Cancel</button><button type="button" class="btn btn-primary" id="overwrite-confirm">Overwrite</button></div>
+    </div>
+  </div>
+</div>
+<div id="message-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header message-modal-header" id="message-modal-header"><h2 id="message-modal-title">Message</h2><button type="button" class="modal-close" id="message-modal-close">&times;</button></div>
+    <div class="modal-body">
+      <p id="message-modal-body" class="message-modal-body"></p>
+      <div class="modal-actions"><button type="button" class="btn btn-primary" id="message-modal-close-btn">OK</button></div>
+    </div>
+  </div>
+</div>
+<div id="error-modal" class="modal">
+  <div class="modal-content modal-wide">
+    <div class="modal-header error-modal-header"><h2 id="error-modal-title">Error</h2><button type="button" class="modal-close" id="error-modal-close">&times;</button></div>
+    <div class="modal-body">
+      <p id="error-modal-message" class="error-modal-message"></p>
+      <pre id="error-modal-details" class="error-modal-details"></pre>
+      <div class="modal-actions"><button type="button" class="btn btn-primary" id="error-modal-close-btn">Close</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     STUDIO MODALS — right-click, export, import, load
+     ═══════════════════════════════════════════════════════════ -->
+<div class="ctx-menu hidden" id="ctx-menu">
+  <div class="ctx-item" id="ctx-edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit Properties</div>
+  <div class="ctx-item" id="ctx-duplicate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Duplicate</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" id="ctx-delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>Delete Node</div>
+</div>
+
+<div class="modal-overlay hidden" id="export-modal">
+  <div class="modal-box modal-wide">
+    <div class="modal-head"><h2>Dataflow Configuration JSON</h2><button class="modal-close-btn" data-modal="export-modal">&times;</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#64748b;margin-bottom:12px">Copy this JSON to use with the <strong>dataflow-engine</strong>.</p>
+      <pre class="json-output" id="export-json-output"></pre>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="export-copy-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
+      <button class="btn btn-outline" id="export-download-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download .json</button>
+      <button class="btn btn-primary" data-modal="export-modal">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="import-modal">
+  <div class="modal-box">
+    <div class="modal-head"><h2>Import Config JSON onto Canvas</h2><button class="modal-close-btn" data-modal="import-modal">&times;</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#64748b;margin-bottom:14px">Paste a config JSON or upload a <code>.json</code> file to load it onto the canvas.</p>
+      <div class="form-row"><label>Upload File</label><input type="file" id="import-file-input" accept=".json" style="width:100%;font-size:12px" /></div>
+      <div class="form-row"><label>Or Paste JSON</label><textarea id="import-json-text" rows="10" placeholder='{"Inputs": {}, "Outputs": {}, "Transformations": {"steps": []}}'></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-modal="import-modal">Cancel</button>
+      <button class="btn btn-primary" id="import-apply-btn">Load onto Canvas</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="load-modal">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head"><h2>Load Configuration</h2><button class="modal-close-btn" data-modal="load-modal">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>Select a saved configuration</label>
+        <select id="load-config-select" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px">
+          <option value="">-- Select a config --</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-modal="load-modal">Cancel</button>
+      <button class="btn btn-primary" id="load-apply-btn">Load</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCRIPTS
+     ═══════════════════════════════════════════════════════════ -->
+<script src="/static/vendor/jsoneditor/jsoneditor.min.js"></script>
+<script src="/static/js/api.js"></script>
+<script src="/static/js/utils.js"></script>
+<script src="/static/js/logic-view.js"></script>
+<script src="/static/js/diagram.js"></script>
+<script src="/static/js/dataflow-studio.js"></script>
+<script src="/static/app.js"></script>
+
+<!-- ═══════════════════════════════════════════════════════════
+     INTEGRATION SCRIPT  — unified Studio-only view
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  /* ── helpers ── */
+  function $(id) { return document.getElementById(id); }
+
+  /* ── element refs ── */
+  var currentFileEl   = $('current-file');
+  var centerModeBar   = $('center-mode-bar');
+  var centerTitle     = $('center-config-title');
+  var canvasViewArea  = $('canvas-wrap');
+  var studioStatusBar = $('studio-status-bar');
+  var testPage        = $('test-page');
+  var settingsPage    = $('settings-page');
+  var leftPanel       = $('left-panel');
+  var nodePropsDrawer = $('node-props-drawer');
+  var jsonOverlay     = $('studio-json-overlay');
+  var btnStudioCanvas = $('btn-studio-canvas');
+  var btnStudioJson   = $('btn-studio-json');
+
+  /* ══════════════════════════════
+     CANVAS is always the active view.
+     Center-mode-bar hides until a config is selected.
+     ══════════════════════════════ */
+
+  /* ══════════════════════════════
+     STUDIO JSON EDITOR  (jsoneditor library — tree mode)
+     ══════════════════════════════ */
+
+  var _studioEditor = null; // JSONEditor instance
+
+  function initStudioEditor() {
+    var container = $('studio-jsoneditor-container');
+    if (!container || _studioEditor) return;
+    if (typeof JSONEditor === 'undefined') return;
+
+    _studioEditor = new JSONEditor(container, {
+      mode: 'tree',
+      modes: ['tree', 'code'],        // allow switching to raw code view
+      search: true,
+      enableSort: false,
+      enableTransform: false,
+      indentation: 2,
+      onChangeJSON: function () { /* live edits tracked by editor */ },
+      onError: function (err) { console.warn('[JSONEditor]', err); }
+    });
+  }
+
+  /* ── Canvas ↔ JSON Editor toggle ── */
+  function showCanvasMode() {
+    if (jsonOverlay)     jsonOverlay.classList.remove('json-active');
+    if (btnStudioCanvas) btnStudioCanvas.classList.add('active');
+    if (btnStudioJson)   btnStudioJson.classList.remove('active');
+    setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 50);
+  }
+
+  function showJsonMode() {
+    /* Snapshot current canvas state */
+    var cfg = null;
+    if (window.studioGetJson) {
+      try { cfg = JSON.parse(JSON.stringify(window.studioGetJson())); } catch (e) { cfg = {}; }
+    }
+
+    /* Update file label */
+    var cfgName = (currentFileEl ? currentFileEl.textContent.trim() : '') || 'config.json';
+    var fileLabel = $('json-file-label');
+    if (fileLabel) fileLabel.textContent = cfgName;
+
+    if (jsonOverlay)     jsonOverlay.classList.add('json-active');
+    if (btnStudioCanvas) btnStudioCanvas.classList.remove('active');
+    if (btnStudioJson)   btnStudioJson.classList.add('active');
+
+    /* Init editor on first use, then set JSON */
+    if (!_studioEditor) initStudioEditor();
+    if (_studioEditor && cfg !== null) {
+      try { _studioEditor.set(cfg); } catch (e) { console.warn('[JSONEditor] set error', e); }
+    }
+  }
+
+  if (btnStudioCanvas) btnStudioCanvas.addEventListener('click', showCanvasMode);
+  if (btnStudioJson)   btnStudioJson.addEventListener('click', showJsonMode);
+
+  /* JSON overlay — Apply to Canvas */
+  var jsonApplyBtn = $('json-overlay-apply-btn');
+  if (jsonApplyBtn) jsonApplyBtn.addEventListener('click', function () {
+    var cfg = null;
+    if (_studioEditor) {
+      try { cfg = _studioEditor.get(); } catch (e) {
+        if (window.CodeParser && window.CodeParser.showErrorPopup) {
+          window.CodeParser.showErrorPopup('Invalid JSON', 'Fix JSON errors before applying.', String(e));
+        }
+        return;
+      }
+    }
+    if (!cfg) return;
+    if (window.studioLoadConfig) window.studioLoadConfig(cfg);
+    showCanvasMode();
+    /* Auto-save to server */
+    var nameInput = $('toolbar-config-name');
+    var saveName = nameInput ? nameInput.value.trim() : '';
+    if (!saveName) saveName = (currentFileEl ? currentFileEl.textContent.trim() : '');
+    if (saveName && window.CodeParser && window.CodeParser.API) {
+      if (!saveName.toLowerCase().endsWith('.json')) saveName += '.json';
+      window.CodeParser.API.saveConfig(saveName, cfg).then(function (res) {
+        if (!res || !res.error) {
+          if (typeof window.refreshConfigList === 'function') window.refreshConfigList();
+        }
+      }).catch(function () {});
+    }
+  });
+
+  /* JSON overlay — Close (discard edits) */
+  var jsonCloseBtn = $('json-overlay-close-btn');
+  if (jsonCloseBtn) jsonCloseBtn.addEventListener('click', showCanvasMode);
+
+  /* ══════════════════════════════
+     NODE PROPERTIES DRAWER
+     ══════════════════════════════ */
+  var drawerCloseBtn = $('drawer-close-btn');
+  if (drawerCloseBtn) drawerCloseBtn.addEventListener('click', function () {
+    if (nodePropsDrawer) nodePropsDrawer.classList.remove('drawer-open');
+    if (window.studioShowEmpty) window.studioShowEmpty();
+  });
+
+  /* ══════════════════════════════
+     MutationObserver on #current-file
+     Auto-loads the selected config onto the canvas.
+     ══════════════════════════════ */
+  var _lastLoadedCfg = '';
+
+  function syncConfigState() {
+    if (!currentFileEl) return;
+    var name   = currentFileEl.textContent.trim();
+    var hasCfg = name !== '' && name !== 'Select a configuration';
+
+    /* Update title bar */
+    if (centerTitle) centerTitle.textContent = hasCfg ? name : '—';
+
+    /* Show / hide mode-bar */
+    if (centerModeBar) centerModeBar.style.display = hasCfg ? 'flex' : 'none';
+
+    /* Sync test-page config name */
+    var tpName = $('test-page-config-name');
+    if (tpName) tpName.textContent = hasCfg ? name : '';
+
+    /* Pre-fill toolbar config-name box */
+    var cnInput = $('toolbar-config-name');
+    if (hasCfg && cnInput && !cnInput.value) cnInput.value = name;
+
+    /* Auto-load config into canvas (skip if same config already loaded) */
+    if (hasCfg && name !== _lastLoadedCfg) {
+      _lastLoadedCfg = name;
+      fetch('/api/config/' + encodeURIComponent(name))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (cfg) {
+          if (cfg && window.studioLoadConfig) window.studioLoadConfig(cfg);
+        })
+        .catch(function () {});
+    }
+  }
+
+  if (currentFileEl) {
+    new MutationObserver(syncConfigState).observe(
+      currentFileEl, { childList: true, subtree: true, characterData: true }
+    );
+  }
+
+  /* ══════════════════════════════
+     SIDEBAR TOGGLE — collapse left panel
+     ══════════════════════════════ */
+  var sidebarToggle = $('sidebar-toggle');
+  if (sidebarToggle) sidebarToggle.addEventListener('click', function () {
+    if (leftPanel) leftPanel.classList.toggle('lp-collapsed');
+  });
+
+  /* ══════════════════════════════
+     TEST OVERLAY
+     ══════════════════════════════ */
+  var testPageBackBtn = $('test-page-back-btn');
+  if (testPageBackBtn) testPageBackBtn.addEventListener('click', function () {
+    if (testPage) testPage.classList.add('hidden');
+  });
+
+  /* Sync wizard step indicator */
+  function syncWizardStep(tabId) {
+    ['input','logs','output','reconciliation'].forEach(function (t) {
+      var ws = $('ws-' + t);
+      if (ws) ws.classList.toggle('ws-active', t === tabId);
+    });
+  }
+
+  ['input','logs','output','reconciliation'].forEach(function (t) {
+    var ws  = $('ws-' + t);
+    var tab = $('test-tab-' + t);
+    if (ws && tab) {
+      ws.addEventListener('click', function () { tab.click(); syncWizardStep(t); });
+    }
+    if (tab) {
+      new MutationObserver(function () {
+        if (tab.classList.contains('active')) syncWizardStep(t);
+      }).observe(tab, { attributes: true, attributeFilter: ['class'] });
+    }
+  });
+
+  /* ══════════════════════════════
+     SETTINGS MODAL
+     (btn-test is handled by app.js → showTest() → loadTestSampleData())
+     ══════════════════════════════ */
+  var btnSettingsIcon = $('btn-settings-icon');
+  if (btnSettingsIcon) btnSettingsIcon.addEventListener('click', function () {
+    if (settingsPage) settingsPage.classList.remove('hidden');
+  });
+
+  var settingsModalClose = $('settings-modal-close');
+  if (settingsModalClose) settingsModalClose.addEventListener('click', function () {
+    if (settingsPage) settingsPage.classList.add('hidden');
+  });
+
+  if (settingsPage) {
+    settingsPage.addEventListener('click', function (e) {
+      if (e.target === settingsPage) settingsPage.classList.add('hidden');
+    });
+  }
+
+  var navSettings = $('nav-settings');
+  if (navSettings) navSettings.addEventListener('click', function () {
+    if (settingsPage) settingsPage.classList.remove('hidden');
+  });
+
+  /* nav-import (app.js may fire this) → open settings instead */
+  var navImport = $('nav-import');
+  if (navImport) navImport.addEventListener('click', function () {
+    if (settingsPage) settingsPage.classList.remove('hidden');
+  });
+
+  /* ══════════════════════════════
+     OVERRIDE window-exposed navigation (app.js sets these)
+     ══════════════════════════════ */
+  setTimeout(function () {
+    window.showConfigurationsView = function () {
+      if (testPage)     testPage.classList.add('hidden');
+      if (settingsPage) settingsPage.classList.add('hidden');
+      showCanvasMode();
+    };
+    window.showTestPage = function () {
+      if (testPage) testPage.classList.remove('hidden');
+    };
+  }, 0);
+
+  /* ══════════════════════════════
+     KEYBOARD — Esc closes overlays (inner-to-outer priority)
+     ══════════════════════════════ */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (nodePropsDrawer && nodePropsDrawer.classList.contains('drawer-open')) {
+      nodePropsDrawer.classList.remove('drawer-open');
+      if (window.studioShowEmpty) window.studioShowEmpty();
+      return;
+    }
+    if (jsonOverlay && jsonOverlay.classList.contains('json-active')) {
+      showCanvasMode(); return;
+    }
+    if (testPage     && !testPage.classList.contains('hidden'))         { testPage.classList.add('hidden');     return; }
+    if (settingsPage && !settingsPage.classList.contains('hidden'))     { settingsPage.classList.add('hidden'); return; }
+  });
+
+  /* Clean up stale localStorage */
+  localStorage.removeItem('parser-engine-page');
+  localStorage.removeItem('parser-engine-sidebar-collapsed');
+
+})();
+</script>
+
+</body>
+</html>
