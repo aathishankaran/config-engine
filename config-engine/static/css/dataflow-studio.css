@@ -1667,3 +1667,62 @@ html, body {
   background: var(--usb-blue-pale);
   color: var(--usb-blue);
 }
+
+/* ===================================================================
+   CONNECTION DELETE POPUP — floats near clicked connection arrow
+=================================================================== */
+.conn-delete-popup {
+  position: fixed;
+  z-index: 8500;
+  background: #fff;
+  border: 1px solid var(--border-dark);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.16);
+  padding: 6px 8px;
+  min-width: 148px;
+  pointer-events: auto;
+  animation: conn-popup-in 0.15s ease;
+}
+@keyframes conn-popup-in {
+  from { opacity: 0; transform: scale(0.92) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.conn-delete-popup-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.conn-delete-label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.conn-delete-label i {
+  color: #94a3b8;
+  font-size: 11px;
+}
+.conn-delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid #fecaca;
+  border-radius: 5px;
+  background: #fff;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.conn-delete-btn:hover {
+  background: #dc2626;
+  color: #fff;
+  border-color: #dc2626;
+}

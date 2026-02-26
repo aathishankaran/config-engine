@@ -774,7 +774,7 @@
             </marker>
           </defs>
           <g id="connections-group"></g>
-          <path id="temp-connection" class="conn-temp hidden" d=""/>
+          <path id="temp-connection" class="conn-temp hidden" d="M -9999 -9999"/>
         </svg>
         <div class="canvas-nodes" id="canvas-nodes"></div>
         <div class="canvas-drop-hint" id="drop-hint">
@@ -1393,6 +1393,16 @@
 
 <!-- Studio top alert bar — replaces modal popups -->
 <div id="studio-alert" class="studio-alert" role="alert" aria-live="polite"></div>
+
+<!-- Connection delete popup — appears on click of a connection arrow -->
+<div id="conn-delete-popup" class="conn-delete-popup hidden" role="dialog" aria-label="Connection options">
+  <div class="conn-delete-popup-inner">
+    <span class="conn-delete-label"><i class="fa-solid fa-arrow-right-long"></i> Connection</span>
+    <button id="conn-delete-btn" class="conn-delete-btn" title="Delete this connection">
+      <i class="fa-solid fa-trash-can"></i> Delete
+    </button>
+  </div>
+</div>
 
 
 <!-- ═══════════════════════════════════════════════════════════

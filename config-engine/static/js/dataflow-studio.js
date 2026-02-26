@@ -659,7 +659,11 @@
     selectedNodeId = null;
     selectedConnId = null;
     document.querySelectorAll('.df-node').forEach(function(el){ el.classList.remove('selected'); });
-    document.querySelectorAll('.conn-path').forEach(function(el){ el.classList.remove('selected'); });
+    document.querySelectorAll('.conn-path').forEach(function(el){
+      el.classList.remove('selected');
+      el.setAttribute('marker-end', 'url(#arrow-default)');
+    });
+    hideConnDeletePopup();
     showEmptyProps();
   }
 
@@ -832,12 +836,13 @@
       path.addEventListener('click', function(e) {
         e.stopPropagation();
         selectedConnId = c.id;
-        document.querySelectorAll('.conn-path').forEach(function(p) { p.classList.remove('selected'); p.setAttribute('marker-end','url(#arrow-default)'); });
+        document.querySelectorAll('.conn-path').forEach(function(p) {
+          p.classList.remove('selected');
+          p.setAttribute('marker-end', 'url(#arrow-default)');
+        });
         path.classList.add('selected');
         path.setAttribute('marker-end', 'url(#arrow-selected)');
-      });
-      path.addEventListener('dblclick', function() {
-        if (confirm('Delete this connection?')) deleteConnection(c.id);
+        showConnDeletePopup(c.id, e.clientX, e.clientY);
       });
       g.appendChild(path);
     });
@@ -854,7 +859,34 @@
 
   function hideTempConn() {
     var el = document.getElementById('temp-connection');
-    if (el) { el.classList.add('hidden'); el.setAttribute('d',''); }
+    if (el) {
+      el.classList.add('hidden');
+      el.setAttribute('d', 'M -9999 -9999');  /* move off-screen — d="" + marker-end causes artifact at origin */
+      el.removeAttribute('marker-end');
+    }
+  }
+
+  /* ── Connection delete popup ── */
+  var _connDeleteTarget = null; // connId currently targeted by popup
+
+  function showConnDeletePopup(connId, clientX, clientY) {
+    _connDeleteTarget = connId;
+    var popup = document.getElementById('conn-delete-popup');
+    if (!popup) return;
+    popup.classList.remove('hidden');
+    /* Position near cursor, keeping inside viewport */
+    var pw = 160, ph = 48;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var left = Math.min(clientX + 12, vw - pw - 8);
+    var top  = Math.min(clientY + 12, vh - ph - 8);
+    popup.style.left = left + 'px';
+    popup.style.top  = top  + 'px';
+  }
+
+  function hideConnDeletePopup() {
+    _connDeleteTarget = null;
+    var popup = document.getElementById('conn-delete-popup');
+    if (popup) popup.classList.add('hidden');
   }
 
   /* ================================================================
@@ -2543,10 +2575,6 @@
       var activeRp = document.querySelector('.right-panel-content:not(.rp-hidden)');
       if (activeRp && activeRp.id !== 'right-panel-props' && activeRp.contains(document.activeElement)) return;
       switch(e.key) {
-        case 'v': case 'V':
-          document.getElementById('tb-mode-select').click(); break;
-        case 'c': case 'C':
-          if (!e.ctrlKey && !e.metaKey) document.getElementById('tb-mode-connect').click(); break;
         case 'f': case 'F':
           fitCanvas(); break;
         case 'a': case 'A':
@@ -2558,7 +2586,9 @@
         case 'Escape':
           deselectAll();
           connectFrom = null; hideTempConn();
-          document.getElementById('ctx-menu').classList.add('hidden');
+          hideConnDeletePopup();
+          var ctxMenu = document.getElementById('ctx-menu');
+          if (ctxMenu) ctxMenu.classList.add('hidden');
           break;
         case '+': case '=':
           zoom = Math.min(MAX_ZOOM, zoom + 0.1); applyTransform(); break;
@@ -2582,6 +2612,25 @@
     setupKeyboard();
     updateStatus();
     applyTransform();
+
+    /* ── Connection delete popup button ── */
+    var connDeleteBtn = document.getElementById('conn-delete-btn');
+    if (connDeleteBtn) {
+      connDeleteBtn.addEventListener('click', function() {
+        if (_connDeleteTarget) {
+          deleteConnection(_connDeleteTarget);
+          hideConnDeletePopup();
+          deselectAll();
+        }
+      });
+    }
+    /* Close popup when clicking anywhere outside it */
+    document.addEventListener('mousedown', function(e) {
+      var popup = document.getElementById('conn-delete-popup');
+      if (popup && !popup.contains(e.target) && !e.target.closest('.conn-path')) {
+        hideConnDeletePopup();
+      }
+    }, true);
 
     /* ── Expose globals for integration script ── */
     window.studioLoadConfig  = loadConfig;
