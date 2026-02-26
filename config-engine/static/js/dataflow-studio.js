@@ -766,6 +766,8 @@
       ? '<i class="fa-solid fa-check"></i> ' + esc(meta.test_file) + ' (' + (meta.rows || 0) + ' rows)'
       : '<i class="fa-solid fa-flask"></i> Upload Test CSV / File';
 
+    var isFixed = (node.format === 'fixed');
+
     body.innerHTML =
       '<div class="props-section">' +
         '<div class="props-section-title">Basic</div>' +
@@ -775,6 +777,29 @@
         formRow('S3 Path', textInput('pi-s3path', node.s3_path, 's3://bucket/path')) +
         formRow('Dataset', textInput('pi-dataset', node.dataset, 'MAINFRAME.DATASET')) +
         formRow('Copybook', textInput('pi-copybook', node.copybook, 'copybook_name')) +
+      '</div>' +
+      /* ── Fixed Width Settings — only visible when format = "fixed" ── */
+      '<div class="props-section fixed-only-section" id="pi-fixed-section"' + (isFixed ? '' : ' style="display:none"') + '>' +
+        '<div class="props-section-title">' +
+          '<i class="fa-solid fa-ruler-horizontal" style="margin-right:6px;font-size:10px"></i>Fixed Width Settings' +
+        '</div>' +
+        '<div class="fixed-info-banner">' +
+          '<i class="fa-solid fa-circle-info"></i>' +
+          ' Define fields below with Start position (1-based) and Length (chars). ' +
+          'Header and Trailer records will be skipped automatically.' +
+        '</div>' +
+        formRow('Count File Path',
+          textInput('pi-count-path', node.count_file_path || '', '/path/to/count.ctl') +
+          '<span class="field-hint">Control file with expected record count — used for validation</span>') +
+        formRow('Record Length',
+          textInput('pi-record-length', node.record_length !== undefined ? node.record_length : '', 'e.g. 200') +
+          '<span class="field-hint">Total character width of one data record (optional validation)</span>') +
+        formRow('Header Records to Skip',
+          textInput('pi-header-count', node.header_count !== undefined ? node.header_count : '0', '0') +
+          '<span class="field-hint">Number of header lines at top of file (e.g. 1)</span>') +
+        formRow('Trailer Records to Skip',
+          textInput('pi-trailer-count', node.trailer_count !== undefined ? node.trailer_count : '0', '0') +
+          '<span class="field-hint">Number of trailer lines at bottom of file (e.g. 1)</span>') +
       '</div>' +
       '<div class="props-section">' +
         '<div class="props-section-title">Fields</div>' +
@@ -795,7 +820,18 @@
         '</button>' +
         (meta.test_file ? tfBadgeHtml : '<div class="import-file-badge" id="pi-test-file-badge"></div>') +
       '</div>';
+
     rebindPropsApply(node);
+
+    /* Show / hide Fixed Width Settings section when format changes */
+    var piFormatSel = document.getElementById('pi-format');
+    var piFixedSec  = document.getElementById('pi-fixed-section');
+    if (piFormatSel && piFixedSec) {
+      piFormatSel.addEventListener('change', function () {
+        piFixedSec.style.display = (this.value === 'fixed') ? '' : 'none';
+      });
+    }
+
     /* Bind Import Copybook */
     var copybookBtn = document.getElementById('pi-import-copybook-btn');
     if (copybookBtn) {
@@ -1105,16 +1141,23 @@
     var rows = fields.map(function(f, i) {
       return '<div class="list-item">' +
         '<div class="list-item-inputs">' +
-          '<input type="text" placeholder="Name" value="' + esc(f.name||'') + '" data-field="name" data-idx="' + i + '" />' +
-          selectOpts(['string','int','long','double','decimal','date','timestamp'], f.type||'string', 'data-field="type" data-idx="' + i + '"') +
-          '<input type="number" placeholder="Start" value="' + esc(f.start||'') + '" data-field="start" data-idx="' + i + '" style="max-width:52px" />' +
-          '<input type="number" placeholder="Len" value="' + esc(f.length||'') + '" data-field="length" data-idx="' + i + '" style="max-width:48px" />' +
+          '<input type="text" placeholder="Field name" value="' + esc(f.name||'') + '" data-field="name" data-idx="' + i + '" class="lci-name" title="Field name" />' +
+          selectOpts(['string','int','long','double','decimal','date','timestamp'], f.type||'string', 'data-field="type" data-idx="' + i + '" class="lci-type" title="Data type"') +
+          '<input type="number" placeholder="1" value="' + esc(f.start||'') + '" data-field="start" data-idx="' + i + '" class="lci-start" title="Start position (1-based)" />' +
+          '<input type="number" placeholder="0" value="' + esc(f.length||'') + '" data-field="length" data-idx="' + i + '" class="lci-len" title="Field length in characters" />' +
         '</div>' +
-        '<button class="list-item-remove" data-ns="' + ns + '" data-idx="' + i + '" title="Remove">×</button>' +
+        '<button class="list-item-remove" data-ns="' + ns + '" data-idx="' + i + '" title="Remove field">×</button>' +
       '</div>';
     }).join('');
     return '<div class="list-editor" id="' + ns + '-editor">' +
       '<div class="list-editor-header"><span>Fields (' + fields.length + ')</span></div>' +
+      '<div class="list-editor-col-header">' +
+        '<span class="lch-name">Name</span>' +
+        '<span class="lch-type">Type</span>' +
+        '<span class="lch-start">Start</span>' +
+        '<span class="lch-len">Length</span>' +
+        '<span class="lch-del"></span>' +
+      '</div>' +
       '<div class="list-editor-items">' + rows + '</div>' +
       '<button class="btn-add-row" data-ns="' + ns + '" data-action="add-field">+ Add Field</button>' +
     '</div>';
@@ -1353,6 +1396,14 @@
       node.s3_path= g('pi-s3path');
       node.dataset= g('pi-dataset');
       node.copybook=g('pi-copybook');
+      /* Fixed-width specific fields — collected whenever format is fixed */
+      var _rl = parseInt(g('pi-record-length'), 10);
+      var _hc = parseInt(g('pi-header-count'),  10);
+      var _tc = parseInt(g('pi-trailer-count'), 10);
+      node.count_file_path = g('pi-count-path') || undefined;
+      node.record_length   = isNaN(_rl) ? undefined : _rl;
+      node.header_count    = isNaN(_hc) ? 0 : _hc;
+      node.trailer_count   = isNaN(_tc) ? 0 : _tc;
       // Update connections that used old name
       if (oldName && oldName !== node.name) {
         connections.forEach(function(c){

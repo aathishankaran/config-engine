@@ -1098,6 +1098,28 @@ html, body {
   font-weight: 600;
   color: var(--text-secondary);
 }
+/* Column header labels above field rows */
+.list-editor-col-header {
+  display: flex;
+  align-items: center;
+  padding: 3px 8px 3px 8px;
+  background: #f0f4f8;
+  border-bottom: 1px solid var(--border);
+  gap: 4px;
+}
+.list-editor-col-header span {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--usb-blue);
+}
+.lch-name  { flex: 1; min-width: 80px; }
+.lch-type  { flex: 1; min-width: 70px; }
+.lch-start { width: 52px; text-align: center; }
+.lch-len   { width: 48px; text-align: center; }
+.lch-del   { width: 20px; }
+
 .list-editor-items { max-height: 240px; overflow-y: auto; }
 
 .list-item {
@@ -1162,6 +1184,32 @@ html, body {
   width: 100%;
 }
 .btn-add-row:hover { background: var(--usb-red-light); }
+
+/* ── Fixed Width Settings section ───────────────────────────────── */
+/* Info banner inside the Fixed Width section */
+.fixed-info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: #1e40af;
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+.fixed-info-banner i { margin-top: 1px; flex-shrink: 0; color: #3b82f6; }
+
+/* Hint text below an input inside a form-row */
+.field-hint {
+  display: block;
+  font-size: 10px;
+  color: #94a3b8;
+  margin-top: 3px;
+  line-height: 1.4;
+}
 
 .props-actions {
   display: flex;
