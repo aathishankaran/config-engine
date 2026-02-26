@@ -501,9 +501,9 @@
 
   <!-- ── Left zone: aligns with #left-panel (340 px) ── -->
   <div class="header-zone-left">
-    <button type="button" class="btn btn-icon sidebar-toggle" id="sidebar-toggle"
-            title="Toggle config list" aria-label="Toggle config list">
-      <i class="fa-solid fa-bars"></i>
+    <button type="button" class="btn btn-icon" id="sidebar-toggle"
+            title="Toggle panels" aria-label="Toggle layout panels">
+      <i class="fa-solid fa-table-columns"></i>
     </button>
     <a href="/" class="logo" style="text-decoration:none;display:flex;align-items:center;gap:8px;overflow:hidden">
       <img src="/static/images/usbank-logo.png" class="logo-icon" alt="US Bank" />
@@ -528,10 +528,6 @@
     </a>
     <button type="button" id="btn-settings-icon" title="Application settings">
       <i class="fa-solid fa-gear"></i> Settings
-    </button>
-    <button type="button" id="btn-toggle-right" title="Toggle components panel"
-            aria-label="Toggle components panel">
-      <i class="fa-solid fa-table-columns" id="toggle-right-icon"></i>
     </button>
   </div>
 
@@ -560,22 +556,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
     Export JSON
   </button>
-  <button class="tb-btn" id="tb-save" title="Save to server">
+  <input class="toolbar-config-name" id="toolbar-config-name" type="text" placeholder="config-name.json" />
+  <button class="tb-btn" id="tb-save" title="Save to server (Ctrl+S)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
     Save
-  </button>
-  <input class="toolbar-config-name" id="toolbar-config-name" type="text" placeholder="config-name.json" />
-
-  <div class="tb-sep"></div>
-
-  <!-- Canvas mode -->
-  <button class="tb-btn active" id="tb-mode-select" title="Select / Move (V)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><path d="M5 3l14 9-7 1-3 6z"/></svg>
-    Select
-  </button>
-  <button class="tb-btn" id="tb-mode-connect" title="Connect nodes (C)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-    Connect
   </button>
 
   <div class="tb-sep"></div>
@@ -1631,21 +1615,14 @@
   }
 
   /* ══════════════════════════════
-     SIDEBAR TOGGLE — collapse left panel
+     LAYOUT TOGGLE — collapse/expand BOTH left and right panels together
      ══════════════════════════════ */
   var sidebarToggle = $('sidebar-toggle');
-  if (sidebarToggle) sidebarToggle.addEventListener('click', function () {
-    if (leftPanel) leftPanel.classList.toggle('lp-collapsed');
-  });
-
-  /* ══════════════════════════════
-     RIGHT PANEL TOGGLE — collapse/expand components panel
-     ══════════════════════════════ */
-  var btnToggleRight = $('btn-toggle-right');
-  var propsPanel     = $('props-panel');
-  if (btnToggleRight && propsPanel) {
-    btnToggleRight.addEventListener('click', function () {
-      propsPanel.classList.toggle('rp-collapsed');
+  var propsPanel    = $('props-panel');
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', function () {
+      if (leftPanel)  leftPanel.classList.toggle('lp-collapsed');
+      if (propsPanel) propsPanel.classList.toggle('rp-collapsed');
     });
   }
 
