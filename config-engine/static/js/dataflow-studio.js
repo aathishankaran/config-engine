@@ -50,8 +50,8 @@
   var FORMATS_OUT     = ['parquet','csv','cobol'];
   var WRITE_MODES     = ['overwrite','append'];
   var FIELD_TYPES     = ['string','int','long','double','decimal','date','timestamp'];
-  var VALIDATE_DTYPES = ['string','int','long','double','decimal','date','timestamp'];
-  var VALIDATE_FMTS   = ['any','alpha','numeric','alphanumeric','date','email','regex'];
+  var VALIDATE_DTYPES = ['TEXT','NUMBER','DATE','TIMESTAMP'];
+  var VALIDATE_FMTS   = ['ANY','ALPHA','NUMERIC','ALPHANUMERIC','DATE','EMAIL','REGEX'];
   var FAIL_MODES      = ['flag','drop','abort'];
 
   /* ================================================================
@@ -67,6 +67,7 @@
   var panX = 0, panY = 0;
   var _nodeCounter = 1;
   var _connCounter = 1;
+  var _typeCounters = {};  // per-type counter for step IDs
 
   // drag state
   var dragging = null; // { nodeId, offX, offY, moved }
@@ -93,6 +94,25 @@
     var base = type.toUpperCase().slice(0,3);
     return base + '_' + (_nodeCounter++);
   }
+
+  /* Generate step IDs like select_1, validate_2, filter_3 */
+  function nextStepId(type) {
+    _typeCounters[type] = (_typeCounters[type] || 0) + 1;
+    return type + '_' + _typeCounters[type];
+  }
+
+  /* Re-sync type counters after loading a config (avoids clashes) */
+  function syncTypeCounters() {
+    nodes.forEach(function(n) {
+      if (!n.step_id) return;
+      var m = n.step_id.match(/^([a-z_]+)_(\d+)$/);
+      if (m) {
+        var t = m[1]; var num = parseInt(m[2], 10);
+        if (!_typeCounters[t] || _typeCounters[t] < num) _typeCounters[t] = num;
+      }
+    });
+  }
+
   function getNode(id) { return nodes.find(function(n){ return n.id===id; }); }
   function getConn(id) { return connections.find(function(c){ return c.id===id; }); }
 
@@ -209,10 +229,11 @@
       });
     }
     // steps
+    var sId = nextStepId(type);
     return Object.assign(base, {
-      step_id: id.toLowerCase(),
+      step_id: sId,
       description: '',
-      output_alias: id.toLowerCase(),
+      output_alias: sId,
       source_inputs: [],
       // type-specific logic fields
       filter_conditions: [], // [{field, op, value}]
@@ -651,13 +672,12 @@
   ─────────────────────────────────────────────────────────────────── */
   function mapTypeToValidateDtype(type) {
     var t = (type || '').toLowerCase();
-    if (t === 'int' || t === 'integer')       return 'int';
-    if (t === 'long' || t === 'bigint')       return 'long';
-    if (t === 'double' || t === 'float')      return 'double';
-    if (t === 'decimal' || t === 'number')    return 'decimal';
-    if (t === 'date')                         return 'date';
-    if (t === 'timestamp' || t === 'datetime') return 'timestamp';
-    return 'string';
+    if (t === 'int' || t === 'integer' || t === 'long' || t === 'bigint' ||
+        t === 'double' || t === 'float' || t === 'decimal' || t === 'number' ||
+        t === 'number' || t === 'numeric') return 'NUMBER';
+    if (t === 'date') return 'DATE';
+    if (t === 'timestamp') return 'TIMESTAMP';
+    return 'TEXT';
   }
 
   function getFieldsForAlias(alias) {
@@ -713,10 +733,10 @@
         if (e.target && e.target.classList.contains('vr-fmt')) {
           var item  = e.target.closest('.validate-rule-item');
           var patEl = item && item.querySelector('.vr-pattern');
-          var show  = (e.target.value === 'date' || e.target.value === 'regex');
+          var show  = (e.target.value === 'DATE' || e.target.value === 'REGEX');
           if (patEl) {
             patEl.style.display = show ? '' : 'none';
-            patEl.placeholder   = e.target.value === 'date' ? 'yyyy-MM-dd' : 'regex pattern';
+            patEl.placeholder   = e.target.value === 'DATE' ? 'yyyy-MM-dd' : 'regex pattern';
           }
         }
       });
@@ -1165,7 +1185,7 @@
         formRow('Step ID', textInput('ps-id', node.step_id, 'e.g. map_columns')) +
         formRow('Description', textInput('ps-desc', node.description, 'Describe this step')) +
         formRow('Output Alias', textInput('ps-alias', node.output_alias, 'e.g. mapped_data')) +
-        formRow('Source Inputs (comma-sep)', textInput('ps-src', (node.source_inputs||[]).join(', '), 'e.g. CUSTOMER, filtered_data')) +
+        formRow('Source Inputs', multiSourceSelect('ps-src', node.source_inputs || [], node.id)) +
       '</div>' +
       '<div class="props-section">' +
         '<div class="props-section-title">Expressions</div>' +
@@ -1182,7 +1202,7 @@
         formRow('Step ID', textInput('pf-id', node.step_id, 'e.g. filter_active')) +
         formRow('Description', textInput('pf-desc', node.description, 'Describe this step')) +
         formRow('Output Alias', textInput('pf-alias', node.output_alias, 'e.g. active_records')) +
-        formRow('Source Inputs (comma-sep)', textInput('pf-src', (node.source_inputs||[]).join(', '), 'e.g. CUSTOMER')) +
+        formRow('Source Inputs', multiSourceSelect('pf-src', node.source_inputs || [], node.id)) +
       '</div>' +
       '<div class="props-section">' +
         '<div class="props-section-title">Conditions</div>' +
@@ -1202,8 +1222,8 @@
       '</div>' +
       '<div class="props-section">' +
         '<div class="props-section-title">Join Configuration</div>' +
-        formRow('Left Input', textInput('pj-left', node.join_left, 'e.g. CUSTOMER')) +
-        formRow('Right Input', textInput('pj-right', node.join_right, 'e.g. TRANS')) +
+        formRow('Left Input', singleSourceSelect('pj-left', node.join_left, node.id)) +
+        formRow('Right Input', singleSourceSelect('pj-right', node.join_right, node.id)) +
         formRow('Join Type', selectInput('pj-jtype', JOIN_TYPES, node.join_type || 'inner')) +
       '</div>' +
       '<div class="props-section">' +
@@ -1221,7 +1241,7 @@
         formRow('Step ID', textInput('pa-id', node.step_id, 'e.g. agg_by_region')) +
         formRow('Description', textInput('pa-desc', node.description, 'Describe this step')) +
         formRow('Output Alias', textInput('pa-alias', node.output_alias, 'e.g. region_totals')) +
-        formRow('Source Inputs (comma-sep)', textInput('pa-src', (node.source_inputs||[]).join(', '), 'e.g. joined_data')) +
+        formRow('Source Inputs', multiSourceSelect('pa-src', node.source_inputs || [], node.id)) +
       '</div>' +
       '<div class="props-section">' +
         '<div class="props-section-title">Group By</div>' +
@@ -1242,7 +1262,7 @@
         formRow('Step ID', textInput('pu-id', node.step_id, 'e.g. union_all')) +
         formRow('Description', textInput('pu-desc', node.description, 'Describe this step')) +
         formRow('Output Alias', textInput('pu-alias', node.output_alias, 'e.g. combined_data')) +
-        formRow('Source Inputs (comma-sep)', textInput('pu-src', (node.source_inputs||[]).join(', '), 'e.g. input1, input2')) +
+        formRow('Source Inputs', multiSourceSelect('pu-src', node.source_inputs || [], node.id)) +
         '<div class="form-row checkbox-row">' +
           '<input type="checkbox" id="pu-distinct"' + (node.union_distinct ? ' checked' : '') + ' />' +
           '<label for="pu-distinct">Distinct (remove duplicates)</label>' +
@@ -1261,7 +1281,7 @@
         formRow('Step ID', textInput('pc-id', node.step_id, 'e.g. custom_sort')) +
         formRow('Description', textInput('pc-desc', node.description, 'Describe this step')) +
         formRow('Output Alias', textInput('pc-alias', node.output_alias, 'e.g. sorted_data')) +
-        formRow('Source Inputs (comma-sep)', textInput('pc-src', (node.source_inputs||[]).join(', '), 'e.g. joined_data')) +
+        formRow('Source Inputs', multiSourceSelect('pc-src', node.source_inputs || [], node.id)) +
       '</div>' +
       '<div class="props-section">' +
         '<div class="props-section-title">Logic (JSON)</div>' +
@@ -1280,7 +1300,7 @@
         formRow('Step ID',    textInput('pv-id',   node.step_id,    'e.g. validate_accounts')) +
         formRow('Description',textInput('pv-desc', node.description,'Describe this validation')) +
         formRow('Output Alias',textInput('pv-alias',node.output_alias,'e.g. validated_data')) +
-        formRow('Source Input', textInput('pv-src', (node.source_inputs||[]).join(', '),'e.g. ACCTIN')) +
+        formRow('Source Input', singleSourceSelect('pv-src', (node.source_inputs||[])[0] || '', node.id)) +
       '</div>' +
       '<div class="props-section">' +
         '<div class="props-section-title">Validation Settings</div>' +
@@ -1311,10 +1331,10 @@
         if (e.target && e.target.classList.contains('vr-fmt')) {
           var item    = e.target.closest('.validate-rule-item');
           var patEl   = item && item.querySelector('.vr-pattern');
-          var showPat = (e.target.value === 'date' || e.target.value === 'regex');
+          var showPat = (e.target.value === 'DATE' || e.target.value === 'REGEX');
           if (patEl) {
             patEl.style.display = showPat ? '' : 'none';
-            patEl.placeholder = e.target.value === 'date' ? 'yyyy-MM-dd' : 'regex pattern';
+            patEl.placeholder = e.target.value === 'DATE' ? 'yyyy-MM-dd' : 'regex pattern';
           }
         }
       });
@@ -1327,8 +1347,7 @@
         // Sync source_inputs from the current text in pv-src
         var pvSrcEl = document.getElementById('pv-src');
         if (pvSrcEl && pvSrcEl.value.trim()) {
-          node.source_inputs = pvSrcEl.value.split(',')
-            .map(function(s){ return s.trim(); }).filter(Boolean);
+          node.source_inputs = [pvSrcEl.value.trim()].filter(Boolean);
         }
         var fields = [];
         (node.source_inputs || []).some(function(alias) {
@@ -1346,13 +1365,13 @@
       });
     }
 
-    /* pv-src blur: auto-populate rules when source changes and rules are empty */
+    /* pv-src change: auto-populate rules when source changes and rules are empty */
     var pvSrcInput = document.getElementById('pv-src');
     if (pvSrcInput) {
-      pvSrcInput.addEventListener('blur', function() {
+      pvSrcInput.addEventListener('change', function() {
         var v = pvSrcInput.value.trim();
         if (!v) return;
-        node.source_inputs = v.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+        node.source_inputs = [v];
         // Only auto-populate when the rules editor is currently empty
         var existingRules = document.querySelectorAll('#pv-rules-editor .validate-rule-item');
         if (existingRules.length === 0) {
@@ -1365,15 +1384,90 @@
     }
   }
 
+  /* ── Source / alias dropdowns — populated from current canvas nodes ──
+     getSourceOptions: returns [{value, label}] of all available inputs/steps
+     excluding the current node (to prevent self-reference).
+  ─────────────────────────────────────────────────────────────────── */
+  function getSourceOptions(excludeNodeId) {
+    var opts = [];
+    nodes.forEach(function(n) {
+      if (n.id === excludeNodeId) return;
+      if (n.type === 'input') {
+        opts.push({ value: n.name || n.id, label: (n.name || n.id) + ' [Input]' });
+      } else if (n.type !== 'output') {
+        var alias = n.output_alias || n.step_id || n.id;
+        var lbl   = (TYPE_META[n.type] || { label: n.type }).label;
+        opts.push({ value: alias, label: alias + ' [' + lbl + ']' });
+      }
+    });
+    return opts;
+  }
+
+  /* Multi-select dropdown (source_inputs for most step types) */
+  function multiSourceSelect(id, currentValues, excludeNodeId) {
+    var opts = getSourceOptions(excludeNodeId);
+    var vals = currentValues || [];
+    var html = '<select id="' + id + '" class="multi-source-select" multiple' +
+               ' size="' + Math.min(Math.max(opts.length, 2), 5) + '">';
+    opts.forEach(function(o) {
+      var sel = vals.indexOf(o.value) >= 0 ? ' selected' : '';
+      html += '<option value="' + esc(o.value) + '"' + sel + '>' + esc(o.label) + '</option>';
+    });
+    /* Keep any current values not in the grid (loaded from JSON) */
+    vals.forEach(function(v) {
+      if (!v) return;
+      var exists = opts.some(function(o) { return o.value === v; });
+      if (!exists) html += '<option value="' + esc(v) + '" selected>' + esc(v) + ' (saved)</option>';
+    });
+    if (!opts.length && !vals.length) {
+      html += '<option disabled value="">No nodes on canvas yet</option>';
+    }
+    html += '</select>';
+    return html;
+  }
+
+  /* Single-select dropdown (join left / right, validate source) */
+  function singleSourceSelect(id, currentValue, excludeNodeId) {
+    var opts = getSourceOptions(excludeNodeId);
+    var html = '<select id="' + id + '" class="single-source-select">';
+    html += '<option value="">— select source —</option>';
+    opts.forEach(function(o) {
+      var sel = o.value === currentValue ? ' selected' : '';
+      html += '<option value="' + esc(o.value) + '"' + sel + '>' + esc(o.label) + '</option>';
+    });
+    if (currentValue) {
+      var exists = opts.some(function(o) { return o.value === currentValue; });
+      if (!exists) html += '<option value="' + esc(currentValue) + '" selected>' + esc(currentValue) + ' (saved)</option>';
+    }
+    html += '</select>';
+    return html;
+  }
+
+  /* Read selected values from a multi-select */
+  function getMultiSelectValues(id) {
+    var el = document.getElementById(id);
+    if (!el) return [];
+    return Array.prototype.slice.call(el.options)
+      .filter(function(o) { return o.selected; })
+      .map(function(o) { return o.value; })
+      .filter(Boolean);
+  }
+
+  /* Read single select value (with fallback) */
+  function getSingleSelectValue(id) {
+    var el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+  }
+
   /* Build the validation rules list editor */
   function buildValidationRulesEditor(ns, rules) {
     var rows = rules.map(function(r, i) {
-      var showPattern = (r.format === 'regex' || r.format === 'date');
+      var showPattern = (r.format === 'REGEX' || r.format === 'DATE');
       return '<div class="list-item validate-rule-item">' +
         /* Row 1: Field + Type + nullable + × */
         '<div class="validate-rule-row1">' +
           '<input type="text"   placeholder="Field name" value="' + esc(r.field||'')     + '" data-field="field"    data-idx="' + i + '" class="vr-field"   title="Column name to validate" />' +
-          selectOpts(VALIDATE_DTYPES, r.data_type||'string', 'data-field="data_type" data-idx="' + i + '" class="vr-dtype" title="Expected data type"') +
+          selectOpts(VALIDATE_DTYPES, r.data_type||'TEXT', 'data-field="data_type" data-idx="' + i + '" class="vr-dtype" title="Expected data type"') +
           '<label class="vr-nullable-wrap" title="Check nullable — uncheck = field is required">' +
             '<input type="checkbox" data-field="nullable" data-idx="' + i + '" class="vr-nullable"' + (r.nullable !== false ? ' checked' : '') + '/>' +
             '<span>Null OK</span>' +
@@ -1385,8 +1479,8 @@
           '<label class="vr-sub-lbl">Max Len</label>' +
           '<input type="number" placeholder="—"  value="' + esc(r.max_length||'') + '" data-field="max_length" data-idx="' + i + '" class="vr-maxlen" title="Maximum character length (blank = no check)" />' +
           '<label class="vr-sub-lbl">Format</label>' +
-          selectOpts(VALIDATE_FMTS, r.format||'any', 'data-field="format" data-idx="' + i + '" class="vr-fmt" title="Value format check"') +
-          '<input type="text" placeholder="' + (r.format === 'date' ? 'yyyy-MM-dd' : 'regex pattern') + '" value="' + esc(r.pattern||r.date_format||'') + '" data-field="pattern" data-idx="' + i + '" class="vr-pattern" title="Date format (yyyy-MM-dd) or regex pattern"' + (showPattern ? '' : ' style="display:none"') + ' />' +
+          selectOpts(VALIDATE_FMTS, r.format||'ANY', 'data-field="format" data-idx="' + i + '" class="vr-fmt" title="Value format check"') +
+          '<input type="text" placeholder="' + (r.format === 'DATE' ? 'yyyy-MM-dd' : 'regex pattern') + '" value="' + esc(r.pattern||r.date_format||'') + '" data-field="pattern" data-idx="' + i + '" class="vr-pattern" title="Date format (yyyy-MM-dd) or regex pattern"' + (showPattern ? '' : ' style="display:none"') + ' />' +
         '</div>' +
       '</div>';
     }).join('');
@@ -1732,20 +1826,20 @@
       node.id          = node.step_id;
       node.description = g('ps-desc');
       node.output_alias= g('ps-alias') || node.step_id;
-      node.source_inputs = g('ps-src').split(',').map(function(s){return s.trim();}).filter(Boolean);
+      node.source_inputs = getMultiSelectValues('ps-src');
     } else if (node.type === 'filter') {
       node.step_id     = g('pf-id') || node.id;
       node.id          = node.step_id;
       node.description = g('pf-desc');
       node.output_alias= g('pf-alias') || node.step_id;
-      node.source_inputs = g('pf-src').split(',').map(function(s){return s.trim();}).filter(Boolean);
+      node.source_inputs = getMultiSelectValues('pf-src');
     } else if (node.type === 'join') {
       node.step_id     = g('pj-id') || node.id;
       node.id          = node.step_id;
       node.description = g('pj-desc');
       node.output_alias= g('pj-alias') || node.step_id;
-      node.join_left   = g('pj-left');
-      node.join_right  = g('pj-right');
+      node.join_left   = getSingleSelectValue('pj-left');
+      node.join_right  = getSingleSelectValue('pj-right');
       node.join_type   = g('pj-jtype');
       node.source_inputs = [node.join_left, node.join_right].filter(Boolean);
     } else if (node.type === 'aggregate') {
@@ -1753,20 +1847,20 @@
       node.id          = node.step_id;
       node.description = g('pa-desc');
       node.output_alias= g('pa-alias') || node.step_id;
-      node.source_inputs = g('pa-src').split(',').map(function(s){return s.trim();}).filter(Boolean);
+      node.source_inputs = getMultiSelectValues('pa-src');
     } else if (node.type === 'union') {
       node.step_id       = g('pu-id') || node.id;
       node.id            = node.step_id;
       node.description   = g('pu-desc');
       node.output_alias  = g('pu-alias') || node.step_id;
-      node.source_inputs = g('pu-src').split(',').map(function(s){return s.trim();}).filter(Boolean);
+      node.source_inputs = getMultiSelectValues('pu-src');
       node.union_distinct= gc('pu-distinct');
     } else if (node.type === 'validate') {
       node.step_id      = g('pv-id') || node.id;
       node.id           = node.step_id;
       node.description  = g('pv-desc');
       node.output_alias = g('pv-alias') || node.step_id;
-      node.source_inputs= g('pv-src').split(',').map(function(s){return s.trim();}).filter(Boolean);
+      node.source_inputs = [getSingleSelectValue('pv-src')].filter(Boolean);
       node.fail_mode    = g('pv-fail-mode') || 'flag';
       node.error_bucket = g('pv-error-bucket') || '';
       /* Read validation rules from the editor DOM */
@@ -1779,13 +1873,13 @@
         var pat = getF('.vr-pattern');
         var rule = {
           field:       getF('.vr-field'),
-          data_type:   getF('.vr-dtype') || 'string',
+          data_type:   getF('.vr-dtype') || 'TEXT',
           max_length:  getF('.vr-maxlen') ? parseInt(getF('.vr-maxlen'), 10) || undefined : undefined,
           nullable:    getC('.vr-nullable'),
-          format:      fmt || 'any'
+          format:      fmt || 'ANY'
         };
-        if (fmt === 'date' && pat) rule.date_format = pat;
-        else if (fmt === 'regex' && pat) rule.pattern = pat;
+        if (fmt === 'DATE' && pat) rule.date_format = pat;
+        else if (fmt === 'REGEX' && pat) rule.pattern = pat;
         if (rule.field) node.validate_rules.push(rule);
       });
     } else {
@@ -1793,7 +1887,7 @@
       node.id           = node.step_id;
       node.description  = g('pc-desc');
       node.output_alias = g('pc-alias') || node.step_id;
-      node.source_inputs= g('pc-src').split(',').map(function(s){return s.trim();}).filter(Boolean);
+      node.source_inputs = getMultiSelectValues('pc-src');
       try { node.custom_logic = JSON.parse(g('pc-logic') || '{}'); } catch(e) { node.custom_logic = g('pc-logic'); }
     }
 
@@ -2001,7 +2095,7 @@
     // Clear
     nodes = []; connections = [];
     document.getElementById('canvas-nodes').innerHTML = '';
-    _nodeCounter = 1; _connCounter = 1;
+    _nodeCounter = 1; _connCounter = 1; _typeCounters = {};
     deselectAll();
 
     var inputs  = config.Inputs  || {};
@@ -2128,6 +2222,7 @@
     });
 
     renderConnections();
+    syncTypeCounters();
     updateStatus();
     fitCanvas();
 
@@ -2247,13 +2342,11 @@
      TOOLBAR SETUP
   ================================================================ */
   function setupToolbar() {
-    // Mode buttons
-    document.getElementById('tb-mode-select').addEventListener('click', function() {
-      setMode('select');
-    });
-    document.getElementById('tb-mode-connect').addEventListener('click', function() {
-      setMode('connect');
-    });
+    // Mode buttons (optional — toolbar buttons removed; port-click handles mode switching)
+    var tbSel = document.getElementById('tb-mode-select');
+    var tbCon = document.getElementById('tb-mode-connect');
+    if (tbSel) tbSel.addEventListener('click', function() { setMode('select'); });
+    if (tbCon) tbCon.addEventListener('click', function() { setMode('connect'); });
 
     // Zoom
     document.getElementById('tb-zoom-in').addEventListener('click', function() {

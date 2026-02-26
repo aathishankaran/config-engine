@@ -1172,13 +1172,13 @@ html, body {
 .lch-len   { width: 48px; text-align: center; }
 .lch-del   { width: 20px; }
 
-.list-editor-items { max-height: 240px; overflow-y: auto; }
+.list-editor-items { max-height: 320px; overflow-y: auto; }
 
 .list-item {
   display: flex;
   align-items: flex-start;
   gap: 4px;
-  padding: 6px 8px;
+  padding: 9px 8px;
   border-bottom: 1px solid var(--border);
   background: #fff;
 }
@@ -1195,10 +1195,10 @@ html, body {
 .list-item-inputs select {
   flex: 1;
   min-width: 55px;
-  padding: 4px 6px;
+  padding: 5px 7px;
   border: 1px solid var(--border-dark);
   border-radius: var(--radius-sm);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-primary);
 }
 .list-item-inputs input:focus,
@@ -1244,7 +1244,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 7px 8px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--border);
   background: #fff;
 }
@@ -1636,3 +1636,34 @@ html, body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ===================================================================
+   SOURCE DROPDOWN SELECTS (multi-source-select, single-source-select)
+=================================================================== */
+.multi-source-select,
+.single-source-select {
+  width: 100%;
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-primary);
+  padding: 3px 4px;
+  background: #fff;
+}
+.multi-source-select {
+  min-height: 52px;
+}
+.multi-source-select option,
+.single-source-select option {
+  padding: 4px 6px;
+  font-size: 12px;
+}
+.multi-source-select:focus,
+.single-source-select:focus {
+  outline: none;
+  border-color: var(--usb-red);
+}
+.multi-source-select option:checked {
+  background: var(--usb-blue-pale);
+  color: var(--usb-blue);
+}
