@@ -659,27 +659,27 @@ html, body {
 }
 
 /* ===================================================================
-   STUDIO JSON OVERLAY — full-canvas code editor style
+   STUDIO JSON OVERLAY — light, clean tree-only editor
 =================================================================== */
 #studio-json-overlay {
   position: absolute;
   inset: 0;
-  background: #1e1e2e;
+  background: #f8fafc;        /* light page background */
   z-index: 200;
   display: none;
   flex-direction: column;
 }
 #studio-json-overlay.json-active { display: flex; }
 
-/* Top title bar */
+/* ── Title bar — navy header, macOS traffic-light dots ── */
 .json-overlay-titlebar {
-  background: #12121c;
+  background: var(--usb-blue);  /* deep navy, matches app header */
   padding: 0 16px;
   display: flex;
   align-items: center;
-  height: 40px;
+  height: 42px;
   gap: 12px;
-  border-bottom: 1px solid #3a3a50;
+  border-bottom: 3px solid var(--usb-red);
   flex-shrink: 0;
 }
 .json-overlay-titlebar-left {
@@ -688,60 +688,31 @@ html, body {
   gap: 8px;
   flex: 1;
 }
-.json-overlay-titlebar .dot { width: 12px; height: 12px; border-radius: 50%; }
-.json-overlay-titlebar .dot-red { background: #ff5f57; }
+.json-overlay-titlebar .dot { width: 11px; height: 11px; border-radius: 50%; }
+.json-overlay-titlebar .dot-red    { background: #ff5f57; }
 .json-overlay-titlebar .dot-yellow { background: #ffbd2e; }
-.json-overlay-titlebar .dot-green { background: #28ca41; }
+.json-overlay-titlebar .dot-green  { background: #28ca41; }
 .json-file-label {
-  color: rgba(255,255,255,0.6);
+  color: rgba(255,255,255,0.75);
   font-size: 13px;
-  font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-family: 'Menlo','Monaco','Consolas','Courier New', monospace;
   margin-left: 8px;
 }
-.json-overlay-toolbar {
-  background: #1a1a2e;
-  padding: 8px 16px;
+/* Read-only lock badge in title bar */
+.json-readonly-badge {
   display: flex;
   align-items: center;
-  gap: 10px;
-  border-bottom: 1px solid #2a2a40;
-  flex-shrink: 0;
-}
-.json-validation-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-  padding: 4px 10px;
-  border-radius: 4px;
-}
-.json-validation-status.valid   { color: #28ca41; background: rgba(40,202,65,0.12); }
-.json-validation-status.invalid { color: #ff5f57; background: rgba(255,95,87,0.12); }
-.json-validation-status.idle    { color: rgba(255,255,255,0.4); }
-.json-line-info {
-  color: rgba(255,255,255,0.35);
+  gap: 5px;
   font-size: 11px;
-  font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-  margin-left: auto;
+  font-weight: 600;
+  color: rgba(255,255,255,0.65);
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  letter-spacing: 0.3px;
 }
-.json-overlay-toolbar .btn {
-  font-size: 12px;
-  padding: 5px 14px;
-}
-.btn-json-format {
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 14px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 5px;
-  color: rgba(255,255,255,0.8);
-  font-size: 12px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s;
-}
-.btn-json-format:hover { background: rgba(255,255,255,0.14); color: #fff; }
+/* Apply / Close buttons */
 .btn-json-apply {
   display: flex; align-items: center; gap: 6px;
   padding: 5px 16px;
@@ -756,8 +727,21 @@ html, body {
   transition: all 0.15s;
 }
 .btn-json-apply:hover { background: var(--usb-red-dark); }
+.btn-json-format {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 14px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 5px;
+  color: rgba(255,255,255,0.8);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.btn-json-format:hover { background: rgba(255,255,255,0.16); color: #fff; }
 
-/* ── jsoneditor container: fills the overlay below the title bar ── */
+/* ── JSONEditor container — fills overlay below title bar ── */
 #studio-jsoneditor-container {
   flex: 1 1 0%;
   min-height: 0;
@@ -771,122 +755,103 @@ html, body {
   border: none;
   border-radius: 0;
   font-size: 13px;
+  background: #fff;
 }
 
-/* Toolbar */
+/* ── Hide the built-in toolbar completely ──────────────────────────
+   We have our own title bar; the library toolbar icons are removed.  */
 #studio-jsoneditor-container .jsoneditor-menu {
-  background: #0A2240;
-  border-bottom: 2px solid #CF2A36;
-  padding: 4px 8px;
-  flex-shrink: 0;
-}
-#studio-jsoneditor-container .jsoneditor-menu button {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.18);
-  border-radius: 4px;
-  color: rgba(255,255,255,0.9);
-  margin: 2px 1px;
-}
-#studio-jsoneditor-container .jsoneditor-menu button:hover:not([disabled]) {
-  background: rgba(255,255,255,0.2);
-  color: #fff;
-}
-#studio-jsoneditor-container .jsoneditor-menu .jsoneditor-separator {
-  border-left: 1px solid rgba(255,255,255,0.2);
-  margin: 0 4px;
+  display: none !important;
 }
 
-/* Navigation breadcrumb */
+/* ── Navigation breadcrumb ── */
 #studio-jsoneditor-container .jsoneditor-navigation-bar {
-  background: #12121c;
-  color: rgba(255,255,255,0.55);
-  border-bottom: 1px solid #2a2a3e;
+  background: #f1f5f9;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
   font-size: 12px;
-  padding: 4px 10px;
+  padding: 4px 12px;
   flex-shrink: 0;
 }
 #studio-jsoneditor-container .jsoneditor-navigation-bar .jsoneditor-nav-bar-pointer {
-  color: rgba(255,255,255,0.3);
+  color: #94a3b8;
 }
 
-/* Tree / outer panel */
+/* ── Tree area — clean white background ── */
 #studio-jsoneditor-container .jsoneditor-outer,
 #studio-jsoneditor-container .jsoneditor-tree-inner {
-  background: #1a1a2e;
+  background: #fff;
 }
 #studio-jsoneditor-container .jsoneditor-tree {
-  background: #1a1a2e;
+  background: #fff;
 }
 #studio-jsoneditor-container .jsoneditor-tree tr:hover > td {
-  background: rgba(255,255,255,0.04);
+  background: #f0f4f8;
 }
 #studio-jsoneditor-container .jsoneditor-tree tr.selected > td {
-  background: rgba(30,58,95,0.55);
+  background: #E8EEF6;
 }
 
-/* Key (field) text */
+/* ── Key (field) names — navy, non-editable look ── */
 #studio-jsoneditor-container .jsoneditor-field {
-  color: #9cdcfe;
-  font-weight: 500;
+  color: var(--usb-blue);    /* US Bank navy — stands out clearly */
+  font-weight: 600;
+  cursor: default;           /* no text-cursor — signals read-only */
+  user-select: text;
 }
-#studio-jsoneditor-container .jsoneditor-field[contenteditable="true"]:focus {
-  background: rgba(255,255,255,0.07);
-  border-radius: 3px;
-  outline: 1px solid #528bff;
-  color: #c9d1d9;
+/* Suppress any focus ring on locked key fields */
+#studio-jsoneditor-container .jsoneditor-field[contenteditable="false"]:focus,
+#studio-jsoneditor-container .jsoneditor-field[contenteditable="false"] {
+  outline: none;
+  background: transparent;
 }
 
-/* Value colors */
-#studio-jsoneditor-container .jsoneditor-string  { color: #ce9178; }
-#studio-jsoneditor-container .jsoneditor-number  { color: #b5cea8; }
-#studio-jsoneditor-container .jsoneditor-boolean { color: #569cd6; }
-#studio-jsoneditor-container .jsoneditor-null    { color: #808080; font-style: italic; }
+/* ── Value colors — clear, readable on white ── */
+#studio-jsoneditor-container .jsoneditor-string  { color: #b45309; }  /* warm amber  */
+#studio-jsoneditor-container .jsoneditor-number  { color: #0f766e; }  /* teal        */
+#studio-jsoneditor-container .jsoneditor-boolean { color: #6d28d9; }  /* purple      */
+#studio-jsoneditor-container .jsoneditor-null    { color: #94a3b8; font-style: italic; }
 #studio-jsoneditor-container .jsoneditor-object,
-#studio-jsoneditor-container .jsoneditor-array   { color: rgba(255,255,255,0.55); }
+#studio-jsoneditor-container .jsoneditor-array   { color: #64748b; }
 
-/* Value input focus */
+/* Value input highlight when being edited */
 #studio-jsoneditor-container .jsoneditor-value[contenteditable="true"]:focus {
-  background: rgba(206,145,120,0.12);
+  background: #fef3c7;      /* soft amber tint */
   border-radius: 3px;
-  outline: 1px solid #ce9178;
+  outline: 2px solid #d97706;
+  color: #92400e;
 }
 
-/* Toggle arrows */
-#studio-jsoneditor-container .jsoneditor-toggler { color: rgba(255,255,255,0.45); }
+/* ── Expand/collapse toggle arrows ── */
+#studio-jsoneditor-container .jsoneditor-toggler,
+#studio-jsoneditor-container .jsoneditor-button { color: #94a3b8; }
 
-/* Search input */
-#studio-jsoneditor-container .jsoneditor-search input {
-  background: #252540;
-  color: #c9d1d9;
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 4px;
-  padding: 2px 8px;
-}
-#studio-jsoneditor-container .jsoneditor-search .jsoneditor-results {
-  color: rgba(255,255,255,0.45);
-  font-size: 11px;
+/* ── Hide per-row context-menu buttons (insert/delete/move actions) ──
+   Removing these prevents structural changes to the JSON that could
+   break the dataflow diagram.  Values remain editable via direct click. */
+#studio-jsoneditor-container .jsoneditor-contextmenu-button { display: none !important; }
+
+/* ── Hide row selection checkboxes — not needed in value-only mode ── */
+#studio-jsoneditor-container .jsoneditor-tree td.jsoneditor-tree-path { display: none; }
+#studio-jsoneditor-container col.jsoneditor-tree-path             { display: none; }
+
+/* ── Key fields — clearly styled as non-editable labels ── */
+#studio-jsoneditor-container .jsoneditor-field[contenteditable="false"] {
+  cursor: default;
+  opacity: 1;
+  border: none !important;
+  outline: none !important;
+  user-select: text;
 }
 
-/* Status bar */
+/* ── Status bar ── */
 #studio-jsoneditor-container .jsoneditor-statusbar {
-  background: #12121c;
-  color: rgba(255,255,255,0.35);
-  border-top: 1px solid #2a2a3e;
+  background: #f8fafc;
+  color: #94a3b8;
+  border-top: 1px solid #e2e8f0;
   font-size: 11px;
   flex-shrink: 0;
 }
-
-/* Code mode */
-#studio-jsoneditor-container .jsoneditor-mode-code .jsoneditor-outer { background: #1e1e2e; }
-#studio-jsoneditor-container .CodeMirror {
-  background: #1e1e2e !important;
-  color: #abb2bf !important;
-  font-family: 'Menlo','Monaco','Consolas',monospace;
-  font-size: 13px;
-  height: 100%;
-}
-#studio-jsoneditor-container .CodeMirror-gutters { background: #13131f; border-right: 1px solid #2a2a3e; }
-#studio-jsoneditor-container .CodeMirror-linenumber { color: rgba(255,255,255,0.2); }
 
 /* ===================================================================
    PANEL TOGGLE BUTTONS

@@ -754,6 +754,9 @@
             <span class="dot dot-yellow"></span>
             <span class="dot dot-green"></span>
             <span class="json-file-label" id="json-file-label">config.json</span>
+            <span class="json-readonly-badge">
+              <i class="fa-solid fa-lock" style="font-size:10px"></i> Keys locked
+            </span>
           </div>
           <button class="btn-json-apply" id="json-overlay-apply-btn">
             <i class="fa-solid fa-check"></i> Apply to Canvas
@@ -1436,11 +1439,17 @@
 
     _studioEditor = new JSONEditor(container, {
       mode: 'tree',
-      modes: ['tree', 'code'],        // allow switching to raw code view
-      search: true,
+      /* No modes[] — locks editor to tree view only (no code/mode icons) */
+      search: false,
       enableSort: false,
       enableTransform: false,
       indentation: 2,
+      /* ── Key-name protection ──────────────────────────────────────
+         Allow editing VALUES only. Key names are read-only so users
+         cannot accidentally rename fields and break the dataflow job. */
+      onEditable: function (node) {
+        return { field: false, value: true };
+      },
       onChangeJSON: function () { /* live edits tracked by editor */ },
       onError: function (err) { console.warn('[JSONEditor]', err); }
     });
