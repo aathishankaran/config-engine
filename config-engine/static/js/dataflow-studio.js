@@ -1,7 +1,7 @@
 /**
  * Dataflow Studio — draw.io-style dataflow JSON builder.
  * USB Bank Developer Portal template. Orthogonal (straight elbow) connections.
- * Supports: Input, Output, Select, Filter, Join, Aggregate, Union, Custom nodes.
+ * Supports: Input, Output, Select, Filter, Join, Aggregate, Union, Custom, Validate nodes.
  * Generates dataflow-engine compatible JSON.
  */
 (function () {
@@ -26,7 +26,8 @@
     join:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="5"/><circle cx="16" cy="12" r="5"/></svg>',
     aggregate:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H6l6 8-6 8h12"/></svg>',
     union: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
-    custom:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2M12 20v2"/></svg>'
+    custom:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2M12 20v2"/></svg>',
+    validate:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>'
   };
 
   var TYPE_META = {
@@ -37,17 +38,21 @@
     join:      { label: 'Join',      color: '#0891b2' },
     aggregate: { label: 'Aggregate', color: '#dc2626' },
     union:     { label: 'Union',     color: '#0284c7' },
-    custom:    { label: 'Custom',    color: '#64748b' }
+    custom:    { label: 'Custom',    color: '#64748b' },
+    validate:  { label: 'Validate',  color: '#0d9488' }
   };
 
-  var SELECT_OPS = ['move','add','subtract','multiply','divide','compute','initialize','string','unstring','inspect'];
-  var FILTER_OPS = ['==','!=','>','<','>=','<=','in','not_in'];
-  var JOIN_TYPES  = ['inner','left','right','full'];
-  var AGG_OPS    = ['sum','count','avg','min','max'];
-  var FORMATS_IN  = ['csv','parquet','cobol','fixed'];
-  var FORMATS_OUT = ['parquet','csv','cobol'];
-  var WRITE_MODES = ['overwrite','append'];
-  var FIELD_TYPES = ['string','int','long','double','decimal','date','timestamp'];
+  var SELECT_OPS      = ['move','add','subtract','multiply','divide','compute','initialize','string','unstring','inspect'];
+  var FILTER_OPS      = ['==','!=','>','<','>=','<=','in','not_in'];
+  var JOIN_TYPES      = ['inner','left','right','full'];
+  var AGG_OPS         = ['sum','count','avg','min','max'];
+  var FORMATS_IN      = ['csv','parquet','cobol','fixed'];
+  var FORMATS_OUT     = ['parquet','csv','cobol'];
+  var WRITE_MODES     = ['overwrite','append'];
+  var FIELD_TYPES     = ['string','int','long','double','decimal','date','timestamp'];
+  var VALIDATE_DTYPES = ['string','int','long','double','decimal','date','timestamp'];
+  var VALIDATE_FMTS   = ['any','alpha','numeric','alphanumeric','date','email','regex'];
+  var FAIL_MODES      = ['flag','drop','abort'];
 
   /* ================================================================
      STATE
@@ -730,6 +735,7 @@
     else if (node.type === 'join')      renderJoinProps(body, node);
     else if (node.type === 'aggregate') renderAggregateProps(body, node);
     else if (node.type === 'union')     renderUnionProps(body, node);
+    else if (node.type === 'validate')  renderValidateProps(body, node);
     else renderCustomProps(body, node);
 
     drawer.classList.add('drawer-open');
@@ -1133,6 +1139,84 @@
     rebindPropsApply(node);
   }
 
+  /* ---- VALIDATE STEP ---- */
+  function renderValidateProps(body, node) {
+    body.innerHTML =
+      '<div class="props-section">' +
+        '<div class="props-section-title">Step Info</div>' +
+        formRow('Step ID',    textInput('pv-id',   node.step_id,    'e.g. validate_accounts')) +
+        formRow('Description',textInput('pv-desc', node.description,'Describe this validation')) +
+        formRow('Output Alias',textInput('pv-alias',node.output_alias,'e.g. validated_data')) +
+        formRow('Source Input', textInput('pv-src', (node.source_inputs||[]).join(', '),'e.g. ACCTIN')) +
+      '</div>' +
+      '<div class="props-section">' +
+        '<div class="props-section-title">Validation Settings</div>' +
+        '<div class="fixed-info-banner">' +
+          '<i class="fa-solid fa-circle-info"></i>' +
+          ' <b>flag</b>: adds <code>_is_valid</code> &amp; <code>_validation_errors</code> columns. ' +
+          '<b>drop</b>: removes invalid rows. <b>abort</b>: raises error if any row fails.' +
+        '</div>' +
+        formRow('On Failure', selectInput('pv-fail-mode', FAIL_MODES, node.fail_mode || 'flag')) +
+      '</div>' +
+      '<div class="props-section">' +
+        '<div class="props-section-title">Validation Rules</div>' +
+        buildValidationRulesEditor('pv-rules', node.validate_rules || []) +
+      '</div>';
+    rebindPropsApply(node);
+
+    /* Show / hide pattern input when format changes in any rule row */
+    var ruleEditor = document.getElementById('pv-rules-editor');
+    if (ruleEditor) {
+      ruleEditor.addEventListener('change', function(e) {
+        if (e.target && e.target.classList.contains('vr-fmt')) {
+          var item    = e.target.closest('.validate-rule-item');
+          var patEl   = item && item.querySelector('.vr-pattern');
+          var showPat = (e.target.value === 'date' || e.target.value === 'regex');
+          if (patEl) {
+            patEl.style.display = showPat ? '' : 'none';
+            patEl.placeholder = e.target.value === 'date' ? 'yyyy-MM-dd' : 'regex pattern';
+          }
+        }
+      });
+    }
+  }
+
+  /* Build the validation rules list editor */
+  function buildValidationRulesEditor(ns, rules) {
+    var rows = rules.map(function(r, i) {
+      var showPattern = (r.format === 'regex' || r.format === 'date');
+      return '<div class="list-item validate-rule-item">' +
+        /* Row 1: Field + Type + nullable + × */
+        '<div class="validate-rule-row1">' +
+          '<input type="text"   placeholder="Field name" value="' + esc(r.field||'')     + '" data-field="field"    data-idx="' + i + '" class="vr-field"   title="Column name to validate" />' +
+          selectOpts(VALIDATE_DTYPES, r.data_type||'string', 'data-field="data_type" data-idx="' + i + '" class="vr-dtype" title="Expected data type"') +
+          '<label class="vr-nullable-wrap" title="Check nullable — uncheck = field is required">' +
+            '<input type="checkbox" data-field="nullable" data-idx="' + i + '" class="vr-nullable"' + (r.nullable !== false ? ' checked' : '') + '/>' +
+            '<span>Null OK</span>' +
+          '</label>' +
+          '<button class="list-item-remove" data-ns="' + ns + '" data-idx="' + i + '" title="Remove rule">×</button>' +
+        '</div>' +
+        /* Row 2: Max Length + Format + Pattern/DateFmt */
+        '<div class="validate-rule-row2">' +
+          '<label class="vr-sub-lbl">Max Len</label>' +
+          '<input type="number" placeholder="—"  value="' + esc(r.max_length||'') + '" data-field="max_length" data-idx="' + i + '" class="vr-maxlen" title="Maximum character length (blank = no check)" />' +
+          '<label class="vr-sub-lbl">Format</label>' +
+          selectOpts(VALIDATE_FMTS, r.format||'any', 'data-field="format" data-idx="' + i + '" class="vr-fmt" title="Value format check"') +
+          '<input type="text" placeholder="' + (r.format === 'date' ? 'yyyy-MM-dd' : 'regex pattern') + '" value="' + esc(r.pattern||r.date_format||'') + '" data-field="pattern" data-idx="' + i + '" class="vr-pattern" title="Date format (yyyy-MM-dd) or regex pattern"' + (showPattern ? '' : ' style="display:none"') + ' />' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    return '<div class="list-editor" id="' + ns + '-editor">' +
+      '<div class="list-editor-header">' +
+        '<span>Rules (' + rules.length + ')</span>' +
+        '<span style="font-size:10px;color:#94a3b8">Field | Type | Nullable | MaxLen | Format | Pattern</span>' +
+      '</div>' +
+      '<div class="list-editor-items">' + rows + '</div>' +
+      '<button class="btn-add-row" data-ns="' + ns + '" data-action="add-rule">+ Add Rule</button>' +
+    '</div>';
+  }
+
   /* ================================================================
      LIST EDITORS
   ================================================================ */
@@ -1287,6 +1371,9 @@
         } else if (action === 'add-agg') {
           if (!node.agg_aggregations) node.agg_aggregations = [];
           node.agg_aggregations.push({field:'', operation:'sum', alias:'', condition:''});
+        } else if (action === 'add-rule') {
+          if (!node.validate_rules) node.validate_rules = [];
+          node.validate_rules.push({field:'', data_type:'string', max_length:'', nullable:true, format:'any', date_format:'', pattern:''});
         }
         showPropsPanel(node);
       });
@@ -1335,6 +1422,8 @@
       node.agg_group_by.splice(idx, 1);
     } else if (ns === 'pa-aggs') {
       node.agg_aggregations.splice(idx, 1);
+    } else if (ns === 'pv-rules') {
+      if (node.validate_rules) node.validate_rules.splice(idx, 1);
     }
   }
 
@@ -1375,6 +1464,27 @@
     // aggregations
     var aggEditor = body.querySelector('#pa-aggs-editor');
     if (aggEditor) node.agg_aggregations = readItems('#pa-aggs-editor');
+    // validate rules — has checkboxes, read specially
+    var ruleEditor = body.querySelector('#pv-rules-editor');
+    if (ruleEditor) {
+      node.validate_rules = [];
+      ruleEditor.querySelectorAll('.validate-rule-item').forEach(function(item) {
+        var gv = function(sel) { var el = item.querySelector(sel); return el ? el.value : ''; };
+        var gc2 = function(sel) { var el = item.querySelector(sel); return el ? el.checked : true; };
+        var fmt = gv('.vr-fmt');
+        var pat = gv('.vr-pattern');
+        var rule = {
+          field:       gv('.vr-field'),
+          data_type:   gv('.vr-dtype') || 'string',
+          max_length:  gv('.vr-maxlen'),
+          nullable:    gc2('.vr-nullable'),
+          format:      fmt || 'any',
+          date_format: fmt === 'date'  ? pat : '',
+          pattern:     fmt === 'regex' ? pat : ''
+        };
+        if (rule.field) node.validate_rules.push(rule);
+      });
+    }
   }
 
   /* ================================================================
@@ -1467,6 +1577,32 @@
       node.output_alias  = g('pu-alias') || node.step_id;
       node.source_inputs = g('pu-src').split(',').map(function(s){return s.trim();}).filter(Boolean);
       node.union_distinct= gc('pu-distinct');
+    } else if (node.type === 'validate') {
+      node.step_id      = g('pv-id') || node.id;
+      node.id           = node.step_id;
+      node.description  = g('pv-desc');
+      node.output_alias = g('pv-alias') || node.step_id;
+      node.source_inputs= g('pv-src').split(',').map(function(s){return s.trim();}).filter(Boolean);
+      node.fail_mode    = g('pv-fail-mode') || 'flag';
+      /* Read validation rules from the editor DOM */
+      var ruleItems = document.querySelectorAll('#pv-rules-editor .validate-rule-item');
+      node.validate_rules = [];
+      ruleItems.forEach(function(item) {
+        var getF = function(sel) { var el = item.querySelector(sel); return el ? el.value : ''; };
+        var getC = function(sel) { var el = item.querySelector(sel); return el ? el.checked : true; };
+        var fmt = getF('.vr-fmt');
+        var pat = getF('.vr-pattern');
+        var rule = {
+          field:       getF('.vr-field'),
+          data_type:   getF('.vr-dtype') || 'string',
+          max_length:  getF('.vr-maxlen') ? parseInt(getF('.vr-maxlen'), 10) || undefined : undefined,
+          nullable:    getC('.vr-nullable'),
+          format:      fmt || 'any'
+        };
+        if (fmt === 'date' && pat) rule.date_format = pat;
+        else if (fmt === 'regex' && pat) rule.pattern = pat;
+        if (rule.field) node.validate_rules.push(rule);
+      });
     } else {
       node.step_id      = g('pc-id') || node.id;
       node.id           = node.step_id;
@@ -1618,6 +1754,26 @@
         return typeof node.custom_logic === 'string' ? JSON.parse(node.custom_logic || '{}') : (node.custom_logic || {});
       } catch(e) { return {}; }
     }
+    if (node.type === 'validate') {
+      return {
+        fail_mode: node.fail_mode || 'flag',
+        rules: (node.validate_rules || [])
+          .filter(function(r) { return r.field; })
+          .map(function(r) {
+            var rule = {
+              field:     r.field,
+              data_type: r.data_type  || 'string',
+              nullable:  r.nullable !== false
+            };
+            if (r.max_length) rule.max_length = parseInt(r.max_length, 10);
+            if (r.format && r.format !== 'any') rule.format = r.format;
+            if (r.format === 'date'  && r.date_format) rule.date_format = r.date_format;
+            if (r.format === 'date'  && r.pattern)     rule.date_format = r.pattern;
+            if (r.format === 'regex' && r.pattern)     rule.pattern     = r.pattern;
+            return rule;
+          })
+      };
+    }
     return {};
   }
 
@@ -1736,6 +1892,19 @@
         });
       } else if (s.type === 'union') {
         n.union_distinct = !!logic.distinct;
+      } else if (s.type === 'validate') {
+        n.fail_mode = logic.fail_mode || 'flag';
+        n.validate_rules = (logic.rules || []).map(function(r) {
+          return {
+            field:       r.field       || '',
+            data_type:   r.data_type   || 'string',
+            max_length:  r.max_length  || '',
+            nullable:    r.nullable !== false,
+            format:      r.format      || 'any',
+            date_format: r.date_format || '',
+            pattern:     r.pattern     || ''
+          };
+        });
       } else {
         n.custom_logic = JSON.stringify(logic, null, 2);
       }

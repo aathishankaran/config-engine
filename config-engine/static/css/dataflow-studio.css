@@ -46,6 +46,8 @@
   --node-union-header:     #0284c7;
   --node-custom-border:    #64748b;
   --node-custom-header:    #64748b;
+  --node-validate-border:  #0d9488;
+  --node-validate-header:  #0d9488;
 }
 
 html, body {
@@ -344,7 +346,8 @@ html, body {
 .pi-join   .palette-item-icon { background: #cffafe; color: #0891b2; }
 .pi-aggregate .palette-item-icon { background: #fee2e2; color: #dc2626; }
 .pi-union  .palette-item-icon { background: #e0f2fe; color: #0284c7; }
-.pi-custom .palette-item-icon { background: #f1f5f9; color: #64748b; }
+.pi-custom    .palette-item-icon { background: #f1f5f9; color: #64748b; }
+.pi-validate  .palette-item-icon { background: #ccfbf1; color: #0d9488; }
 
 /* ===================================================================
    CANVAS
@@ -490,6 +493,7 @@ html, body {
 .node-aggregate .node-icon-badge { background: var(--node-aggregate-border); }
 .node-union     .node-icon-badge { background: var(--node-union-border); }
 .node-custom    .node-icon-badge { background: var(--node-custom-border); }
+.node-validate  .node-icon-badge { background: var(--node-validate-border); }
 
 /* Node body */
 .node-body {
@@ -530,6 +534,7 @@ html, body {
 .df-node.node-aggregate { border-top: 3px solid var(--node-aggregate-border); }
 .df-node.node-union     { border-top: 3px solid var(--node-union-border); }
 .df-node.node-custom    { border-top: 3px solid var(--node-custom-border); }
+.df-node.node-validate  { border-top: 3px solid var(--node-validate-border); }
 
 /* Connection Ports */
 .node-port {
@@ -1184,6 +1189,74 @@ html, body {
   width: 100%;
 }
 .btn-add-row:hover { background: var(--usb-red-light); }
+
+/* ── Validate rule item — two-row layout ──────────────────────────
+   Row 1: Field name | Data Type | Nullable | ×
+   Row 2: MaxLen label | MaxLen | Format label | Format | Pattern  */
+.validate-rule-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border);
+  background: #fff;
+}
+.validate-rule-item:last-child { border-bottom: none; }
+.validate-rule-item:hover { background: #fafafa; }
+
+.validate-rule-row1,
+.validate-rule-row2 {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: nowrap;
+}
+/* Field name — takes all remaining space */
+.validate-rule-row1 .vr-field  { flex: 1; min-width: 90px; }
+/* Type dropdown */
+.validate-rule-row1 .vr-dtype  { width: 90px; flex-shrink: 0; }
+/* Nullable checkbox + label */
+.vr-nullable-wrap {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.vr-nullable-wrap input[type="checkbox"] { width: 13px; height: 13px; cursor: pointer; }
+
+/* Row 2 */
+.validate-rule-row2 .vr-sub-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #94a3b8;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.validate-rule-row2 .vr-maxlen  { width: 52px; flex-shrink: 0; }
+.validate-rule-row2 .vr-fmt     { width: 110px; flex-shrink: 0; }
+.validate-rule-row2 .vr-pattern { flex: 1; min-width: 80px; }
+
+/* All inputs inside validate-rule-item */
+.validate-rule-item input[type="text"],
+.validate-rule-item input[type="number"],
+.validate-rule-item select {
+  padding: 4px 6px;
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-primary);
+  font-family: inherit;
+}
+.validate-rule-item input:focus,
+.validate-rule-item select:focus {
+  outline: none;
+  border-color: var(--node-validate-border);
+}
 
 /* ── Fixed Width Settings section ───────────────────────────────── */
 /* Info banner inside the Fixed Width section */
