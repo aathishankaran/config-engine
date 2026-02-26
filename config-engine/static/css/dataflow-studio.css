@@ -594,20 +594,20 @@ html, body {
    PROPERTIES PANEL — right sidebar: palette only (wider)
 =================================================================== */
 .studio-props {
-  width: 260px;
-  min-width: 220px;
-  max-width: 260px;
+  width: var(--rp-width, 260px);
+  min-width: var(--rp-width, 260px);
+  max-width: var(--rp-width, 260px);
   background: var(--bg-panel);
-  border-left: 1px solid var(--border);
+  /* border provided by the panel-resizer element to its left */
   display: flex;
   flex-direction: column;
   overflow: hidden;
   transition: width 0.22s ease, min-width 0.22s ease, max-width 0.22s ease;
 }
 .studio-props.rp-collapsed {
-  width: 0;
-  min-width: 0;
-  max-width: 0;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
 }
 
 /* ===================================================================

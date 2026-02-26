@@ -18,6 +18,12 @@
     /* Suppress original nav / search wrap */
     .nav, .search-wrap { display: none !important; }
 
+    /* ── Panel width CSS variables (updated live by the resize-splitter JS) ── */
+    :root {
+      --lp-width: 340px;   /* left panel */
+      --rp-width: 260px;   /* right panel */
+    }
+
     /* ══════════════════════════════════════════════════════════════
        HEADER  — 3-zone layout aligned with left/center/right panels
     ══════════════════════════════════════════════════════════════ */
@@ -30,10 +36,10 @@
       align-items: stretch;
       flex-shrink: 0;
     }
-    /* Left zone — width matches #left-panel (340px) */
+    /* Left zone — tracks #left-panel via --lp-width */
     .header-zone-left {
-      width: 340px;
-      min-width: 340px;
+      width: var(--lp-width);
+      min-width: var(--lp-width);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -50,10 +56,10 @@
       padding: 0 12px;
       min-width: 0;
     }
-    /* Right zone — width matches .studio-props (260px) */
+    /* Right zone — tracks .studio-props via --rp-width */
     .header-zone-right {
-      width: 260px;
-      min-width: 260px;
+      width: var(--rp-width);
+      min-width: var(--rp-width);
       display: flex;
       align-items: center;
       justify-content: flex-end;
@@ -61,6 +67,7 @@
       padding: 0 12px;
       border-left: 1px solid var(--border);
       flex-shrink: 0;
+      transition: width .2s ease, min-width .2s ease;
     }
     .logo-text { font-size: 16px; font-weight: 800; color: var(--usb-blue); letter-spacing: -0.3px; }
     .logo-text .logo-red { color: var(--usb-red); }
@@ -145,16 +152,41 @@
        LEFT PANEL  — configs list (340 px)
     ══════════════════════════════════════════════════════════════ */
     #left-panel {
-      width: 340px;
-      min-width: 340px;
+      width: var(--lp-width);
+      min-width: var(--lp-width);
       background: var(--bg-sidebar);
-      border-right: 1px solid var(--border);
+      /* border provided by the panel-resizer element */
       display: flex;
       flex-direction: column;
       overflow: hidden;
       transition: width .2s ease, min-width .2s ease;
     }
-    #left-panel.lp-collapsed { width: 0; min-width: 0; }
+    #left-panel.lp-collapsed { width: 0 !important; min-width: 0 !important; }
+
+    /* ── Vertical panel splitter / resize handle ─────────────────── */
+    .panel-resizer {
+      width: 5px;
+      flex-shrink: 0;
+      background: var(--border);
+      cursor: ew-resize;
+      position: relative;
+      z-index: 6;
+      transition: background 0.15s;
+      user-select: none;
+    }
+    /* Wider grab area without visual width */
+    .panel-resizer::before {
+      content: '';
+      position: absolute;
+      inset: 0 -4px;
+    }
+    .panel-resizer:hover,
+    .panel-resizer.pr-dragging { background: var(--usb-red); }
+
+    /* Hide left splitter when left panel is collapsed */
+    #left-panel.lp-collapsed + .panel-resizer { display: none; }
+    /* Hide right splitter when right panel is collapsed (toggled via JS) */
+    .panel-resizer.pr-hidden { display: none; }
 
     .lp-header {
       padding: 12px 16px 10px;
@@ -601,10 +633,10 @@
 
     <a href="/runbook" target="_blank" id="btn-runbook-link" title="Open User Runbook"
        class="header-btn" style="text-decoration:none;color:#374151;">
-      <i class="fa-solid fa-book-open"></i> Runbook
+      <i class="fa-solid fa-book-open"></i>
     </a>
     <button type="button" id="btn-settings-icon" title="Application settings">
-      <i class="fa-solid fa-gear"></i> Settings
+      <i class="fa-solid fa-gear"></i>
     </button>
   </div>
 
@@ -707,6 +739,9 @@
     <!-- current-file hidden label (app.js updates this) -->
     <span id="current-file" aria-hidden="true" style="display:none">Select a configuration</span>
   </div>
+
+  <!-- ▌ Left splitter — drag to resize left panel ▌ -->
+  <div class="panel-resizer" id="panel-resizer-left" title="Drag to resize"></div>
 
   <!-- ══════════════════════
        CENTER — Diagram / Canvas
@@ -995,6 +1030,9 @@
     </div><!-- /#test-page -->
 
   </div><!-- /#center-area -->
+
+  <!-- ▌ Right splitter — drag to resize right panel ▌ -->
+  <div class="panel-resizer" id="panel-resizer-right" title="Drag to resize"></div>
 
   <!-- ══════════════════════
        RIGHT PANEL — Component Palette only
@@ -1908,6 +1946,79 @@
       window.dispatchEvent(new Event('resize'));
     });
   }
+
+  /* ══════════════════════════════════════════════════════════
+     PANEL SPLITTERS — drag the vertical dividers to resize
+     Left splitter  → resizes left  panel (--lp-width)
+     Right splitter → resizes right panel (--rp-width)
+     Both also update the matching header zone automatically
+     because they all read the same CSS variable.
+  ══════════════════════════════════════════════════════════ */
+  (function () {
+    var root = document.documentElement;
+
+    function makeSplitter(resizerId, cssVar, side) {
+      var resizer = document.getElementById(resizerId);
+      if (!resizer) return;
+
+      /* Elements whose transitions we pause during drag */
+      var panelEl  = document.getElementById(side === 'left' ? 'left-panel' : 'props-panel');
+      var hdrZone  = document.querySelector(side === 'left' ? '.header-zone-left' : '.header-zone-right');
+
+      var MIN_W = 160;
+      var dragging = false, startX = 0, startW = 0;
+
+      resizer.addEventListener('mousedown', function (e) {
+        if (e.button !== 0) return;
+        dragging = true;
+        startX   = e.clientX;
+        startW   = panelEl ? panelEl.offsetWidth : parseInt(
+                     getComputedStyle(root).getPropertyValue(cssVar), 10) || 260;
+
+        /* Freeze transitions so drag feels instant */
+        if (panelEl)  panelEl.style.transition  = 'none';
+        if (hdrZone)  hdrZone.style.transition  = 'none';
+        resizer.classList.add('pr-dragging');
+        document.body.style.cursor     = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', function (e) {
+        if (!dragging) return;
+        var maxW  = Math.round(window.innerWidth * 0.45);
+        var delta = side === 'left' ? e.clientX - startX : startX - e.clientX;
+        var newW  = Math.max(MIN_W, Math.min(maxW, startW + delta));
+        root.style.setProperty(cssVar, newW + 'px');
+      });
+
+      document.addEventListener('mouseup', function () {
+        if (!dragging) return;
+        dragging = false;
+        if (panelEl) panelEl.style.transition = '';
+        if (hdrZone) hdrZone.style.transition = '';
+        resizer.classList.remove('pr-dragging');
+        document.body.style.cursor     = '';
+        document.body.style.userSelect = '';
+        window.dispatchEvent(new Event('resize'));
+      });
+    }
+
+    makeSplitter('panel-resizer-left',  '--lp-width', 'left');
+    makeSplitter('panel-resizer-right', '--rp-width', 'right');
+
+    /* Hide right splitter when right panel is collapsed, show when expanded */
+    var rightResizer = document.getElementById('panel-resizer-right');
+    var rightPanel   = document.getElementById('props-panel');
+    if (rightResizer && rightPanel) {
+      function syncRightResizer() {
+        rightResizer.classList.toggle('pr-hidden', rightPanel.classList.contains('rp-collapsed'));
+      }
+      syncRightResizer();
+      new MutationObserver(syncRightResizer)
+        .observe(rightPanel, { attributes: true, attributeFilter: ['class'] });
+    }
+  })();
 
   /* Clean up stale localStorage */
   localStorage.removeItem('parser-engine-page');
