@@ -69,7 +69,7 @@
   var connectFrom = null; // nodeId
   var tempConnMouse = null;
   // pan state
-  var panning = null; // { startX, startY, startPanX, startPanY }
+  var panning = null; // { startX, startY, startPanX, startPanY, moved }
 
   /* ── per-config node file metadata cache ──
      Keyed by config name: { NODE_NAME: { test_file, copybook_file, rows, fields, type } }
@@ -277,10 +277,14 @@
       }
 
       selectNode(nodeId);
+      // Use wrap-relative coords + pan offset so position is always accurate
+      var _wrap = document.getElementById('canvas-wrap');
+      var _wr   = _wrap.getBoundingClientRect();
+      var node  = getNode(nodeId);
       dragging = {
         nodeId: nodeId,
-        offX: e.clientX / zoom - getNode(nodeId).x,
-        offY: e.clientY / zoom - getNode(nodeId).y,
+        offX: (e.clientX - _wr.left - panX) / zoom - node.x,
+        offY: (e.clientY - _wr.top  - panY) / zoom - node.y,
         moved: false
       };
     });
@@ -326,31 +330,34 @@
       if (e.target.classList.contains('node-port')) return;
       if (e.target.closest('.df-node')) return;
 
-      // Deselect
-      if (mode === 'select') {
-        deselectAll();
-        // Start pan with middle mouse or alt+left
-        if (e.button === 1 || (e.button === 0 && e.altKey)) {
-          e.preventDefault();
-          panning = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY };
-          wrap.classList.add('pan-mode');
-        }
-      }
       if (mode === 'connect') {
-        // cancel connect
         connectFrom = null;
         hideTempConn();
+        return;
+      }
+
+      // Left-click (or middle-click) on empty canvas → start pan
+      // Deselect only if the mouse is released without dragging (see mouseup)
+      if (e.button === 0 || e.button === 1) {
+        e.preventDefault();
+        panning = {
+          startX: e.clientX, startY: e.clientY,
+          startPanX: panX, startPanY: panY,
+          moved: false
+        };
+        wrap.classList.add('pan-mode');
       }
     });
 
     wrap.addEventListener('mousemove', function(e) {
-      // Dragging a node
+      // ── Drag a node ──────────────────────────────────────────────
       if (dragging) {
         var node = getNode(dragging.nodeId);
         if (!node) return;
-        var nx = snap(e.clientX / zoom - dragging.offX);
-        var ny = snap(e.clientY / zoom - dragging.offY);
-        if (Math.abs(nx - node.x) > 2 || Math.abs(ny - node.y) > 2) {
+        var wrapRect = wrap.getBoundingClientRect();
+        var nx = snap((e.clientX - wrapRect.left - panX) / zoom - dragging.offX);
+        var ny = snap((e.clientY - wrapRect.top  - panY) / zoom - dragging.offY);
+        if (Math.abs(nx - node.x) > 1 || Math.abs(ny - node.y) > 1) {
           dragging.moved = true;
           node.x = Math.max(0, nx);
           node.y = Math.max(0, ny);
@@ -360,16 +367,19 @@
         }
       }
 
-      // Panning
+      // ── Pan canvas ───────────────────────────────────────────────
       if (panning) {
         var dx = e.clientX - panning.startX;
         var dy = e.clientY - panning.startY;
-        panX = panning.startPanX + dx;
-        panY = panning.startPanY + dy;
-        applyTransform();
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+          panning.moved = true;
+          panX = panning.startPanX + dx;
+          panY = panning.startPanY + dy;
+          applyTransform();
+        }
       }
 
-      // Temp connection line
+      // ── Temp connection line ─────────────────────────────────────
       if (mode === 'connect' && connectFrom) {
         var wrapRect = wrap.getBoundingClientRect();
         var mx = (e.clientX - wrapRect.left - panX) / zoom;
@@ -381,14 +391,24 @@
 
     wrap.addEventListener('mouseup', function(e) {
       if (dragging) { dragging = null; }
-      if (panning) { panning = null; wrap.classList.remove('pan-mode'); }
+      if (panning) {
+        // Pure click (no drag) on empty canvas → deselect nodes
+        if (!panning.moved) { deselectAll(); }
+        panning = null;
+        wrap.classList.remove('pan-mode');
+      }
       if (mode === 'connect' && connectFrom) {
-        // Released on empty canvas — cancel
         if (!e.target.classList.contains('node-port')) {
           connectFrom = null;
           hideTempConn();
         }
       }
+    });
+
+    // Release drag/pan even when mouse leaves the canvas entirely
+    document.addEventListener('mouseup', function() {
+      if (dragging) { dragging = null; }
+      if (panning)  { panning = null; wrap.classList.remove('pan-mode'); }
     });
 
     // Scroll to zoom

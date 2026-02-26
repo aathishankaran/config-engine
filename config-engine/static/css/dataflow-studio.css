@@ -358,9 +358,14 @@ html, body {
     linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
   background-size: 20px 20px;
-  cursor: default;
+  cursor: grab;          /* always show grab on empty canvas */
 }
 .studio-canvas-wrap.connect-mode { cursor: crosshair; }
+.studio-canvas-wrap.pan-mode     { cursor: grabbing; }  /* actively panning */
+
+/* Node cursor: move when hovering, grabbing while dragging */
+.df-node { cursor: move; }
+.df-node:active { cursor: grabbing; }
 
 .studio-canvas {
   position: absolute;
