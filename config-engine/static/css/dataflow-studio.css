@@ -9,9 +9,9 @@
   --usb-red-dark:   #a8222c;
   --usb-red-light:  #f9e4e5;
   --usb-red-muted:  #e8a0a6;
-  --usb-blue:       #0057A8;
-  --usb-blue-light: #004080;
-  --usb-blue-pale:  #e8f0f8;
+  --usb-blue:       #1B3A6B;   /* deep US-Bank navy  — Pantone 280 family */
+  --usb-blue-light: #132A4E;   /* darker press/hover shade               */
+  --usb-blue-pale:  #E8EEF6;   /* very subtle tinted hover background    */
 
   /* === Page/Panel Colors (from styles.css) === */
   --bg-page:     #f5f5f5;
