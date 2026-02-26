@@ -96,40 +96,46 @@
   function getNode(id) { return nodes.find(function(n){ return n.id===id; }); }
   function getConn(id) { return connections.find(function(c){ return c.id===id; }); }
 
+  /* ── Top alert bar — slides down from top, auto-hides after 3.5 s ── */
   function toast(msg, type) {
     type = type || 'info';
-    var cp = window.CodeParser;
+    var alertEl = document.getElementById('studio-alert');
+    if (!alertEl) { _toastFallback(msg, type); return; }
 
-    /* ── Route to the shared modal popup system ── */
-    if (type === 'error') {
-      if (cp && cp.showErrorPopup) {
-        cp.showErrorPopup('Error', msg, '');
-      } else if (cp && cp.showMessagePopup) {
-        cp.showMessagePopup('Error', msg, 'error');
-      } else {
-        _toastFallback(msg, type);
-      }
-      return;
-    }
+    /* clear previous state */
+    alertEl.classList.remove('alert-success', 'alert-error', 'alert-info', 'alert-show');
 
-    if (type === 'success') {
-      if (cp && cp.showMessagePopup) {
-        cp.showMessagePopup('Success', msg, 'success');
-      } else {
-        _toastFallback(msg, type);
-      }
-      return;
-    }
+    var iconMap = {
+      success: 'fa-circle-check',
+      error:   'fa-circle-xmark',
+      info:    'fa-circle-info'
+    };
+    var icon = iconMap[type] || 'fa-circle-info';
 
-    /* info and everything else */
-    if (cp && cp.showMessagePopup) {
-      cp.showMessagePopup('Information', msg, 'success');
-    } else {
-      _toastFallback(msg, type);
-    }
+    alertEl.className = 'studio-alert alert-' + type;
+    alertEl.innerHTML =
+      '<i class="fa-solid ' + icon + ' alert-icon"></i>' +
+      '<span class="alert-msg">' + msg + '</span>' +
+      '<button class="alert-close-btn" aria-label="Dismiss" ' +
+        'onclick="var a=document.getElementById(\'studio-alert\');' +
+                 'a.classList.remove(\'alert-show\');"' +
+      '>&times;</button>';
+
+    /* trigger slide-in (requestAnimationFrame ensures class change takes effect) */
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        alertEl.classList.add('alert-show');
+      });
+    });
+
+    /* auto-hide */
+    if (alertEl._hideTimer) clearTimeout(alertEl._hideTimer);
+    alertEl._hideTimer = setTimeout(function() {
+      alertEl.classList.remove('alert-show');
+    }, 3500);
   }
 
-  /* Fallback visual toast used only when CodeParser is not yet initialised */
+  /* Fallback visual toast used only when #studio-alert is not in the DOM */
   function _toastFallback(msg, type) {
     var el = document.createElement('div');
     el.className = 'toast ' + (type || 'info');
@@ -1281,9 +1287,13 @@
         '<div class="fixed-info-banner">' +
           '<i class="fa-solid fa-circle-info"></i>' +
           ' <b>flag</b>: adds <code>_is_valid</code> &amp; <code>_validation_errors</code> columns. ' +
-          '<b>drop</b>: removes invalid rows. <b>abort</b>: raises error if any row fails.' +
+          '<b>drop</b>: removes invalid rows and routes them to the Error Bucket. <b>abort</b>: raises error if any row fails.' +
         '</div>' +
         formRow('On Failure', selectInput('pv-fail-mode', FAIL_MODES, node.fail_mode || 'flag')) +
+        formRow('Error Bucket',
+          textInput('pv-error-bucket', node.error_bucket || '', '/datalake/errors/validate/') +
+          '<span class="field-hint">Path to write invalid rows in append mode (applies when fail mode is <b>drop</b>)</span>'
+        ) +
       '</div>' +
       '<div class="props-section">' +
         '<div class="props-section-title props-section-title-row">' +
@@ -1758,6 +1768,7 @@
       node.output_alias = g('pv-alias') || node.step_id;
       node.source_inputs= g('pv-src').split(',').map(function(s){return s.trim();}).filter(Boolean);
       node.fail_mode    = g('pv-fail-mode') || 'flag';
+      node.error_bucket = g('pv-error-bucket') || '';
       /* Read validation rules from the editor DOM */
       var ruleItems = document.querySelectorAll('#pv-rules-editor .validate-rule-item');
       node.validate_rules = [];
