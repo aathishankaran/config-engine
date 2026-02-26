@@ -9,9 +9,9 @@
   --usb-red-dark:   #a8222c;
   --usb-red-light:  #f9e4e5;
   --usb-red-muted:  #e8a0a6;
-  --usb-blue:       #235ae4;
-  --usb-blue-light: #2c5282;
-  --usb-blue-pale:  #e8f0f9;
+  --usb-blue:       #0057A8;
+  --usb-blue-light: #004080;
+  --usb-blue-pale:  #e8f0f8;
 
   /* === Page/Panel Colors (from styles.css) === */
   --bg-page:     #f5f5f5;
@@ -770,7 +770,7 @@ html, body {
 
 /* Toolbar */
 #studio-jsoneditor-container .jsoneditor-menu {
-  background: #235ae4;
+  background: #0A2240;
   border-bottom: 2px solid #CF2A36;
   padding: 4px 8px;
   flex-shrink: 0;
