@@ -607,6 +607,38 @@ html, body {
   box-shadow: 0 0 0 3px rgba(218,41,28,0.18);
 }
 
+/* ── Horizontal layout mode: ports move to left / right edges ─────────────
+   When .layout-h is applied to the canvas wrap (by autoLayoutHorizontal),
+   port-in moves to the left side and port-out moves to the right side,
+   so connections flow left-to-right instead of top-to-bottom. */
+.layout-h .node-port.port-in {
+  top: 50% !important;
+  left: -7px !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important;
+}
+.layout-h .node-port.port-in:hover,
+.layout-h .node-port.port-in.highlight {
+  transform: translateY(-50%) scale(1.4) !important;
+}
+.layout-h .node-port.port-out {
+  top: 50% !important;
+  right: -7px !important;
+  bottom: auto !important;
+  left: auto !important;
+  transform: translateY(-50%) !important;
+}
+.layout-h .node-port.port-out:hover,
+.layout-h .node-port.port-out.highlight {
+  transform: translateY(-50%) scale(1.4) !important;
+}
+/* In connect-mode with horizontal layout */
+.layout-h.connect-mode .node-port.port-in {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.25);
+  animation: port-in-pulse 1.2s ease-in-out infinite;
+}
+
 /* ===================================================================
    PROPERTIES PANEL — right sidebar: palette only (wider)
 =================================================================== */
@@ -849,13 +881,24 @@ html, body {
   color: #94a3b8;
 }
 
-/* ── Tree area — clean white background ── */
-#studio-jsoneditor-container .jsoneditor-outer,
+/* ── Tree area: allow horizontal scroll so long keys/values are never wrapped ── */
+#studio-jsoneditor-container .jsoneditor-outer {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  background: #fff;
+}
 #studio-jsoneditor-container .jsoneditor-tree-inner {
   background: #fff;
+  min-width: max-content;  /* grow wider than the pane if needed */
 }
 #studio-jsoneditor-container .jsoneditor-tree {
   background: #fff;
+  white-space: nowrap;       /* prevent wrapping for every row */
+}
+/* Force all table cells to never wrap — keys and values show fully on one line */
+#studio-jsoneditor-container .jsoneditor-tree td {
+  white-space: nowrap;
+  vertical-align: middle;
 }
 #studio-jsoneditor-container .jsoneditor-tree tr:hover > td {
   background: #f0f4f8;
@@ -870,6 +913,7 @@ html, body {
   font-weight: 600;
   cursor: default;           /* no text-cursor — signals read-only */
   user-select: text;
+  white-space: nowrap;
 }
 /* Suppress any focus ring on locked key fields */
 #studio-jsoneditor-container .jsoneditor-field[contenteditable="false"]:focus,
@@ -886,20 +930,28 @@ html, body {
 #studio-jsoneditor-container .jsoneditor-object,
 #studio-jsoneditor-container .jsoneditor-array   { color: #64748b; }
 
-/* Values are editable — text cursor signals that to users */
-#studio-jsoneditor-container .jsoneditor-value {
+/* ── Editable values: look and feel ──────────────────────────────────────
+   contenteditable="true" values show a dashed border on hover and a solid
+   amber outline when focused, making it clear they are click-to-edit. */
+#studio-jsoneditor-container .jsoneditor-value[contenteditable="true"] {
   cursor: text;
-}
-/* Hovering a value row: subtle underline hint that it's editable */
-#studio-jsoneditor-container .jsoneditor-tree tr:hover .jsoneditor-value {
-  text-decoration: underline dotted rgba(27,58,107,0.3);
-}
-
-/* Value input highlight when being edited */
-#studio-jsoneditor-container .jsoneditor-value[contenteditable="true"]:focus {
-  background: #fef3c7;      /* soft amber tint */
+  white-space: nowrap;
+  border: 1px dashed transparent;
+  padding: 1px 4px;
   border-radius: 3px;
-  outline: 2px solid #d97706;
+  display: inline-block;
+  min-width: 6px;
+}
+#studio-jsoneditor-container .jsoneditor-value[contenteditable="true"]:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+/* Active editing state */
+#studio-jsoneditor-container .jsoneditor-value[contenteditable="true"]:focus {
+  background: #fef3c7;
+  border: 1px solid #d97706 !important;
+  outline: 2px solid rgba(217,119,6,0.3);
+  outline-offset: 1px;
   color: #92400e;
 }
 
@@ -1310,7 +1362,9 @@ html, body {
   align-items: flex-start;
   gap: 4px;
   padding: 7px 8px;
+  margin: 0 6px;             /* left/right breathing room within the panel */
   border-bottom: 1px solid var(--border);
+  border-radius: 4px;
 }
 /* Alternating row colors — light stripe pattern */
 .list-editor-items .list-item:nth-child(odd)  { background: #ffffff; }

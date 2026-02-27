@@ -20,10 +20,6 @@
 
   <!-- ── Left zone: aligns with #left-panel (340 px) ── -->
   <div class="header-zone-left">
-    <button type="button" class="btn btn-icon" id="sidebar-toggle"
-            title="Toggle panels" aria-label="Toggle layout panels">
-      <i class="fa-solid fa-table-columns"></i>
-    </button>
     <a href="/" class="logo" style="text-decoration:none;display:flex;align-items:center;gap:8px;overflow:hidden">
       <img src="/static/images/usbank-logo.png" class="logo-icon" alt="US Bank" />
       <span class="logo-text" style="white-space:nowrap">
@@ -41,37 +37,6 @@
 
   <!-- ── Right zone: aligns with .studio-props (260 px) ── -->
   <div class="header-zone-right">
-
-    <!-- VS Code-style layout toggle buttons -->
-    <div class="layout-btn-group" id="layout-btn-group" title="Toggle panels">
-      <!-- Left panel toggle -->
-      <button type="button" class="layout-btn layout-btn-active" id="btn-layout-left"
-              title="Toggle left panel" aria-label="Toggle left panel">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="1" width="14" height="14" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
-          <line x1="5.5" y1="1" x2="5.5" y2="15" stroke="currentColor" stroke-width="1.2"/>
-          <rect x="1.6" y="1.6" width="3.2" height="12.8" rx="0.5" fill="currentColor" opacity="0.55"/>
-        </svg>
-      </button>
-      <!-- Bottom panel toggle -->
-      <button type="button" class="layout-btn" id="btn-layout-bottom"
-              title="Toggle test panel" aria-label="Toggle bottom test panel">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="1" width="14" height="14" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
-          <line x1="1" y1="10.5" x2="15" y2="10.5" stroke="currentColor" stroke-width="1.2"/>
-          <rect x="1.6" y="11.1" width="12.8" height="3.3" rx="0.5" fill="currentColor" opacity="0.55"/>
-        </svg>
-      </button>
-      <!-- Right panel toggle -->
-      <button type="button" class="layout-btn layout-btn-active" id="btn-layout-right"
-              title="Toggle right panel" aria-label="Toggle right panel">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="1" width="14" height="14" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
-          <line x1="10.5" y1="1" x2="10.5" y2="15" stroke="currentColor" stroke-width="1.2"/>
-          <rect x="11.1" y="1.6" width="3.3" height="12.8" rx="0.5" fill="currentColor" opacity="0.55"/>
-        </svg>
-      </button>
-    </div>
 
     <a href="/runbook" target="_blank" id="btn-runbook-link" title="Open User Runbook"
        class="header-btn" style="text-decoration:none;color:#374151;">
@@ -107,13 +72,13 @@
 
   <div class="tb-sep"></div>
 
-  <!-- Zoom -->
-  <button class="tb-btn" id="tb-zoom-in" title="Zoom In (+)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-  </button>
-  <span class="toolbar-zoom-display" id="zoom-display">100%</span>
+  <!-- Zoom: out − | display | in + -->
   <button class="tb-btn" id="tb-zoom-out" title="Zoom Out (-)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+  </button>
+  <span class="toolbar-zoom-display" id="zoom-display">100%</span>
+  <button class="tb-btn" id="tb-zoom-in" title="Zoom In (+)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
   </button>
   <button class="tb-btn" id="tb-fit" title="Fit to view (F)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
@@ -295,16 +260,7 @@
               <i class="fa-solid fa-lock" style="font-size:10px"></i> Values editable · Keys locked
             </span>
           </div>
-          <!-- Font size zoom controls -->
-          <div class="json-font-size-ctrl">
-            <button class="btn-json-format json-font-btn" id="json-font-dec" title="Decrease font size (zoom out)">
-              <i class="fa-solid fa-magnifying-glass-minus"></i>
-            </button>
-            <span id="json-font-size-label">13px</span>
-            <button class="btn-json-format json-font-btn" id="json-font-inc" title="Increase font size (zoom in)">
-              <i class="fa-solid fa-magnifying-glass-plus"></i>
-            </button>
-          </div>
+          <!-- Font size zoom: use main toolbar zoom buttons instead -->
           <button class="btn-json-apply" id="json-overlay-apply-btn">
             <i class="fa-solid fa-check"></i> Apply to Canvas
           </button>
@@ -1140,6 +1096,10 @@
     if (_studioEditor && cfg !== null) {
       try { _studioEditor.set(cfg); } catch (e) { console.warn('[JSONEditor] set error', e); }
     }
+
+    /* Mirror font size in main toolbar zoom display */
+    var mainDisp = document.getElementById('zoom-display');
+    if (mainDisp) mainDisp.textContent = _jsonFontSize + 'px';
   }
 
   if (btnStudioCanvas) btnStudioCanvas.addEventListener('click', showCanvasMode);
@@ -1189,13 +1149,11 @@
     _jsonFontSize = Math.min(JSON_FONT_MAX, Math.max(JSON_FONT_MIN, sz));
     var container = $('studio-jsoneditor-container');
     if (container) container.style.fontSize = _jsonFontSize + 'px';
-    var lbl = $('json-font-size-label');
-    if (lbl) lbl.textContent = _jsonFontSize + 'px';
-    /* Dim dec button at min, inc button at max */
-    var dec = $('json-font-dec');
-    var inc = $('json-font-inc');
-    if (dec) dec.style.opacity = (_jsonFontSize <= JSON_FONT_MIN) ? '0.35' : '';
-    if (inc) inc.style.opacity = (_jsonFontSize >= JSON_FONT_MAX) ? '0.35' : '';
+    /* Mirror font size in the main toolbar zoom display while JSON editor is open */
+    var mainDisp = document.getElementById('zoom-display');
+    if (mainDisp && window.isJsonEditorActive && window.isJsonEditorActive()) {
+      mainDisp.textContent = _jsonFontSize + 'px';
+    }
   }
 
   /* Expose so toolbar zoom buttons can delegate to JSON editor when it's active */
@@ -1205,10 +1163,45 @@
     return jsonOverlay && jsonOverlay.classList.contains('json-active');
   };
 
-  var jsonFontInc = $('json-font-inc');
-  var jsonFontDec = $('json-font-dec');
-  if (jsonFontInc) jsonFontInc.addEventListener('click', function () { applyJsonFontSize(_jsonFontSize + 1); });
-  if (jsonFontDec) jsonFontDec.addEventListener('click', function () { applyJsonFontSize(_jsonFontSize - 1); });
+  /* ── Click-to-edit: single click starts editing a JSON value ─────────────
+     JSONEditor tree mode requires a click to SELECT then a second click to
+     begin editing a value.  This handler detects a click anywhere inside the
+     tree and immediately focuses the nearest contenteditable value cell so
+     the user can type straight away. */
+  (function () {
+    var jContainer = $('studio-jsoneditor-container');
+    if (!jContainer) return;
+    jContainer.addEventListener('mousedown', function (e) {
+      /* Find the closest contenteditable="true" element */
+      var el = e.target;
+      while (el && el !== jContainer) {
+        if (el.contentEditable === 'true') {
+          /* Already on the editable element — let browser handle it */
+          return;
+        }
+        el = el.parentElement;
+      }
+      /* If we clicked on a row, check whether there is a value cell in that row */
+      var row = e.target.closest('tr');
+      if (row) {
+        var valueEl = row.querySelector('[contenteditable="true"]');
+        if (valueEl) {
+          /* Small delay so JSONEditor's own mousedown finishes first */
+          setTimeout(function () { valueEl.focus(); }, 10);
+        }
+      }
+    }, false);
+
+    /* ── Tooltip on hover for key names ─────────────────────────────────── */
+    jContainer.addEventListener('mouseover', function (e) {
+      var field = e.target;
+      if (field.classList && field.classList.contains('jsoneditor-field')
+          && field.getAttribute('contenteditable') === 'false'
+          && !field.title) {
+        field.title = field.textContent.trim();
+      }
+    }, false);
+  }());
 
   /* ── + New Config button in left panel ── */
   var btnNewConfig = $('btn-new-config');
