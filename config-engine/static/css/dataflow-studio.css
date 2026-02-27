@@ -1197,11 +1197,56 @@ html, body {
   letter-spacing: 0.4px;
   color: var(--usb-blue);
 }
-.lch-name  { flex: 1; min-width: 80px; }
-.lch-type  { flex: 1; min-width: 70px; }
-.lch-start { width: 52px; text-align: center; }
-.lch-len   { width: 48px; text-align: center; }
+.lch-name  { flex: 1.8; min-width: 70px; }
+.lch-type  { flex: 1.2; min-width: 60px; }
+.lch-null  { width: 40px; text-align: center; }
+.lch-fmt   { flex: 1; min-width: 52px; }
+.lch-start { width: 44px; text-align: center; }
+.lch-len   { width: 44px; text-align: center; }
 .lch-del   { width: 20px; }
+
+/* Field editor row inputs */
+.lci-name  { flex: 1.8; min-width: 70px; }
+.lci-type  { flex: 1.2; min-width: 60px; }
+.lci-null-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  flex-shrink: 0;
+  gap: 1px;
+  cursor: pointer;
+}
+.lci-null-lbl  { font-size: 10px; color: #64748b; user-select: none; }
+.lci-nullable  { width: 14px; height: 14px; cursor: pointer; margin: 0; }
+.lci-fmt   { flex: 1; min-width: 52px; }
+.lci-start { width: 44px; }
+.lci-len   { width: 44px; }
+
+/* Output columns row with "From Step" import button */
+.po-cols-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+.po-cols-row .form-input,
+.po-cols-row input[type="text"] { flex: 1; min-width: 0; }
+.btn-sm.btn-link {
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--usb-blue);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 7px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+.btn-sm.btn-link:hover { background: rgba(0,56,168,.06); }
 
 .list-editor-items { max-height: 320px; overflow-y: auto; }
 
