@@ -57,6 +57,7 @@
   /* ================================================================
      STATE
   ================================================================ */
+  var _appSettings = {}; // loaded from /api/settings on init
   var nodes = [];
   var connections = [];
   var selectedNodeId = null;
@@ -746,6 +747,26 @@
       });
     }
     rebindPropsApply(node);
+  }
+
+  /* Sync canvas connections when user picks sources in the props panel.
+     Clears all connections TO this node, then re-creates from selectedAliases. */
+  function syncConnectionsFromSourceSelect(node, selectedAliases) {
+    var nodeId = node.step_id || node.id;
+    // Remove all existing connections into this node
+    connections = connections.filter(function(c) { return c.to !== nodeId; });
+    // Re-create for every selected alias
+    selectedAliases.filter(Boolean).forEach(function(alias) {
+      var srcNode = nodes.find(function(n) {
+        if ((n.step_id || n.id) === nodeId) return false;
+        if (n.type === 'input')  return (n.name || n.id) === alias;
+        if (n.type === 'output') return false;
+        return (n.output_alias || n.step_id || n.id) === alias;
+      });
+      if (srcNode) addConnection(srcNode.id, nodeId);
+    });
+    renderConnections();
+    updateStatus();
   }
 
   function addConnection(fromId, toId) {
@@ -1546,26 +1567,48 @@
   }
 
   /* ---- VALIDATE STEP ---- */
+  var _FAIL_MODE_TOOLTIP =
+    '<b>flag</b>: keeps all rows, adds <code>_is_valid</code> &amp; <code>_validation_errors</code> columns.<br>' +
+    '<b>drop</b>: removes invalid rows, routes them to the Error Bucket.<br>' +
+    '<b>abort</b>: raises an error immediately if any row fails validation.';
+
   function renderValidateProps(body, node) {
+    /* Pre-populate bucket paths from global settings if node fields are empty */
+    var defValidBucket = node.validation_bucket !== undefined
+      ? node.validation_bucket
+      : (_appSettings.validation_bucket_prefix || '');
+    var defErrorBucket = node.error_bucket !== undefined
+      ? node.error_bucket
+      : (_appSettings.error_bucket_prefix || '');
+
+    var failTooltipHtml =
+      '<span class="field-info-tooltip">' +
+        '<i class="fa-solid fa-circle-info info-icon"></i>' +
+        '<span class="tooltip-text">' + _FAIL_MODE_TOOLTIP + '</span>' +
+      '</span>';
+
     body.innerHTML =
       '<div class="props-section">' +
         '<div class="props-section-title">Step Info</div>' +
-        formRow('Step ID',    textInput('pv-id',   node.step_id,    'e.g. validate_accounts')) +
-        formRow('Description',textInput('pv-desc', node.description,'Describe this validation')) +
-        formRow('Output Alias',textInput('pv-alias',node.output_alias,'e.g. validated_data')) +
+        formRow('Step ID',     textInput('pv-id',   node.step_id,    'e.g. validate_accounts')) +
+        formRow('Description', textInput('pv-desc', node.description, 'Describe this validation')) +
+        formRow('Output Alias',textInput('pv-alias', node.output_alias, 'e.g. validated_data')) +
         formRow('Source Input', singleSourceSelect('pv-src', (node.source_inputs||[])[0] || '', node.id)) +
       '</div>' +
       '<div class="props-section">' +
         '<div class="props-section-title">Validation Settings</div>' +
-        '<div class="fixed-info-banner">' +
-          '<i class="fa-solid fa-circle-info"></i>' +
-          ' <b>flag</b>: adds <code>_is_valid</code> &amp; <code>_validation_errors</code> columns. ' +
-          '<b>drop</b>: removes invalid rows and routes them to the Error Bucket. <b>abort</b>: raises error if any row fails.' +
+        /* On Failure row with inline tooltip icon */
+        '<div class="form-row">' +
+          '<label>On Failure ' + failTooltipHtml + '</label>' +
+          selectInput('pv-fail-mode', FAIL_MODES, node.fail_mode || 'abort') +
         '</div>' +
-        formRow('On Failure', selectInput('pv-fail-mode', FAIL_MODES, node.fail_mode || 'flag')) +
+        formRow('Validation Bucket',
+          textInput('pv-validation-bucket', defValidBucket, 's3://bucket/validation/') +
+          '<span class="field-hint">S3 path for validation result records</span>'
+        ) +
         formRow('Error Bucket',
-          textInput('pv-error-bucket', node.error_bucket || '', '/datalake/errors/validate/') +
-          '<span class="field-hint">Path to write invalid rows in append mode (applies when fail mode is <b>drop</b>)</span>'
+          textInput('pv-error-bucket', defErrorBucket, 's3://bucket/errors/') +
+          '<span class="field-hint">S3 path for invalid rows (applies when On Failure = <b>drop</b>)</span>'
         ) +
       '</div>' +
       '<div class="props-section">' +
@@ -1577,13 +1620,13 @@
       '</div>';
     rebindPropsApply(node);
 
-    /* Show / hide pattern input when format changes in any rule row */
+    /* Show / hide pattern input when format changes in any rule card */
     var ruleEditor = document.getElementById('pv-rules-editor');
     if (ruleEditor) {
       ruleEditor.addEventListener('change', function(e) {
         if (e.target && e.target.classList.contains('vr-fmt')) {
-          var item    = e.target.closest('.validate-rule-item');
-          var patEl   = item && item.querySelector('.vr-pattern');
+          var card   = e.target.closest('.validate-rule-item');
+          var patEl  = card && card.querySelector('.vr-pattern');
           var showPat = (e.target.value === 'DATE' || e.target.value === 'REGEX');
           if (patEl) {
             patEl.style.display = showPat ? '' : 'none';
@@ -1593,46 +1636,22 @@
       });
     }
 
-    /* "From Schema" button — always loads rules from the source input's field schema */
+    /* "From Schema" button */
     var btnSchema = document.getElementById('btn-load-schema-rules');
     if (btnSchema) {
       btnSchema.addEventListener('click', function() {
-        // Sync source_inputs from the current text in pv-src
         var pvSrcEl = document.getElementById('pv-src');
-        if (pvSrcEl && pvSrcEl.value.trim()) {
-          node.source_inputs = [pvSrcEl.value.trim()].filter(Boolean);
-        }
+        if (pvSrcEl && pvSrcEl.value.trim()) node.source_inputs = [pvSrcEl.value.trim()].filter(Boolean);
         var fields = [];
         (node.source_inputs || []).some(function(alias) {
           var f = getFieldsForAlias(alias);
           if (f.length) { fields = f; return true; }
           return false;
         });
-        if (!fields.length) {
-          toast('No schema found for the selected source input(s). Make sure the source has fields defined.', 'error');
-          return;
-        }
+        if (!fields.length) { toast('No schema found for the selected source input(s).', 'error'); return; }
         node.validate_rules = fieldsToValidateRules(fields);
         refreshValidateRulesUI(node);
         toast('Loaded ' + fields.length + ' rule(s) from schema.', 'success');
-      });
-    }
-
-    /* pv-src change: auto-populate rules when source changes and rules are empty */
-    var pvSrcInput = document.getElementById('pv-src');
-    if (pvSrcInput) {
-      pvSrcInput.addEventListener('change', function() {
-        var v = pvSrcInput.value.trim();
-        if (!v) return;
-        node.source_inputs = [v];
-        // Only auto-populate when the rules editor is currently empty
-        var existingRules = document.querySelectorAll('#pv-rules-editor .validate-rule-item');
-        if (existingRules.length === 0) {
-          tryPrePopulateValidateRules(node);
-          if (node.validate_rules && node.validate_rules.length > 0) {
-            refreshValidateRulesUI(node);
-          }
-        }
       });
     }
   }
@@ -1714,36 +1733,36 @@
 
   /* Build the validation rules list editor */
   function buildValidationRulesEditor(ns, rules) {
-    var rows = rules.map(function(r, i) {
+    var cards = rules.map(function(r, i) {
       var showPattern = (r.format === 'REGEX' || r.format === 'DATE');
-      return '<div class="list-item validate-rule-item">' +
-        /* Row 1: Field + Type + nullable + × */
-        '<div class="validate-rule-row1">' +
-          '<input type="text"   placeholder="Field name" value="' + esc(r.field||'')     + '" data-field="field"    data-idx="' + i + '" class="vr-field"   title="Column name to validate" />' +
+      return '<div class="vr-card validate-rule-item">' +
+        /* Close button — top-right corner of card */
+        '<button class="vr-card-remove list-item-remove" data-ns="' + ns + '" data-idx="' + i + '" title="Remove rule">×</button>' +
+        /* Row 1: Field name + Data type + Nullable checkbox */
+        '<div class="vr-card-row">' +
+          '<input type="text" placeholder="Field name" value="' + esc(r.field||'') + '" data-field="field" data-idx="' + i + '" class="vr-field" title="Column name to validate" />' +
           selectOpts(VALIDATE_DTYPES, r.data_type||'TEXT', 'data-field="data_type" data-idx="' + i + '" class="vr-dtype" title="Expected data type"') +
-          '<label class="vr-nullable-wrap" title="Check nullable — uncheck = field is required">' +
-            '<input type="checkbox" data-field="nullable" data-idx="' + i + '" class="vr-nullable"' + (r.nullable !== false ? ' checked' : '') + '/>' +
+          '<label class="vr-nullable-wrap" title="Uncheck = field is required (must not be null)">' +
+            '<input type="checkbox" data-field="nullable" data-idx="' + i + '" class="vr-nullable"' + (r.nullable !== false ? ' checked' : '') + ' />' +
             '<span>Null OK</span>' +
           '</label>' +
-          '<button class="list-item-remove" data-ns="' + ns + '" data-idx="' + i + '" title="Remove rule">×</button>' +
         '</div>' +
-        /* Row 2: Max Length + Format + Pattern/DateFmt */
-        '<div class="validate-rule-row2">' +
+        /* Row 2: Max Length + Format + optional Pattern */
+        '<div class="vr-card-row vr-card-row2">' +
           '<label class="vr-sub-lbl">Max Len</label>' +
-          '<input type="number" placeholder="—"  value="' + esc(r.max_length||'') + '" data-field="max_length" data-idx="' + i + '" class="vr-maxlen" title="Maximum character length (blank = no check)" />' +
+          '<input type="number" placeholder="—" value="' + esc(r.max_length||'') + '" data-field="max_length" data-idx="' + i + '" class="vr-maxlen" title="Maximum character length (blank = no check)" />' +
           '<label class="vr-sub-lbl">Format</label>' +
           selectOpts(VALIDATE_FMTS, r.format||'ANY', 'data-field="format" data-idx="' + i + '" class="vr-fmt" title="Value format check"') +
-          '<input type="text" placeholder="' + (r.format === 'DATE' ? 'yyyy-MM-dd' : 'regex pattern') + '" value="' + esc(r.pattern||r.date_format||'') + '" data-field="pattern" data-idx="' + i + '" class="vr-pattern" title="Date format (yyyy-MM-dd) or regex pattern"' + (showPattern ? '' : ' style="display:none"') + ' />' +
+          '<input type="text" placeholder="' + (r.format === 'DATE' ? 'yyyy-MM-dd' : 'regex pattern') + '" value="' + esc(r.pattern||r.date_format||'') + '" data-field="pattern" data-idx="' + i + '" class="vr-pattern" title="Date format or regex pattern"' + (showPattern ? '' : ' style="display:none"') + ' />' +
         '</div>' +
       '</div>';
     }).join('');
 
-    return '<div class="list-editor" id="' + ns + '-editor">' +
+    return '<div class="list-editor vr-cards-editor" id="' + ns + '-editor">' +
       '<div class="list-editor-header">' +
         '<span>Rules (' + rules.length + ')</span>' +
-        '<span style="font-size:10px;color:#94a3b8">Field | Type | Nullable | MaxLen | Format | Pattern</span>' +
       '</div>' +
-      '<div class="list-editor-items">' + rows + '</div>' +
+      '<div class="vr-cards-list">' + cards + '</div>' +
       '<button class="btn-add-row" data-ns="' + ns + '" data-action="add-rule">+ Add Rule</button>' +
     '</div>';
   }
@@ -1936,6 +1955,20 @@
         var idx = parseInt(btn.getAttribute('data-idx'), 10);
         removeListRow(node, ns, idx);
         showPropsPanel(node);
+      });
+    });
+
+    // Auto-create canvas connections when source select changes
+    body.querySelectorAll('.multi-source-select').forEach(function(sel) {
+      sel.addEventListener('change', function() {
+        var selected = Array.from(sel.selectedOptions).map(function(o){ return o.value; });
+        syncConnectionsFromSourceSelect(node, selected);
+      });
+    });
+    body.querySelectorAll('.single-source-select').forEach(function(sel) {
+      sel.addEventListener('change', function() {
+        var selected = sel.value ? [sel.value] : [];
+        syncConnectionsFromSourceSelect(node, selected);
       });
     });
 
@@ -2142,8 +2175,9 @@
       node.description  = g('pv-desc');
       node.output_alias = g('pv-alias') || node.step_id;
       node.source_inputs = [getSingleSelectValue('pv-src')].filter(Boolean);
-      node.fail_mode    = g('pv-fail-mode') || 'flag';
-      node.error_bucket = g('pv-error-bucket') || '';
+      node.fail_mode         = g('pv-fail-mode') || 'abort';
+      node.validation_bucket = g('pv-validation-bucket') || '';
+      node.error_bucket      = g('pv-error-bucket') || '';
       /* Read validation rules from the editor DOM */
       var ruleItems = document.querySelectorAll('#pv-rules-editor .validate-rule-item');
       node.validate_rules = [];
@@ -2852,7 +2886,15 @@
   /* ================================================================
      INIT
   ================================================================ */
+  /* Load global app settings (bucket prefixes etc.) for use in prop panels */
+  function loadAppSettings() {
+    fetch('/api/settings').then(function(r){ return r.json(); }).then(function(d){
+      _appSettings = d || {};
+    }).catch(function(){});
+  }
+
   function init() {
+    loadAppSettings();
     setupPalette();
     setupCanvasEvents();
     setupToolbar();
