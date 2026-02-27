@@ -17,6 +17,10 @@
   var MAX_ZOOM = 2.5;
   var ELBOW_GAP = 30; // vertical gap from port before horizontal segment
 
+  /* Layout orientation — 'vertical' (default, top-to-bottom) or 'horizontal' (left-to-right).
+     Controls port positions and connection path routing. */
+  var layoutMode = 'vertical';
+
   /* SVG icons for each node type (used in node header) */
   var TYPE_ICONS = {
     input: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>',
@@ -806,15 +810,44 @@
   function getPortCenter(nodeId, portType) {
     var n = getNode(nodeId);
     if (!n) return {x:0, y:0};
-    var cx = n.x + n.width / 2;
+    var nw = n.width || NODE_W;
+    if (layoutMode === 'horizontal') {
+      /* Horizontal mode: out-port on right edge, in-port on left edge */
+      var cy = n.y + NODE_H / 2;
+      if (portType === 'out') return { x: n.x + nw, y: cy };
+      return { x: n.x, y: cy };
+    }
+    /* Vertical mode (default): out-port on bottom, in-port on top */
+    var cx = n.x + nw / 2;
     if (portType === 'out') return { x: cx, y: n.y + NODE_H };
     return { x: cx, y: n.y };
   }
 
   /* Build an orthogonal elbow path between two points.
-     Routing: from(x,y) → down ELBOW_GAP → horizontal to toX → up/down to to(y)
-     This produces clean straight right-angle connector lines. */
+     In vertical mode:  top-to-bottom Z-elbow (from bottom port → top port).
+     In horizontal mode: left-to-right Z-elbow (from right port → left port). */
   function elbowPath(from, to) {
+    if (layoutMode === 'horizontal') {
+      /* Horizontal: right-to-left flow */
+      if (to.x >= from.x) {
+        /* Forward edge: simple Z-curve going right */
+        var midX = Math.round((from.x + to.x) / 2);
+        return 'M ' + from.x + ' ' + from.y
+             + ' L ' + midX   + ' ' + from.y
+             + ' L ' + midX   + ' ' + to.y
+             + ' L ' + to.x   + ' ' + to.y;
+      }
+      /* Back edge: route above/below the nodes */
+      var sideY = Math.min(from.y, to.y) - 50;
+      return 'M ' + from.x          + ' ' + from.y
+           + ' L ' + (from.x + 32)  + ' ' + from.y
+           + ' L ' + (from.x + 32)  + ' ' + sideY
+           + ' L ' + (to.x   - 32)  + ' ' + sideY
+           + ' L ' + (to.x   - 32)  + ' ' + to.y
+           + ' L ' + to.x           + ' ' + to.y;
+    }
+
+    /* Vertical mode (default) */
     var mid1Y = from.y + ELBOW_GAP;
     var mid2Y = to.y   - ELBOW_GAP;
 
@@ -2837,33 +2870,78 @@
       var el = document.querySelector('[data-node-id="' + n.id + '"]');
       if (el) { el.style.left = n.x + 'px'; el.style.top = n.y + 'px'; }
     });
+    /* Switch to vertical port layout */
+    layoutMode = 'vertical';
+    var cw = document.querySelector('.studio-canvas-wrap');
+    if (cw) { cw.classList.remove('layout-h'); cw.classList.add('layout-v'); }
     renderConnections();
     fitCanvas();
   }
 
-  /* Horizontal layout — arranges all nodes left-to-right in topological order */
+  /* ── Horizontal layout — column-based, left-to-right flow ─────────────────
+     Assigns each node to a column by computing the longest input path (depth),
+     stacks multiple nodes at the same depth in rows within the column, and
+     connects them using left-right ports for clear flow direction. */
   function autoLayoutHorizontal() {
     if (nodes.length === 0) return;
-    var orderedIds  = topoSort();
-    var sorted = nodes.slice().sort(function(a, b) {
-      var ai = orderedIds.indexOf(a.id), bi = orderedIds.indexOf(b.id);
-      if (ai < 0) ai = 9999; if (bi < 0) bi = 9999;
-      return ai - bi;
+
+    /* Build in-edges map for depth calculation */
+    var inEdgesMap = {};
+    nodes.forEach(function(n) { inEdgesMap[n.id] = []; });
+    connections.forEach(function(c) {
+      if (inEdgesMap[c.to]) inEdgesMap[c.to].push(c.from);
     });
 
-    var colGap = NODE_W + 60;
-    var startX = 60;
-    var startY = 100;
+    /* Assign column (depth) = max(parent depths) + 1 */
+    var col = {};
+    var orderedIds = topoSort();
+    orderedIds.forEach(function(id) {
+      var parents = inEdgesMap[id] || [];
+      col[id] = parents.length === 0 ? 0
+              : Math.max.apply(null, parents.map(function(p) { return (col[p] || 0) + 1; }));
+    });
+    /* Fill in nodes not reached by topoSort */
+    nodes.forEach(function(n) { if (col[n.id] === undefined) col[n.id] = 0; });
 
-    sorted.forEach(function(n, i) {
-      n.x = snap(startX + i * colGap);
-      n.y = snap(startY);
+    /* Group nodes by column */
+    var colGroups = {};
+    nodes.forEach(function(n) {
+      var c = col[n.id];
+      if (!colGroups[c]) colGroups[c] = [];
+      colGroups[c].push(n);
+    });
+
+    var colW   = NODE_W + 80;   /* horizontal gap between columns  */
+    var rowH   = NODE_H + 40;   /* vertical gap between rows in a column */
+    var startX = 60;
+    var startY = 60;
+
+    /* Max rows in any column — used to vertically centre smaller groups */
+    var maxRows = 0;
+    Object.keys(colGroups).forEach(function(c) {
+      maxRows = Math.max(maxRows, colGroups[c].length);
+    });
+    var totalGridH = maxRows * rowH;
+
+    Object.keys(colGroups).sort(function(a, b) { return +a - +b; }).forEach(function(c) {
+      var group = colGroups[c];
+      var offsetY = Math.round((totalGridH - group.length * rowH) / 2);
+      group.forEach(function(n, rowIdx) {
+        n.x = snap(startX + (+c) * colW);
+        n.y = snap(startY + offsetY + rowIdx * rowH);
+      });
     });
 
     nodes.forEach(function(n) {
       var el = document.querySelector('[data-node-id="' + n.id + '"]');
       if (el) { el.style.left = n.x + 'px'; el.style.top = n.y + 'px'; }
     });
+
+    /* Switch to horizontal port layout */
+    layoutMode = 'horizontal';
+    var cw = document.querySelector('.studio-canvas-wrap');
+    if (cw) { cw.classList.add('layout-h'); cw.classList.remove('layout-v'); }
+
     renderConnections();
     fitCanvas();
   }
@@ -3189,7 +3267,16 @@
     window.studioFit              = fitCanvas;
     window.studioAutoLayout       = autoLayout;
     window.studioAutoLayoutH      = autoLayoutHorizontal;
-    window.studioClearCanvas = function() { nodes=[]; connections=[]; document.getElementById('canvas-nodes').innerHTML=''; document.getElementById('connections-group').innerHTML=''; deselectAll(); updateStatus(); };
+    window.studioClearCanvas = function() {
+      nodes=[]; connections=[];
+      document.getElementById('canvas-nodes').innerHTML='';
+      document.getElementById('connections-group').innerHTML='';
+      /* Reset to vertical mode on canvas clear */
+      layoutMode = 'vertical';
+      var cw = document.querySelector('.studio-canvas-wrap');
+      if (cw) { cw.classList.remove('layout-h'); cw.classList.add('layout-v'); }
+      deselectAll(); updateStatus();
+    };
     window.studioShowEmpty        = showEmptyProps;
   }
 
