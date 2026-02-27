@@ -46,10 +46,10 @@
   var FILTER_OPS      = ['==','!=','>','<','>=','<=','in','not_in'];
   var JOIN_TYPES      = ['inner','left','right','full'];
   var AGG_OPS         = ['sum','count','avg','min','max'];
-  var FORMATS_IN      = ['csv','parquet','cobol','fixed'];
-  var FORMATS_OUT     = ['parquet','csv','cobol'];
-  var WRITE_MODES     = ['overwrite','append'];
-  var FIELD_TYPES     = ['string','int','long','double','decimal','date','timestamp'];
+  var FORMATS_IN      = ['CSV','PARQUET','FIXED','DELIMITED'];
+  var FORMATS_OUT     = ['PARQUET','CSV','DELIMITED'];
+  var WRITE_MODES     = ['OVERWRITE','APPEND'];
+  var FIELD_TYPES     = ['STRING','INT','LONG','DOUBLE','DECIMAL','DATE','TIMESTAMP'];
   var VALIDATE_DTYPES = ['TEXT','NUMBER','DATE','TIMESTAMP'];
   var VALIDATE_FMTS   = ['ANY','ALPHA','NUMERIC','ALPHANUMERIC','DATE','EMAIL','REGEX'];
   var FAIL_MODES      = ['flag','drop','abort'];
@@ -152,7 +152,7 @@
     if (alertEl._hideTimer) clearTimeout(alertEl._hideTimer);
     alertEl._hideTimer = setTimeout(function() {
       alertEl.classList.remove('alert-show');
-    }, 3500);
+    }, type === 'error' ? 10000 : 3500);
   }
 
   /* Fallback visual toast used only when #studio-alert is not in the DOM */
@@ -942,34 +942,33 @@
   /* ---- INPUT NODE ---- */
   function renderInputProps(body, node) {
     var meta = getNodeMeta(node);
-    var cbBadgeHtml = meta.copybook_file
+    var schemaBadgeHtml = meta.copybook_file
       ? '<div class="import-file-badge visible">✓ ' + esc(meta.copybook_file) + ' (' + (meta.fields || 0) + ' fields)</div>'
       : '<div class="import-file-badge" id="pi-copybook-badge"></div>';
-    var cbBtnClass = meta.copybook_file ? ' has-file' : '';
-    var cbBtnLabel = meta.copybook_file
+    var schemaBtnClass = meta.copybook_file ? ' has-file' : '';
+    var schemaBtnLabel = meta.copybook_file
       ? '<i class="fa-solid fa-check"></i> ' + esc(meta.copybook_file) + ' (' + (meta.fields || 0) + ' fields)'
-      : '<i class="fa-solid fa-upload"></i> Upload Copybook (.cbl / .cpy)';
+      : '<i class="fa-solid fa-file-import"></i> Upload Schema File';
     var tfBadgeHtml = meta.test_file
       ? '<div class="import-file-badge visible">✓ ' + esc(meta.test_file) + ' (' + (meta.rows || 0) + ' rows)</div>'
       : '<div class="import-file-badge" id="pi-test-file-badge"></div>';
     var tfBtnClass = meta.test_file ? ' has-file' : '';
     var tfBtnLabel = meta.test_file
       ? '<i class="fa-solid fa-check"></i> ' + esc(meta.test_file) + ' (' + (meta.rows || 0) + ' rows)'
-      : '<i class="fa-solid fa-flask"></i> Upload Test CSV / File';
+      : '<i class="fa-solid fa-flask"></i> Upload Test Data File';
 
-    var isFixed = (node.format === 'fixed');
+    var curFmt = (node.format || '').toUpperCase();
+    var isFixed = (curFmt === 'FIXED');
 
     body.innerHTML =
       '<div class="props-section">' +
         '<div class="props-section-title">Basic</div>' +
         formRow('Name / ID', textInput('pi-name', node.name, 'e.g. CUSTOMER')) +
-        formRow('Format', selectInput('pi-format', FORMATS_IN, node.format)) +
-        formRow('Path', textInput('pi-path', node.path, 'data/input/file.csv')) +
-        formRow('S3 Path', textInput('pi-s3path', node.s3_path, 's3://bucket/path')) +
-        formRow('Dataset', textInput('pi-dataset', node.dataset, 'MAINFRAME.DATASET')) +
-        formRow('Copybook', textInput('pi-copybook', node.copybook, 'copybook_name')) +
+        formRow('Format', selectInput('pi-format', FORMATS_IN, curFmt || FORMATS_IN[0])) +
+        formRow('S3 Path', textInput('pi-s3path', node.s3_path, 's3://bucket/path/to/file')) +
+        formRow('Partition Column', textInput('pi-partition-col', node.partition_col !== undefined ? node.partition_col : 'load_date()', 'e.g. load_date()')) +
       '</div>' +
-      /* ── Fixed Width Settings — only visible when format = "fixed" ── */
+      /* ── Fixed Width Settings — only visible when format = "FIXED" ── */
       '<div class="props-section fixed-only-section" id="pi-fixed-section"' + (isFixed ? '' : ' style="display:none"') + '>' +
         '<div class="props-section-title">' +
           '<i class="fa-solid fa-ruler-horizontal" style="margin-right:6px;font-size:10px"></i>Fixed Width Settings' +
@@ -996,16 +995,23 @@
         '<div class="props-section-title">Fields</div>' +
         buildFieldsEditor('pi-fields', node.fields || []) +
         '<div class="props-import-section">' +
-          '<div class="props-import-title"><i class="fa-solid fa-file-code"></i> Import Copybook</div>' +
-          '<button type="button" class="btn-import-sm' + cbBtnClass + '" id="pi-import-copybook-btn">' +
-            cbBtnLabel +
+          '<div class="props-import-title"><i class="fa-solid fa-file-import"></i> Import Schema</div>' +
+          '<div class="schema-template-links">' +
+            '<span class="schema-tpl-label">Templates:</span>' +
+            '<a href="#" class="schema-tpl-link" data-fmt="csv">CSV</a>' +
+            '<a href="#" class="schema-tpl-link" data-fmt="json">JSON</a>' +
+            '<a href="#" class="schema-tpl-link" data-fmt="txt">Text</a>' +
+            '<a href="#" class="schema-tpl-link" data-fmt="cbl">COBOL</a>' +
+          '</div>' +
+          '<button type="button" class="btn-import-sm' + schemaBtnClass + '" id="pi-import-schema-btn">' +
+            schemaBtnLabel +
           '</button>' +
-          (meta.copybook_file ? cbBadgeHtml : '<div class="import-file-badge" id="pi-copybook-badge"></div>') +
+          (meta.copybook_file ? schemaBadgeHtml : '<div class="import-file-badge" id="pi-copybook-badge"></div>') +
         '</div>' +
       '</div>' +
       '<div class="props-section">' +
         '<div class="props-section-title">Test Data</div>' +
-        '<p style="font-size:12px;color:#64748b;margin-bottom:8px">Upload a CSV test file for this input node. Used during testing &amp; reconciliation.</p>' +
+        '<p style="font-size:12px;color:#64748b;margin-bottom:8px">Upload a test data file (CSV, fixed-width, delimited, DAT, etc.) for this input node.</p>' +
         '<button type="button" class="btn-import-sm' + tfBtnClass + '" id="pi-test-file-btn">' +
           tfBtnLabel +
         '</button>' +
@@ -1019,17 +1025,26 @@
     var piFixedSec  = document.getElementById('pi-fixed-section');
     if (piFormatSel && piFixedSec) {
       piFormatSel.addEventListener('change', function () {
-        piFixedSec.style.display = (this.value === 'fixed') ? '' : 'none';
+        piFixedSec.style.display = (this.value === 'FIXED') ? '' : 'none';
       });
     }
 
-    /* Bind Import Copybook */
-    var copybookBtn = document.getElementById('pi-import-copybook-btn');
-    if (copybookBtn) {
-      copybookBtn.addEventListener('click', function() {
-        pickAndParseCopybook(node, 'pi-fields', 'pi-copybook-badge', copybookBtn, 'input');
+    /* Bind Import Schema */
+    var schemaBtn = document.getElementById('pi-import-schema-btn');
+    if (schemaBtn) {
+      schemaBtn.addEventListener('click', function() {
+        pickAndParseSchema(node, 'pi-fields', 'pi-copybook-badge', schemaBtn, 'input');
       });
     }
+
+    /* Bind template download links */
+    body.querySelectorAll('.schema-tpl-link').forEach(function(a) {
+      a.addEventListener('click', function(e) {
+        e.preventDefault();
+        downloadSchemaTemplate(a.getAttribute('data-fmt'));
+      });
+    });
+
     /* Bind Test File */
     var testFileBtn = document.getElementById('pi-test-file-btn');
     if (testFileBtn) {
@@ -1042,13 +1057,13 @@
   /* ---- OUTPUT NODE ---- */
   function renderOutputProps(body, node) {
     var meta = getNodeMeta(node);
-    var cbBadgeHtml = meta.copybook_file
+    var schemaBadgeHtml = meta.copybook_file
       ? '<div class="import-file-badge visible">✓ ' + esc(meta.copybook_file) + ' (' + (meta.fields || 0) + ' fields)</div>'
       : '<div class="import-file-badge" id="po-copybook-badge"></div>';
-    var cbBtnClass = meta.copybook_file ? ' has-file' : '';
-    var cbBtnLabel = meta.copybook_file
+    var schemaBtnClass = meta.copybook_file ? ' has-file' : '';
+    var schemaBtnLabel = meta.copybook_file
       ? '<i class="fa-solid fa-check"></i> ' + esc(meta.copybook_file) + ' (' + (meta.fields || 0) + ' fields)'
-      : '<i class="fa-solid fa-upload"></i> Upload Copybook (.cbl / .cpy)';
+      : '<i class="fa-solid fa-file-import"></i> Upload Schema File';
     var tfBadgeHtml = meta.test_file
       ? '<div class="import-file-badge visible">✓ ' + esc(meta.test_file) + ' (' + (meta.rows || 0) + ' rows)</div>'
       : '<div class="import-file-badge" id="po-test-file-badge"></div>';
@@ -1057,25 +1072,33 @@
       ? '<i class="fa-solid fa-check"></i> ' + esc(meta.test_file) + ' (' + (meta.rows || 0) + ' rows)'
       : '<i class="fa-solid fa-flask"></i> Upload Expected Output CSV';
 
+    var curFmtO = (node.format || '').toUpperCase();
+
     body.innerHTML =
       '<div class="props-section">' +
         '<div class="props-section-title">Basic</div>' +
         formRow('Name / ID', textInput('po-name', node.name, 'e.g. REPORT1')) +
-        formRow('Format', selectInput('po-format', FORMATS_OUT, node.format)) +
-        formRow('Path', textInput('po-path', node.path, 'data/output/report')) +
+        formRow('Format', selectInput('po-format', FORMATS_OUT, curFmtO || FORMATS_OUT[0])) +
         formRow('S3 Path', textInput('po-s3path', node.s3_path, 's3://bucket/output')) +
-        formRow('Write Mode', selectInput('po-wmode', WRITE_MODES, node.write_mode)) +
+        formRow('Write Mode', selectInput('po-wmode', WRITE_MODES, (node.write_mode || '').toUpperCase() || WRITE_MODES[0])) +
         formRow('Output Columns (comma-sep)', textInput('po-outcols', node.output_columns, 'COL1, COL2, ...')) +
       '</div>' +
       '<div class="props-section">' +
         '<div class="props-section-title">Fields (optional)</div>' +
         buildFieldsEditor('po-fields', node.fields || []) +
         '<div class="props-import-section">' +
-          '<div class="props-import-title"><i class="fa-solid fa-file-code"></i> Import Copybook</div>' +
-          '<button type="button" class="btn-import-sm' + cbBtnClass + '" id="po-import-copybook-btn">' +
-            cbBtnLabel +
+          '<div class="props-import-title"><i class="fa-solid fa-file-import"></i> Import Schema</div>' +
+          '<div class="schema-template-links">' +
+            '<span class="schema-tpl-label">Templates:</span>' +
+            '<a href="#" class="schema-tpl-link" data-fmt="csv">CSV</a>' +
+            '<a href="#" class="schema-tpl-link" data-fmt="json">JSON</a>' +
+            '<a href="#" class="schema-tpl-link" data-fmt="txt">Text</a>' +
+            '<a href="#" class="schema-tpl-link" data-fmt="cbl">COBOL</a>' +
+          '</div>' +
+          '<button type="button" class="btn-import-sm' + schemaBtnClass + '" id="po-import-schema-btn">' +
+            schemaBtnLabel +
           '</button>' +
-          (meta.copybook_file ? cbBadgeHtml : '<div class="import-file-badge" id="po-copybook-badge"></div>') +
+          (meta.copybook_file ? schemaBadgeHtml : '<div class="import-file-badge" id="po-copybook-badge"></div>') +
         '</div>' +
       '</div>' +
       '<div class="props-section">' +
@@ -1087,12 +1110,19 @@
         (meta.test_file ? tfBadgeHtml : '<div class="import-file-badge" id="po-test-file-badge"></div>') +
       '</div>';
     rebindPropsApply(node);
-    var copybookBtn = document.getElementById('po-import-copybook-btn');
-    if (copybookBtn) {
-      copybookBtn.addEventListener('click', function() {
-        pickAndParseCopybook(node, 'po-fields', 'po-copybook-badge', copybookBtn, 'output');
+    var schemaBtn = document.getElementById('po-import-schema-btn');
+    if (schemaBtn) {
+      schemaBtn.addEventListener('click', function() {
+        pickAndParseSchema(node, 'po-fields', 'po-copybook-badge', schemaBtn, 'output');
       });
     }
+    /* Bind template download links */
+    body.querySelectorAll('.schema-tpl-link').forEach(function(a) {
+      a.addEventListener('click', function(e) {
+        e.preventDefault();
+        downloadSchemaTemplate(a.getAttribute('data-fmt'));
+      });
+    });
     var testFileBtn = document.getElementById('po-test-file-btn');
     if (testFileBtn) {
       testFileBtn.addEventListener('click', function() {
@@ -1160,6 +1190,197 @@
   }
 
   /* ================================================================
+     SCHEMA TEMPLATE DOWNLOADS
+  ================================================================ */
+  function _schemaTemplateContent(fmt) {
+    if (fmt === 'csv') {
+      return {
+        text: 'name,type,start,length\nFIELD1,STRING,1,10\nFIELD2,DECIMAL,11,10\nFIELD3,DATE,21,8\n',
+        mime: 'text/csv', filename: 'schema_template.csv'
+      };
+    } else if (fmt === 'json') {
+      return {
+        text: JSON.stringify({
+          fields: [
+            {name: 'FIELD1', type: 'STRING', start: 1, length: 10},
+            {name: 'FIELD2', type: 'DECIMAL', start: 11, length: 10},
+            {name: 'FIELD3', type: 'DATE', start: 21, length: 8}
+          ]
+        }, null, 2),
+        mime: 'application/json', filename: 'schema_template.json'
+      };
+    } else if (fmt === 'txt') {
+      return {
+        text: '# Schema Definition - pipe-delimited\n# Format: name|type|start|length\nFIELD1|STRING|1|10\nFIELD2|DECIMAL|11|10\nFIELD3|DATE|21|8\n',
+        mime: 'text/plain', filename: 'schema_template.txt'
+      };
+    } else if (fmt === 'cbl') {
+      return {
+        text: '      * COBOL Copybook Template\n       01  RECORD-LAYOUT.\n           05  FIELD1          PIC X(10).\n           05  FIELD2          PIC 9(8)V99.\n           05  FIELD3          PIC 9(8).\n',
+        mime: 'text/plain', filename: 'schema_template.cbl'
+      };
+    }
+    return null;
+  }
+
+  function downloadSchemaTemplate(fmt) {
+    var tpl = _schemaTemplateContent(fmt);
+    if (!tpl) return;
+    var blob = new Blob([tpl.text], {type: tpl.mime});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = tpl.filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+  }
+
+  /* ================================================================
+     SCHEMA CLIENT-SIDE PARSERS
+  ================================================================ */
+  function _parseSchemaCSV(text) {
+    var lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) return [];
+    var headers = lines[0].split(',').map(function(h) { return h.trim().toLowerCase(); });
+    var nameIdx = headers.indexOf('name');
+    var typeIdx = headers.indexOf('type');
+    var startIdx = headers.indexOf('start');
+    var lengthIdx = headers.indexOf('length');
+    if (nameIdx < 0) return [];
+    return lines.slice(1).filter(function(l) { return l.trim(); }).map(function(line) {
+      var parts = line.split(',');
+      return {
+        name: (parts[nameIdx] || '').trim(),
+        type: (parts[typeIdx] || 'STRING').trim().toUpperCase(),
+        start: startIdx >= 0 ? (parseInt((parts[startIdx] || ''), 10) || undefined) : undefined,
+        length: lengthIdx >= 0 ? (parseInt((parts[lengthIdx] || ''), 10) || undefined) : undefined
+      };
+    }).filter(function(f) { return f.name; });
+  }
+
+  function _parseSchemaJSON(text) {
+    var obj = JSON.parse(text);
+    var fields = obj.fields || obj.schema || obj;
+    if (!Array.isArray(fields)) return [];
+    return fields.map(function(f) {
+      return {
+        name: f.name || '',
+        type: (f.type || 'STRING').toUpperCase(),
+        start: f.start,
+        length: f.length
+      };
+    }).filter(function(f) { return f.name; });
+  }
+
+  function _parseSchemaTxt(text) {
+    var lines = text.trim().split(/\r?\n/);
+    return lines
+      .filter(function(l) { return l.trim() && !l.trim().startsWith('#'); })
+      .map(function(line) {
+        var parts = line.split('|');
+        return {
+          name: (parts[0] || '').trim(),
+          type: (parts[1] || 'STRING').trim().toUpperCase(),
+          start: parseInt((parts[2] || ''), 10) || undefined,
+          length: parseInt((parts[3] || ''), 10) || undefined
+        };
+      }).filter(function(f) { return f.name; });
+  }
+
+  function _applySchemaFields(parsedFields, filename, node, fieldsEditorId, badgeId, btn, configPath, nodeType) {
+    node.fields = parsedFields.map(function(f) {
+      return {name: f.name, type: (f.type || 'STRING').toUpperCase(), length: f.length, start: f.start, nullable: true};
+    });
+    var fe = document.getElementById(fieldsEditorId + '-editor');
+    if (fe) fe.outerHTML = buildFieldsEditor(fieldsEditorId, node.fields);
+    var badge = document.getElementById(badgeId);
+    if (badge) { badge.textContent = '✓ ' + parsedFields.length + ' fields from ' + filename; badge.classList.add('visible'); }
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> ' + esc(filename) + ' (' + parsedFields.length + ' fields)';
+    btn.classList.add('has-file');
+    if (!_nodeFileMeta[configPath]) _nodeFileMeta[configPath] = {};
+    var existing = _nodeFileMeta[configPath][node.name || node.id] || {};
+    existing.copybook_file = filename;
+    existing.fields = parsedFields.length;
+    existing.type = nodeType || 'input';
+    _nodeFileMeta[configPath][node.name || node.id] = existing;
+  }
+
+  /* ================================================================
+     IMPORT SCHEMA — multi-format (COBOL server-side; JSON/CSV/TXT client-side)
+  ================================================================ */
+  function pickAndParseSchema(node, fieldsEditorId, badgeId, btn, nodeType) {
+    var configPath = (document.getElementById('current-file') || {}).textContent || '';
+    if (!configPath || configPath === 'Select a configuration') {
+      toast('Select a configuration before importing a schema', 'error'); return;
+    }
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.cbl,.cpy,.cob,.json,.csv,.txt,.xlsx';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.addEventListener('change', function() {
+      var file = input.files && input.files[0];
+      if (!file) { document.body.removeChild(input); return; }
+      var ext = file.name.split('.').pop().toLowerCase();
+
+      if (['cbl', 'cpy', 'cob'].indexOf(ext) >= 0) {
+        /* COBOL — server-side parsing (existing endpoint) */
+        var fd = new FormData();
+        fd.append('file', file);
+        fd.append('node_name', node.name || node.id);
+        fd.append('node_type', nodeType || 'input');
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Parsing…';
+        btn.disabled = true;
+        fetch('/api/config/' + encodeURIComponent(configPath) + '/node-copybook', {method: 'POST', body: fd})
+          .then(function(r) { return r.json(); })
+          .then(function(res) {
+            btn.disabled = false;
+            if (res.error) { toast('Schema parse error: ' + res.error, 'error'); return; }
+            var fields = res.fields || [];
+            _applySchemaFields(fields, file.name, node, fieldsEditorId, badgeId, btn, configPath, nodeType);
+            toast('Schema imported: ' + fields.length + ' fields', 'success');
+          })
+          .catch(function(e) {
+            btn.disabled = false;
+            toast('Schema import failed: ' + (e.message || e), 'error');
+          });
+      } else {
+        /* JSON / CSV / TXT — client-side parsing */
+        var reader = new FileReader();
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Parsing…';
+        btn.disabled = true;
+        reader.onload = function(ev) {
+          btn.disabled = false;
+          try {
+            var text = ev.target.result;
+            var fields = [];
+            if (ext === 'json') {
+              fields = _parseSchemaJSON(text);
+            } else if (ext === 'csv') {
+              fields = _parseSchemaCSV(text);
+            } else {
+              fields = _parseSchemaTxt(text);
+            }
+            if (!fields.length) { toast('No fields found in schema file. Check the format.', 'error'); return; }
+            _applySchemaFields(fields, file.name, node, fieldsEditorId, badgeId, btn, configPath, nodeType);
+            toast('Schema imported: ' + fields.length + ' fields', 'success');
+          } catch(e) {
+            toast('Schema parse failed: ' + e.message, 'error');
+          }
+        };
+        reader.onerror = function() { btn.disabled = false; toast('File read failed', 'error'); };
+        reader.readAsText(file);
+      }
+      document.body.removeChild(input);
+    });
+    input.click();
+  }
+
+  /* Keep old name as alias for backward-compat (in case any other caller uses it) */
+  var pickAndParseCopybook = pickAndParseSchema;
+
+  /* ================================================================
      TEST FILE UPLOAD — stores per-node CSV test file
   ================================================================ */
   function uploadNodeTestFile(node, badgeId, btn, nodeType) {
@@ -1169,7 +1390,7 @@
     }
     var input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.csv,.txt,.tsv,.dat';
+    input.accept = '.csv,.txt,.tsv,.dat,.fixed,.del';
     input.style.display = 'none';
     document.body.appendChild(input);
     input.addEventListener('change', function() {
@@ -1533,14 +1754,19 @@
 
   function buildFieldsEditor(ns, fields) {
     var rows = fields.map(function(f, i) {
+      var curType = (f.type || 'STRING').toUpperCase();
       return '<div class="list-item">' +
         '<div class="list-item-inputs">' +
           '<input type="text" placeholder="Field name" value="' + esc(f.name||'') + '" data-field="name" data-idx="' + i + '" class="lci-name" title="Field name" />' +
-          selectOpts(['string','int','long','double','decimal','date','timestamp'], f.type||'string', 'data-field="type" data-idx="' + i + '" class="lci-type" title="Data type"') +
+          selectOpts(FIELD_TYPES, curType, 'data-field="type" data-idx="' + i + '" class="lci-type" title="Data type"') +
           '<input type="number" placeholder="1" value="' + esc(f.start||'') + '" data-field="start" data-idx="' + i + '" class="lci-start" title="Start position (1-based)" />' +
           '<input type="number" placeholder="0" value="' + esc(f.length||'') + '" data-field="length" data-idx="' + i + '" class="lci-len" title="Field length in characters" />' +
         '</div>' +
-        '<button class="list-item-remove" data-ns="' + ns + '" data-idx="' + i + '" title="Remove field">×</button>' +
+        '<div class="list-item-actions">' +
+          '<button class="list-item-up" data-ns="' + ns + '" data-idx="' + i + '" title="Move up"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
+          '<button class="list-item-down" data-ns="' + ns + '" data-idx="' + i + '" title="Move down"' + (i === fields.length - 1 ? ' disabled' : '') + '>↓</button>' +
+          '<button class="list-item-remove" data-ns="' + ns + '" data-idx="' + i + '" title="Remove field">×</button>' +
+        '</div>' +
       '</div>';
     }).join('');
     return '<div class="list-editor" id="' + ns + '-editor">' +
@@ -1689,6 +1915,19 @@
       });
     });
 
+    // Move row up / down buttons
+    body.querySelectorAll('.list-item-up, .list-item-down').forEach(function(mbtn) {
+      mbtn.addEventListener('click', function() {
+        if (mbtn.disabled) return;
+        readListEditorIntoNode(node);
+        var ns  = mbtn.getAttribute('data-ns');
+        var idx = parseInt(mbtn.getAttribute('data-idx'), 10);
+        var dir = mbtn.classList.contains('list-item-up') ? -1 : 1;
+        moveListRow(node, ns, idx, dir);
+        showPropsPanel(node);
+      });
+    });
+
     // Remove row buttons
     body.querySelectorAll('.list-item-remove').forEach(function(btn) {
       btn.addEventListener('click', function() {
@@ -1719,22 +1958,30 @@
     }
   }
 
+  function _getListArr(node, ns) {
+    if (ns === 'pi-fields' || ns === 'po-fields') return node.fields;
+    if (ns === 'ps-exprs') return node.select_expressions;
+    if (ns === 'pf-conds') return node.filter_conditions;
+    if (ns === 'pj-keys') return node.join_keys;
+    if (ns === 'pa-grp') return node.agg_group_by;
+    if (ns === 'pa-aggs') return node.agg_aggregations;
+    if (ns === 'pv-rules') return node.validate_rules;
+    return null;
+  }
+
   function removeListRow(node, ns, idx) {
-    if (ns === 'pi-fields' || ns === 'po-fields') {
-      node.fields.splice(idx, 1);
-    } else if (ns === 'ps-exprs') {
-      node.select_expressions.splice(idx, 1);
-    } else if (ns === 'pf-conds') {
-      node.filter_conditions.splice(idx, 1);
-    } else if (ns === 'pj-keys') {
-      node.join_keys.splice(idx, 1);
-    } else if (ns === 'pa-grp') {
-      node.agg_group_by.splice(idx, 1);
-    } else if (ns === 'pa-aggs') {
-      node.agg_aggregations.splice(idx, 1);
-    } else if (ns === 'pv-rules') {
-      if (node.validate_rules) node.validate_rules.splice(idx, 1);
-    }
+    var arr = _getListArr(node, ns);
+    if (arr) arr.splice(idx, 1);
+  }
+
+  function moveListRow(node, ns, idx, dir) {
+    var arr = _getListArr(node, ns);
+    if (!arr) return;
+    var newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= arr.length) return;
+    var tmp = arr[idx];
+    arr[idx] = arr[newIdx];
+    arr[newIdx] = tmp;
   }
 
   function readListEditorIntoNode(node) {
@@ -1809,14 +2056,16 @@
 
     if (node.type === 'input') {
       var oldName = node.name;
-      node.name   = g('pi-name') || node.id;
-      node.id     = node.name; // sync id with name for inputs
-      node.format = g('pi-format');
-      node.path   = g('pi-path');
-      node.s3_path= g('pi-s3path');
-      node.dataset= g('pi-dataset');
-      node.copybook=g('pi-copybook');
-      /* Fixed-width specific fields — collected whenever format is fixed */
+      node.name          = g('pi-name') || node.id;
+      node.id            = node.name; // sync id with name for inputs
+      node.format        = g('pi-format');
+      node.s3_path       = g('pi-s3path');
+      node.partition_col = g('pi-partition-col') || 'load_date()';
+      /* Remove legacy fields that are no longer used */
+      delete node.path;
+      delete node.dataset;
+      delete node.copybook;
+      /* Fixed-width specific fields — collected whenever format is FIXED */
       var _rl = parseInt(g('pi-record-length'), 10);
       var _hc = parseInt(g('pi-header-count'),  10);
       var _tc = parseInt(g('pi-trailer-count'), 10);
@@ -1845,10 +2094,10 @@
       node.name      = g('po-name') || node.id;
       node.id        = node.name;
       node.format    = g('po-format');
-      node.path      = g('po-path');
       node.s3_path   = g('po-s3path');
       node.write_mode= g('po-wmode');
       node.output_columns = g('po-outcols');
+      delete node.path;
       if (oldNameO && oldNameO !== node.name) {
         var elO = document.querySelector('[data-node-id="' + oldNameO + '"]');
         if (elO) elO.setAttribute('data-node-id', node.id);
