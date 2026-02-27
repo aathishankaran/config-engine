@@ -47,9 +47,10 @@
   var JOIN_TYPES      = ['inner','left','right','full'];
   var AGG_OPS         = ['sum','count','avg','min','max'];
   var FORMATS_IN      = ['CSV','PARQUET','FIXED','DELIMITED'];
-  var FORMATS_OUT     = ['PARQUET','CSV','DELIMITED'];
+  var FORMATS_OUT     = ['PARQUET','CSV','DELIMITED','FIXED'];
   var WRITE_MODES     = ['OVERWRITE','APPEND'];
   var FIELD_TYPES     = ['STRING','INT','LONG','DOUBLE','DECIMAL','DATE','TIMESTAMP'];
+  var FREQUENCIES     = ['DAILY','WEEKLY','MONTHLY'];
   var VALIDATE_DTYPES = ['TEXT','NUMBER','DATE','TIMESTAMP'];
   var VALIDATE_FMTS   = ['ANY','ALPHA','NUMERIC','ALPHANUMERIC','DATE','EMAIL','REGEX'];
   var FAIL_MODES      = ['flag','drop','abort'];
@@ -963,23 +964,29 @@
   /* ---- INPUT NODE ---- */
   function renderInputProps(body, node) {
     var meta = getNodeMeta(node);
-    var schemaBadgeHtml = meta.copybook_file
-      ? '<div class="import-file-badge visible">✓ ' + esc(meta.copybook_file) + ' (' + (meta.fields || 0) + ' fields)</div>'
+    /* Use in-memory meta first; fall back to node._schema_file persisted in config JSON */
+    var schemaFile = meta.copybook_file || node._schema_file || '';
+    var schemaFieldCount = meta.fields || (node.fields ? node.fields.length : 0);
+    var schemaBadgeHtml = schemaFile
+      ? '<div class="import-file-badge visible">✓ ' + esc(schemaFile) + ' (' + schemaFieldCount + ' fields)</div>'
       : '<div class="import-file-badge" id="pi-copybook-badge"></div>';
-    var schemaBtnClass = meta.copybook_file ? ' has-file' : '';
-    var schemaBtnLabel = meta.copybook_file
-      ? '<i class="fa-solid fa-check"></i> ' + esc(meta.copybook_file) + ' (' + (meta.fields || 0) + ' fields)'
+    var schemaBtnClass = schemaFile ? ' has-file' : '';
+    var schemaBtnLabel = schemaFile
+      ? '<i class="fa-solid fa-check"></i> ' + esc(schemaFile) + ' (' + schemaFieldCount + ' fields)'
       : '<i class="fa-solid fa-file-import"></i> Upload Schema File';
-    var tfBadgeHtml = meta.test_file
-      ? '<div class="import-file-badge visible">✓ ' + esc(meta.test_file) + ' (' + (meta.rows || 0) + ' rows)</div>'
+    var testFile = meta.test_file || node._test_file || '';
+    var testRows = meta.rows !== undefined ? meta.rows : (node._test_rows || 0);
+    var tfBadgeHtml = testFile
+      ? '<div class="import-file-badge visible">✓ ' + esc(testFile) + ' (' + testRows + ' rows)</div>'
       : '<div class="import-file-badge" id="pi-test-file-badge"></div>';
-    var tfBtnClass = meta.test_file ? ' has-file' : '';
-    var tfBtnLabel = meta.test_file
-      ? '<i class="fa-solid fa-check"></i> ' + esc(meta.test_file) + ' (' + (meta.rows || 0) + ' rows)'
+    var tfBtnClass = testFile ? ' has-file' : '';
+    var tfBtnLabel = testFile
+      ? '<i class="fa-solid fa-check"></i> ' + esc(testFile) + ' (' + testRows + ' rows)'
       : '<i class="fa-solid fa-flask"></i> Upload Test Data File';
 
     var curFmt = (node.format || '').toUpperCase();
     var isFixed = (curFmt === 'FIXED');
+    var curFreq = (node.frequency || '').toUpperCase();
 
     body.innerHTML =
       '<div class="props-section">' +
@@ -988,6 +995,12 @@
         formRow('Format', selectInput('pi-format', FORMATS_IN, curFmt || FORMATS_IN[0])) +
         formRow('S3 Path', textInput('pi-s3path', node.s3_path, 's3://bucket/path/to/file')) +
         formRow('Partition Column', textInput('pi-partition-col', node.partition_col !== undefined ? node.partition_col : 'load_date()', 'e.g. load_date()')) +
+        formRow('Frequency',
+          '<select id="pi-frequency" class="form-select">' +
+            '<option value="">-- Select --</option>' +
+            FREQUENCIES.map(function(f){ return '<option value="' + f + '"' + (curFreq === f ? ' selected' : '') + '>' + f + '</option>'; }).join('') +
+          '</select>' +
+          '<span class="field-hint">How often this dataset is refreshed</span>') +
       '</div>' +
       /* ── Fixed Width Settings — only visible when format = "FIXED" ── */
       '<div class="props-section fixed-only-section" id="pi-fixed-section"' + (isFixed ? '' : ' style="display:none"') + '>' +
@@ -1078,34 +1091,82 @@
   /* ---- OUTPUT NODE ---- */
   function renderOutputProps(body, node) {
     var meta = getNodeMeta(node);
-    var schemaBadgeHtml = meta.copybook_file
-      ? '<div class="import-file-badge visible">✓ ' + esc(meta.copybook_file) + ' (' + (meta.fields || 0) + ' fields)</div>'
+    /* Schema badge: in-memory meta OR persisted node._schema_file */
+    var schemaFileO = meta.copybook_file || node._schema_file || '';
+    var schemaFieldCountO = meta.fields || (node.fields ? node.fields.length : 0);
+    var schemaBadgeHtml = schemaFileO
+      ? '<div class="import-file-badge visible">✓ ' + esc(schemaFileO) + ' (' + schemaFieldCountO + ' fields)</div>'
       : '<div class="import-file-badge" id="po-copybook-badge"></div>';
-    var schemaBtnClass = meta.copybook_file ? ' has-file' : '';
-    var schemaBtnLabel = meta.copybook_file
-      ? '<i class="fa-solid fa-check"></i> ' + esc(meta.copybook_file) + ' (' + (meta.fields || 0) + ' fields)'
+    var schemaBtnClass = schemaFileO ? ' has-file' : '';
+    var schemaBtnLabel = schemaFileO
+      ? '<i class="fa-solid fa-check"></i> ' + esc(schemaFileO) + ' (' + schemaFieldCountO + ' fields)'
       : '<i class="fa-solid fa-file-import"></i> Upload Schema File';
-    var tfBadgeHtml = meta.test_file
-      ? '<div class="import-file-badge visible">✓ ' + esc(meta.test_file) + ' (' + (meta.rows || 0) + ' rows)</div>'
+    /* Test-file badge */
+    var testFileO = meta.test_file || node._test_file || '';
+    var testRowsO = meta.rows !== undefined ? meta.rows : (node._test_rows || 0);
+    var tfBadgeHtml = testFileO
+      ? '<div class="import-file-badge visible">✓ ' + esc(testFileO) + ' (' + testRowsO + ' rows)</div>'
       : '<div class="import-file-badge" id="po-test-file-badge"></div>';
-    var tfBtnClass = meta.test_file ? ' has-file' : '';
-    var tfBtnLabel = meta.test_file
-      ? '<i class="fa-solid fa-check"></i> ' + esc(meta.test_file) + ' (' + (meta.rows || 0) + ' rows)'
+    var tfBtnClass = testFileO ? ' has-file' : '';
+    var tfBtnLabel = testFileO
+      ? '<i class="fa-solid fa-check"></i> ' + esc(testFileO) + ' (' + testRowsO + ' rows)'
       : '<i class="fa-solid fa-flask"></i> Upload Expected Output CSV';
 
     var curFmtO = (node.format || '').toUpperCase();
+    var isFixedO = (curFmtO === 'FIXED');
+    var curFreqO = (node.frequency || '').toUpperCase();
 
     body.innerHTML =
       '<div class="props-section">' +
         '<div class="props-section-title">Basic</div>' +
         formRow('Name / ID', textInput('po-name', node.name, 'e.g. REPORT1')) +
+        formRow('Source Input', multiSourceSelect('po-src', node.source_inputs || [], node.id)) +
         formRow('Format', selectInput('po-format', FORMATS_OUT, curFmtO || FORMATS_OUT[0])) +
         formRow('S3 Path', textInput('po-s3path', node.s3_path, 's3://bucket/output')) +
         formRow('Write Mode', selectInput('po-wmode', WRITE_MODES, (node.write_mode || '').toUpperCase() || WRITE_MODES[0])) +
-        formRow('Output Columns (comma-sep)', textInput('po-outcols', node.output_columns, 'COL1, COL2, ...')) +
+        formRow('Frequency',
+          '<select id="po-frequency" class="form-select">' +
+            '<option value="">-- Select --</option>' +
+            FREQUENCIES.map(function(f){ return '<option value="' + f + '"' + (curFreqO === f ? ' selected' : '') + '>' + f + '</option>'; }).join('') +
+          '</select>' +
+          '<span class="field-hint">How often this output is produced</span>') +
+        formRow('Output Columns',
+          '<div class="po-cols-row">' +
+            '<input type="text" id="po-outcols" value="' + esc(node.output_columns || '') + '" placeholder="COL1, COL2, ..." class="form-input" />' +
+            '<button type="button" class="btn-sm btn-link" id="po-import-from-step-btn" title="Import column list from the connected source step">' +
+              '<i class="fa-solid fa-arrow-down"></i> From Step' +
+            '</button>' +
+          '</div>' +
+          '<span class="field-hint">Comma-separated; leave blank to write all columns</span>') +
+      '</div>' +
+      /* ── Fixed Width Output Settings — only visible when format = "FIXED" ── */
+      '<div class="props-section fixed-only-section" id="po-fixed-section"' + (isFixedO ? '' : ' style="display:none"') + '>' +
+        '<div class="props-section-title">' +
+          '<i class="fa-solid fa-ruler-horizontal" style="margin-right:6px;font-size:10px"></i>Fixed Width Settings' +
+        '</div>' +
+        formRow('Record Length',
+          textInput('po-record-length', node.record_length !== undefined ? node.record_length : '', 'e.g. 200') +
+          '<span class="field-hint">Total character width of one output record</span>') +
+        formRow('Header Records',
+          textInput('po-header-count', node.header_count !== undefined ? node.header_count : '0', '0') +
+          '<span class="field-hint">Number of header lines to write at top of file</span>') +
+        formRow('Trailer Records',
+          textInput('po-trailer-count', node.trailer_count !== undefined ? node.trailer_count : '0', '0') +
+          '<span class="field-hint">Number of trailer lines to write at bottom of file</span>') +
+        formRow('Control File Path',
+          textInput('po-control-path', node.control_file_path || '', 'path/to/output.ctl') +
+          '<span class="field-hint">Path for control file with record count / metadata</span>') +
+      '</div>' +
+      /* ── Control File Schema — only visible when format = "FIXED" ── */
+      '<div class="props-section fixed-only-section" id="po-control-section"' + (isFixedO ? '' : ' style="display:none"') + '>' +
+        '<div class="props-section-title">' +
+          '<i class="fa-solid fa-file-lines" style="margin-right:6px;font-size:10px"></i>Control File Schema' +
+        '</div>' +
+        '<p style="font-size:12px;color:#64748b;margin-bottom:8px">Define the fixed-width layout of the control file (metadata records).</p>' +
+        buildFieldsEditor('po-ctrl-fields', node.control_fields || []) +
       '</div>' +
       '<div class="props-section">' +
-        '<div class="props-section-title">Fields (optional)</div>' +
+        '<div class="props-section-title">Output Fields (optional)</div>' +
         buildFieldsEditor('po-fields', node.fields || []) +
         '<div class="props-import-section">' +
           '<div class="props-import-title"><i class="fa-solid fa-file-import"></i> Import Schema</div>' +
@@ -1119,7 +1180,7 @@
           '<button type="button" class="btn-import-sm' + schemaBtnClass + '" id="po-import-schema-btn">' +
             schemaBtnLabel +
           '</button>' +
-          (meta.copybook_file ? schemaBadgeHtml : '<div class="import-file-badge" id="po-copybook-badge"></div>') +
+          (schemaFileO ? schemaBadgeHtml : '<div class="import-file-badge" id="po-copybook-badge"></div>') +
         '</div>' +
       '</div>' +
       '<div class="props-section">' +
@@ -1128,27 +1189,89 @@
         '<button type="button" class="btn-import-sm' + tfBtnClass + '" id="po-test-file-btn">' +
           tfBtnLabel +
         '</button>' +
-        (meta.test_file ? tfBadgeHtml : '<div class="import-file-badge" id="po-test-file-badge"></div>') +
+        (testFileO ? tfBadgeHtml : '<div class="import-file-badge" id="po-test-file-badge"></div>') +
       '</div>';
+
     rebindPropsApply(node);
+
+    /* Show / hide Fixed Width + Control File sections when format changes */
+    var poFormatSel = document.getElementById('po-format');
+    var poFixedSec  = document.getElementById('po-fixed-section');
+    var poCtrlSec   = document.getElementById('po-control-section');
+    if (poFormatSel && poFixedSec) {
+      poFormatSel.addEventListener('change', function () {
+        var isF = (this.value === 'FIXED');
+        poFixedSec.style.display = isF ? '' : 'none';
+        if (poCtrlSec) poCtrlSec.style.display = isF ? '' : 'none';
+      });
+    }
+
+    /* Import columns from connected source step */
+    var importStepBtn = document.getElementById('po-import-from-step-btn');
+    if (importStepBtn) {
+      importStepBtn.addEventListener('click', function() {
+        importColumnsFromSourceStep(node);
+      });
+    }
+
+    /* Schema import button */
     var schemaBtn = document.getElementById('po-import-schema-btn');
     if (schemaBtn) {
       schemaBtn.addEventListener('click', function() {
         pickAndParseSchema(node, 'po-fields', 'po-copybook-badge', schemaBtn, 'output');
       });
     }
-    /* Bind template download links */
+    /* Template download links */
     body.querySelectorAll('.schema-tpl-link').forEach(function(a) {
       a.addEventListener('click', function(e) {
         e.preventDefault();
         downloadSchemaTemplate(a.getAttribute('data-fmt'));
       });
     });
+    /* Expected output CSV */
     var testFileBtn = document.getElementById('po-test-file-btn');
     if (testFileBtn) {
       testFileBtn.addEventListener('click', function() {
         uploadNodeTestFile(node, 'po-test-file-badge', testFileBtn, 'output');
       });
+    }
+  }
+
+  /* Import column names from the first connected source node into the Output Columns field */
+  function importColumnsFromSourceStep(node) {
+    var sources = node.source_inputs || getMultiSelectValues('po-src');
+    if (!sources.length) {
+      toast('No source inputs selected. Choose a Source Input first.', 'error');
+      return;
+    }
+    var alias = sources[0];
+    var srcNode = nodes.find(function(n) {
+      if (n.type === 'input')  return (n.name || n.id) === alias;
+      if (n.type === 'output') return false;
+      return (n.output_alias || n.step_id || n.id) === alias;
+    });
+    if (!srcNode) {
+      toast('Source "' + alias + '" not found on canvas.', 'error');
+      return;
+    }
+    var cols = [];
+    if (srcNode.fields && srcNode.fields.length > 0) {
+      cols = srcNode.fields.filter(function(f){ return f.name; }).map(function(f){ return f.name; });
+    } else if (srcNode.select_expressions && srcNode.select_expressions.length > 0) {
+      cols = srcNode.select_expressions.filter(function(e){ return e.target; }).map(function(e){ return e.target; });
+    } else if (srcNode.agg_aggregations && srcNode.agg_aggregations.length > 0) {
+      var grpCols = (srcNode.agg_group_by || []).map(function(g){ return g.col || g; }).filter(Boolean);
+      var aggCols = srcNode.agg_aggregations.filter(function(a){ return a.alias; }).map(function(a){ return a.alias; });
+      cols = grpCols.concat(aggCols);
+    }
+    if (!cols.length) {
+      toast('No columns found in "' + alias + '". Define fields or expressions on the source step first.', 'error');
+      return;
+    }
+    var outcolsEl = document.getElementById('po-outcols');
+    if (outcolsEl) {
+      outcolsEl.value = cols.join(', ');
+      toast('Imported ' + cols.length + ' column(s) from "' + alias + '"', 'success');
     }
   }
 
@@ -1325,6 +1448,8 @@
     existing.fields = parsedFields.length;
     existing.type = nodeType || 'input';
     _nodeFileMeta[configPath][node.name || node.id] = existing;
+    /* Persist filename on node so badge survives config reload */
+    node._schema_file = filename;
   }
 
   /* ================================================================
@@ -1440,6 +1565,9 @@
           existing.rows = rowCount;
           existing.type = nodeType || 'input';
           _nodeFileMeta[configPath][node.name || node.id] = existing;
+          /* Persist on node so badge survives config reload */
+          node._test_file = file.name;
+          node._test_rows = rowCount;
           toast('Test file uploaded: ' + file.name, 'success');
         })
         .catch(function(e) {
@@ -1774,10 +1902,17 @@
   function buildFieldsEditor(ns, fields) {
     var rows = fields.map(function(f, i) {
       var curType = (f.type || 'STRING').toUpperCase();
+      var isNullable = f.nullable !== false; // default true
+      var fmt = f.format || '';
       return '<div class="list-item">' +
         '<div class="list-item-inputs">' +
           '<input type="text" placeholder="Field name" value="' + esc(f.name||'') + '" data-field="name" data-idx="' + i + '" class="lci-name" title="Field name" />' +
           selectOpts(FIELD_TYPES, curType, 'data-field="type" data-idx="' + i + '" class="lci-type" title="Data type"') +
+          '<label class="lci-null-wrap" title="Nullable (allow nulls)">' +
+            '<input type="checkbox" data-field="nullable" data-idx="' + i + '" class="lci-nullable"' + (isNullable ? ' checked' : '') + ' />' +
+            '<span class="lci-null-lbl">Null</span>' +
+          '</label>' +
+          '<input type="text" placeholder="fmt" value="' + esc(fmt) + '" data-field="format" data-idx="' + i + '" class="lci-fmt" title="Format pattern (e.g. yyyy-MM-dd)" />' +
           '<input type="number" placeholder="1" value="' + esc(f.start||'') + '" data-field="start" data-idx="' + i + '" class="lci-start" title="Start position (1-based)" />' +
           '<input type="number" placeholder="0" value="' + esc(f.length||'') + '" data-field="length" data-idx="' + i + '" class="lci-len" title="Field length in characters" />' +
         '</div>' +
@@ -1793,6 +1928,8 @@
       '<div class="list-editor-col-header">' +
         '<span class="lch-name">Name</span>' +
         '<span class="lch-type">Type</span>' +
+        '<span class="lch-null">Null</span>' +
+        '<span class="lch-fmt">Format</span>' +
         '<span class="lch-start">Start</span>' +
         '<span class="lch-len">Length</span>' +
         '<span class="lch-del"></span>' +
@@ -1909,8 +2046,13 @@
         var action = btn.getAttribute('data-action');
         readListEditorIntoNode(node);
         if (action === 'add-field') {
-          if (!node.fields) node.fields = [];
-          node.fields.push({name:'', type:'string', start:'', length:''});
+          if (ns === 'po-ctrl-fields') {
+            if (!node.control_fields) node.control_fields = [];
+            node.control_fields.push({name:'', type:'string', nullable:true, format:'', start:'', length:''});
+          } else {
+            if (!node.fields) node.fields = [];
+            node.fields.push({name:'', type:'string', nullable:true, format:'', start:'', length:''});
+          }
         } else if (action === 'add-expr') {
           if (!node.select_expressions) node.select_expressions = [];
           node.select_expressions.push({target:'', expression:'', operation:'move'});
@@ -1929,6 +2071,9 @@
         } else if (action === 'add-rule') {
           if (!node.validate_rules) node.validate_rules = [];
           node.validate_rules.push({field:'', data_type:'string', max_length:'', nullable:true, format:'any', date_format:'', pattern:''});
+        } else if (action === 'add-ctrl-field') {
+          if (!node.control_fields) node.control_fields = [];
+          node.control_fields.push({name:'', type:'string', nullable:true, format:'', start:'', length:''});
         }
         showPropsPanel(node);
       });
@@ -1993,6 +2138,7 @@
 
   function _getListArr(node, ns) {
     if (ns === 'pi-fields' || ns === 'po-fields') return node.fields;
+    if (ns === 'po-ctrl-fields') return node.control_fields;
     if (ns === 'ps-exprs') return node.select_expressions;
     if (ns === 'pf-conds') return node.filter_conditions;
     if (ns === 'pj-keys') return node.join_keys;
@@ -2022,14 +2168,15 @@
     var body = document.getElementById('props-body');
     if (!body) return;
 
-    function readItems(selector, builder) {
+    function readItems(selector) {
       var items = {};
       body.querySelectorAll('[data-idx][data-field]').forEach(function(inp) {
         if (!inp.closest(selector)) return;
         var idx = parseInt(inp.getAttribute('data-idx'), 10);
         var field = inp.getAttribute('data-field');
         if (!items[idx]) items[idx] = {};
-        items[idx][field] = inp.value;
+        // Handle checkboxes specially
+        items[idx][field] = inp.type === 'checkbox' ? inp.checked : inp.value;
       });
       return Object.keys(items).sort(function(a,b){return a-b;}).map(function(i){ return items[i]; });
     }
@@ -2038,6 +2185,12 @@
     var fieldsEditor = body.querySelector('#pi-fields-editor, #po-fields-editor');
     if (fieldsEditor) {
       node.fields = readItems('#' + fieldsEditor.id);
+    }
+
+    // control fields (output fixed-width control file schema)
+    var ctrlFieldsEditor = body.querySelector('#po-ctrl-fields-editor');
+    if (ctrlFieldsEditor) {
+      node.control_fields = readItems('#po-ctrl-fields-editor');
     }
     // select expressions
     var exprEditor = body.querySelector('#ps-exprs-editor');
@@ -2106,6 +2259,7 @@
       node.record_length   = isNaN(_rl) ? undefined : _rl;
       node.header_count    = isNaN(_hc) ? 0 : _hc;
       node.trailer_count   = isNaN(_tc) ? 0 : _tc;
+      node.frequency       = g('pi-frequency') || undefined;
       // Update connections that used old name
       if (oldName && oldName !== node.name) {
         connections.forEach(function(c){
@@ -2124,12 +2278,22 @@
       }
     } else if (node.type === 'output') {
       var oldNameO = node.name;
-      node.name      = g('po-name') || node.id;
-      node.id        = node.name;
-      node.format    = g('po-format');
-      node.s3_path   = g('po-s3path');
-      node.write_mode= g('po-wmode');
+      node.name           = g('po-name') || node.id;
+      node.id             = node.name;
+      node.format         = g('po-format');
+      node.s3_path        = g('po-s3path');
+      node.write_mode     = g('po-wmode');
       node.output_columns = g('po-outcols');
+      node.frequency      = g('po-frequency') || undefined;
+      node.source_inputs  = getMultiSelectValues('po-src');
+      /* Fixed-width output fields */
+      var _rlO = parseInt(g('po-record-length'), 10);
+      var _hcO = parseInt(g('po-header-count'), 10);
+      var _tcO = parseInt(g('po-trailer-count'), 10);
+      node.record_length    = isNaN(_rlO) ? undefined : _rlO;
+      node.header_count     = isNaN(_hcO) ? 0 : _hcO;
+      node.trailer_count    = isNaN(_tcO) ? 0 : _tcO;
+      node.control_file_path = g('po-control-path') || undefined;
       delete node.path;
       if (oldNameO && oldNameO !== node.name) {
         var elO = document.querySelector('[data-node-id="' + oldNameO + '"]');
@@ -2245,36 +2409,82 @@
     nodes.forEach(function(n) {
       if (n.type === 'input') {
         var inp = { name: n.name || n.id, format: n.format || 'parquet', path: n.path || '' };
-        if (n.s3_path)  inp.s3_path = n.s3_path;
-        if (n.dataset)  inp.dataset = n.dataset;
-        if (n.copybook) inp.copybook = n.copybook;
+        if (n.s3_path)       inp.s3_path       = n.s3_path;
+        if (n.dataset)       inp.dataset       = n.dataset;
+        if (n.copybook)      inp.copybook      = n.copybook;
+        if (n.partition_col) inp.partition_col = n.partition_col;
+        if (n.frequency)     inp.frequency     = n.frequency;
+        /* Fixed-width fields */
+        if (n.record_length !== undefined) inp.record_length = n.record_length;
+        if (n.header_count  !== undefined) inp.header_count  = n.header_count;
+        if (n.trailer_count !== undefined) inp.trailer_count = n.trailer_count;
+        if (n.count_file_path) inp.count_file_path = n.count_file_path;
+        /* Schema fields */
         if (n.fields && n.fields.length > 0) {
           inp.fields = n.fields.filter(function(f){ return f.name; }).map(function(f){
-            var fd = { name: f.name, type: f.type || 'string' };
-            if (f.start)  fd.start  = parseInt(f.start, 10);
-            if (f.length) fd.length = parseInt(f.length, 10);
+            var fd = { name: f.name, type: (f.type || 'string').toLowerCase() };
+            if (f.start)              fd.start    = parseInt(f.start, 10);
+            if (f.length)             fd.length   = parseInt(f.length, 10);
+            if (f.nullable !== undefined) fd.nullable = f.nullable !== false && f.nullable !== 'false';
+            if (f.format)             fd.format   = f.format;
             return fd;
           });
         }
+        /* Persist imported schema filename */
+        if (n._schema_file) inp._schema_file = n._schema_file;
+        if (n._test_file)   inp._test_file   = n._test_file;
+        if (n._test_rows !== undefined) inp._test_rows = n._test_rows;
         cfg.Inputs[inp.name] = inp;
       } else if (n.type === 'output') {
         var out = {
           name: n.name || n.id,
-          format: n.format || 'parquet',
+          format: (n.format || 'parquet').toLowerCase(),
           path: n.path || '',
-          write_mode: n.write_mode || 'overwrite'
+          write_mode: (n.write_mode || 'overwrite').toLowerCase()
         };
-        if (n.s3_path)  out.s3_path = n.s3_path;
-        if (n.dataset)  out.dataset = n.dataset;
+        if (n.s3_path)  out.s3_path  = n.s3_path;
+        if (n.dataset)  out.dataset  = n.dataset;
         if (n.copybook) out.copybook = n.copybook;
+        if (n.frequency)     out.frequency     = n.frequency;
+        if (n.source_inputs && n.source_inputs.length > 0) out.source_inputs = n.source_inputs;
+        /* Fixed-width output fields */
+        if ((n.format || '').toUpperCase() === 'FIXED') {
+          if (n.record_length !== undefined) out.record_length = n.record_length;
+          if (n.header_count  !== undefined) out.header_count  = n.header_count;
+          if (n.trailer_count !== undefined) out.trailer_count = n.trailer_count;
+          if (n.control_file_path) out.control_file_path = n.control_file_path;
+        }
+        /* Schema fields */
         if (n.fields && n.fields.length > 0) {
           out.fields = n.fields.filter(function(f){ return f.name; }).map(function(f){
-            return { name: f.name, type: f.type || 'string' };
+            var fd = { name: f.name, type: (f.type || 'string').toLowerCase() };
+            if (f.start)              fd.start    = parseInt(f.start, 10);
+            if (f.length)             fd.length   = parseInt(f.length, 10);
+            if (f.nullable !== undefined) fd.nullable = f.nullable !== false && f.nullable !== 'false';
+            if (f.format)             fd.format   = f.format;
+            return fd;
+          });
+        }
+        /* Control file schema */
+        if (n.control_fields && n.control_fields.length > 0) {
+          out.control_fields = n.control_fields.filter(function(f){ return f.name; }).map(function(f){
+            var fd = { name: f.name, type: (f.type || 'string').toLowerCase() };
+            if (f.start)  fd.start  = parseInt(f.start, 10);
+            if (f.length) fd.length = parseInt(f.length, 10);
+            if (f.nullable !== undefined) fd.nullable = f.nullable !== false && f.nullable !== 'false';
+            if (f.format) fd.format = f.format;
+            return fd;
           });
         }
         if (n.output_columns) {
-          out.output_columns = n.output_columns.split(',').map(function(s){return s.trim();}).filter(Boolean);
+          out.output_columns = (typeof n.output_columns === 'string')
+            ? n.output_columns.split(',').map(function(s){return s.trim();}).filter(Boolean)
+            : n.output_columns;
         }
+        /* Persist imported schema filename */
+        if (n._schema_file) out._schema_file = n._schema_file;
+        if (n._test_file)   out._test_file   = n._test_file;
+        if (n._test_rows !== undefined) out._test_rows = n._test_rows;
         cfg.Outputs[out.name] = out;
       } else {
         // step
