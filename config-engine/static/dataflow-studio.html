@@ -91,14 +91,6 @@
 <div class="main-toolbar">
 
   <!-- Studio file ops -->
-  <button class="tb-btn" id="tb-new" title="New canvas (Ctrl+N)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-    New
-  </button>
-  <button class="tb-btn" id="tb-load" title="Load config from server">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-    Load
-  </button>
   <button class="tb-btn" id="tb-import-json" title="Import config JSON onto canvas">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     Import JSON
@@ -126,8 +118,11 @@
   <button class="tb-btn" id="tb-fit" title="Fit to view (F)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
   </button>
-  <button class="tb-btn" id="tb-auto-layout" title="Auto-arrange (A)">
+  <button class="tb-btn" id="tb-auto-layout" title="Auto-arrange vertically (A)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><line x1="12" y1="2" x2="12" y2="22"/><path d="M5 9l7-7 7 7"/><path d="M5 15l7 7 7-7"/></svg>
+  </button>
+  <button class="tb-btn" id="tb-h-align" title="Arrange horizontally (H)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><line x1="2" y1="12" x2="22" y2="12"/><path d="M9 5l-7 7 7 7"/><path d="M15 5l7 7-7 7"/></svg>
   </button>
 
   <div class="tb-sep"></div>
@@ -168,8 +163,15 @@
        ══════════════════════ -->
   <div id="left-panel">
     <div class="lp-header">
-      <h3><i class="fa-solid fa-layer-group" style="margin-right:7px;font-size:11px;opacity:.8"></i>Configurations</h3>
-      <p>Select or create a dataflow config</p>
+      <div class="lp-header-row">
+        <div>
+          <h3><i class="fa-solid fa-layer-group" style="margin-right:7px;font-size:11px;opacity:.8"></i>Configurations</h3>
+          <p>Select or create a dataflow config</p>
+        </div>
+        <button type="button" class="btn-new-config" id="btn-new-config" title="New configuration (Ctrl+N)">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+      </div>
     </div>
     <div class="lp-search">
       <i class="fa-solid fa-magnifying-glass search-icon"></i>
@@ -290,7 +292,7 @@
           <div class="json-overlay-titlebar-left">
             <span class="json-file-label" id="json-file-label">config.json</span>
             <span class="json-readonly-badge">
-              <i class="fa-solid fa-lock" style="font-size:10px"></i> Keys locked
+              <i class="fa-solid fa-lock" style="font-size:10px"></i> Values editable · Keys locked
             </span>
           </div>
           <!-- Font size zoom controls -->
@@ -605,8 +607,11 @@
 <div id="node-props-drawer">
   <div class="drawer-header">
     <div class="drawer-header-left">
-      <span id="props-title" class="drawer-title">Properties</span>
-      <span id="props-type-badge" class="props-type-badge"></span>
+      <span id="props-type-icon" class="props-type-icon"></span>
+      <div>
+        <span id="props-title" class="drawer-title">Properties</span>
+        <span id="props-type-badge" class="props-type-badge"></span>
+      </div>
     </div>
     <button type="button" id="drawer-close-btn" class="drawer-close-btn" title="Close">&times;</button>
   </div>
@@ -1021,6 +1026,62 @@
 
   var _studioEditor = null; // JSONEditor instance
 
+  /* ── JSON Schema: provides enum dropdowns for well-known fields ── */
+  var STUDIO_EDITOR_SCHEMA = {
+    definitions: {
+      fieldDef: {
+        type: 'object',
+        properties: {
+          name:     { type: 'string' },
+          type:     { type: 'string', enum: ['STRING','INT','LONG','DOUBLE','DECIMAL','DATE','TIMESTAMP'] },
+          nullable: { type: 'boolean' },
+          format:   { type: 'string' },
+          start:    { type: 'integer' },
+          length:   { type: 'integer' }
+        }
+      },
+      inputDef: {
+        type: 'object',
+        properties: {
+          format:    { type: 'string', enum: ['CSV','PARQUET','FIXED','DELIMITED'] },
+          frequency: { type: 'string', enum: ['DAILY','WEEKLY','MONTHLY'] },
+          fields:    { type: 'array', items: { '$ref': '#/definitions/fieldDef' } },
+          control_fields: { type: 'array', items: { '$ref': '#/definitions/fieldDef' } }
+        }
+      },
+      outputDef: {
+        type: 'object',
+        properties: {
+          format:     { type: 'string', enum: ['PARQUET','CSV','DELIMITED','FIXED'] },
+          write_mode: { type: 'string', enum: ['OVERWRITE','APPEND'] },
+          frequency:  { type: 'string', enum: ['DAILY','WEEKLY','MONTHLY'] },
+          fields:     { type: 'array', items: { '$ref': '#/definitions/fieldDef' } },
+          control_fields: { type: 'array', items: { '$ref': '#/definitions/fieldDef' } }
+        }
+      },
+      stepDef: {
+        type: 'object',
+        properties: {
+          type:      { type: 'string', enum: ['select','filter','join','aggregate','union','custom','validate'] },
+          join_type: { type: 'string', enum: ['inner','left','right','full'] },
+          frequency: { type: 'string', enum: ['DAILY','WEEKLY','MONTHLY'] },
+          fields:    { type: 'array', items: { '$ref': '#/definitions/fieldDef' } }
+        }
+      }
+    },
+    type: 'object',
+    properties: {
+      Inputs:  { type: 'object', additionalProperties: { '$ref': '#/definitions/inputDef' } },
+      Outputs: { type: 'object', additionalProperties: { '$ref': '#/definitions/outputDef' } },
+      Transformations: {
+        type: 'object',
+        properties: {
+          steps: { type: 'array', items: { '$ref': '#/definitions/stepDef' } }
+        }
+      }
+    }
+  };
+
   function initStudioEditor() {
     var container = $('studio-jsoneditor-container');
     if (!container || _studioEditor) return;
@@ -1029,20 +1090,16 @@
     _studioEditor = new JSONEditor(container, {
       mode: 'tree',
       /* No modes[] — locks editor to tree view only (no code/mode icons) */
+      schema: STUDIO_EDITOR_SCHEMA,
       search: false,
       enableSort: false,
       enableTransform: false,
       indentation: 2,
       /* ── Key-name protection ──────────────────────────────────────
-         Allow editing VALUES only (strings, numbers, booleans).
-         Key names are always read-only so users cannot accidentally
-         rename fields and break the dataflow job.
-         Object/array nodes have no inline value to edit — return
-         false for those so JSONEditor doesn't try to inline-edit them. */
+         Lock field NAMES (keys) only — users can freely edit all VALUES.
+         This prevents accidental renaming of config properties that
+         would break the dataflow-engine, while allowing full value editing. */
       onEditable: function (node) {
-        if (node.type === 'object' || node.type === 'array') {
-          return { field: false, value: false };
-        }
         return { field: false, value: true };
       },
       onChangeJSON: function () { /* live edits tracked by editor */ },
@@ -1055,7 +1112,11 @@
     if (jsonOverlay)     jsonOverlay.classList.remove('json-active');
     if (btnStudioCanvas) btnStudioCanvas.classList.add('active');
     if (btnStudioJson)   btnStudioJson.classList.remove('active');
-    setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 50);
+    /* Refit canvas after overlay is removed (CSS transition ~150ms) */
+    setTimeout(function () {
+      window.dispatchEvent(new Event('resize'));
+      if (window.studioFit) window.studioFit();
+    }, 100);
   }
 
   function showJsonMode() {
@@ -1137,10 +1198,35 @@
     if (inc) inc.style.opacity = (_jsonFontSize >= JSON_FONT_MAX) ? '0.35' : '';
   }
 
+  /* Expose so toolbar zoom buttons can delegate to JSON editor when it's active */
+  window.jsonEditorZoomIn  = function () { applyJsonFontSize(_jsonFontSize + 1); };
+  window.jsonEditorZoomOut = function () { applyJsonFontSize(_jsonFontSize - 1); };
+  window.isJsonEditorActive = function () {
+    return jsonOverlay && jsonOverlay.classList.contains('json-active');
+  };
+
   var jsonFontInc = $('json-font-inc');
   var jsonFontDec = $('json-font-dec');
   if (jsonFontInc) jsonFontInc.addEventListener('click', function () { applyJsonFontSize(_jsonFontSize + 1); });
   if (jsonFontDec) jsonFontDec.addEventListener('click', function () { applyJsonFontSize(_jsonFontSize - 1); });
+
+  /* ── + New Config button in left panel ── */
+  var btnNewConfig = $('btn-new-config');
+  if (btnNewConfig) btnNewConfig.addEventListener('click', function () {
+    /* Reuse the same new-canvas logic */
+    var tbNew = $('tb-new'); // may not exist if removed from toolbar
+    if (tbNew) { tbNew.click(); return; }
+    /* Inline fallback */
+    var canvas = window.studioGetJson ? true : false;
+    if (!canvas || confirm('Start fresh? Current canvas will be cleared.')) {
+      if (window.studioClearCanvas) window.studioClearCanvas();
+      var cnInput = $('toolbar-config-name');
+      if (cnInput) cnInput.value = '';
+      if (typeof window.refreshConfigList === 'function') window.refreshConfigList();
+      /* Show toast via studioLoadConfig with empty config */
+      if (window.studioLoadConfig) window.studioLoadConfig({ Inputs: {}, Outputs: {}, Transformations: { steps: [] } });
+    }
+  });
 
   /* ══════════════════════════════
      NODE PROPERTIES DRAWER
