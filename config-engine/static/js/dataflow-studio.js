@@ -280,12 +280,14 @@
     el.style.top   = node.y + 'px';
     el.style.width = node.width + 'px';
 
-    /* Elevated circular badge + clean card body */
+    /* Inline header with visible icon + compact card body */
     el.innerHTML =
       (!isInput ? '<div class="node-port port-in" data-port="in" data-node="' + node.id + '"></div>' : '') +
-      '<div class="node-icon-badge">' + icon + '</div>' +
+      '<div class="node-header">' +
+        '<span class="node-header-icon">' + icon + '</span>' +
+        '<span class="node-type-label">' + esc(meta.label) + '</span>' +
+      '</div>' +
       '<div class="node-body">' +
-        '<div class="node-type-label">' + esc(meta.label) + '</div>' +
         '<div class="node-title">' + esc(title) + '</div>' +
         '<div class="node-subtitle">' + esc(subtitle) + '</div>' +
       '</div>' +
@@ -927,10 +929,13 @@
     _currentPropsNode = node; // track for auto-save on switch
 
     var meta = TYPE_META[node.type] || TYPE_META.custom;
+    var icon = TYPE_ICONS[node.type] || TYPE_ICONS.custom;
     var titleEl = document.getElementById('props-title');
     var badge   = document.getElementById('props-type-badge');
+    var iconEl  = document.getElementById('props-type-icon');
     if (titleEl) titleEl.textContent = 'Properties';
     if (badge)   { badge.textContent = meta.label; badge.style.background = meta.color; }
+    if (iconEl)  { iconEl.innerHTML = icon; iconEl.style.background = meta.color; iconEl.title = meta.label; }
 
     var body = document.getElementById('props-body');
     if (body) body.innerHTML = '';
@@ -2836,6 +2841,33 @@
     fitCanvas();
   }
 
+  /* Horizontal layout — arranges all nodes left-to-right in topological order */
+  function autoLayoutHorizontal() {
+    if (nodes.length === 0) return;
+    var orderedIds  = topoSort();
+    var sorted = nodes.slice().sort(function(a, b) {
+      var ai = orderedIds.indexOf(a.id), bi = orderedIds.indexOf(b.id);
+      if (ai < 0) ai = 9999; if (bi < 0) bi = 9999;
+      return ai - bi;
+    });
+
+    var colGap = NODE_W + 60;
+    var startX = 60;
+    var startY = 100;
+
+    sorted.forEach(function(n, i) {
+      n.x = snap(startX + i * colGap);
+      n.y = snap(startY);
+    });
+
+    nodes.forEach(function(n) {
+      var el = document.querySelector('[data-node-id="' + n.id + '"]');
+      if (el) { el.style.left = n.x + 'px'; el.style.top = n.y + 'px'; }
+    });
+    renderConnections();
+    fitCanvas();
+  }
+
   function fitCanvas() {
     if (nodes.length === 0) { zoom=1; panX=60; panY=60; applyTransform(); return; }
     var wrap = document.getElementById('canvas-wrap');
@@ -2873,17 +2905,27 @@
     if (tbSel) tbSel.addEventListener('click', function() { setMode('select'); });
     if (tbCon) tbCon.addEventListener('click', function() { setMode('connect'); });
 
-    // Zoom
+    // Zoom — also delegates to JSON editor font-size when JSON overlay is active
     document.getElementById('tb-zoom-in').addEventListener('click', function() {
+      if (window.isJsonEditorActive && window.isJsonEditorActive()) {
+        if (window.jsonEditorZoomIn) window.jsonEditorZoomIn();
+        return;
+      }
       zoom = Math.min(MAX_ZOOM, zoom + 0.1);
       applyTransform();
     });
     document.getElementById('tb-zoom-out').addEventListener('click', function() {
+      if (window.isJsonEditorActive && window.isJsonEditorActive()) {
+        if (window.jsonEditorZoomOut) window.jsonEditorZoomOut();
+        return;
+      }
       zoom = Math.max(MIN_ZOOM, zoom - 0.1);
       applyTransform();
     });
     document.getElementById('tb-fit').addEventListener('click', fitCanvas);
     document.getElementById('tb-auto-layout').addEventListener('click', autoLayout);
+    var tbHAlign = document.getElementById('tb-h-align');
+    if (tbHAlign) tbHAlign.addEventListener('click', autoLayoutHorizontal);
     document.getElementById('tb-clear').addEventListener('click', function() {
       if (nodes.length === 0 || confirm('Clear all nodes and connections?')) {
         nodes = []; connections = [];
@@ -2894,12 +2936,15 @@
         toast('Canvas cleared', 'info');
       }
     });
-    document.getElementById('tb-new').addEventListener('click', function() {
+    /* tb-new removed from toolbar — handled by btn-new-config in left panel */
+    var tbNew = document.getElementById('tb-new');
+    if (tbNew) tbNew.addEventListener('click', function() {
       if (nodes.length === 0 || confirm('Start fresh? Current canvas will be cleared.')) {
         nodes = []; connections = [];
         document.getElementById('canvas-nodes').innerHTML = '';
         document.getElementById('connections-group').innerHTML = '';
-        document.getElementById('toolbar-config-name').value = '';
+        var cnInput = document.getElementById('toolbar-config-name');
+        if (cnInput) cnInput.value = '';
         deselectAll(); updateStatus();
         zoom=1; panX=60; panY=60; applyTransform();
         toast('New canvas', 'info');
@@ -2914,8 +2959,9 @@
       document.getElementById('import-modal').classList.remove('hidden');
     });
 
-    // Load from server
-    document.getElementById('tb-load').addEventListener('click', function() {
+    // Load from server (tb-load removed from toolbar but keep handler for compat)
+    var tbLoad = document.getElementById('tb-load');
+    if (tbLoad) tbLoad.addEventListener('click', function() {
       openLoadModal();
     });
 
@@ -3140,10 +3186,11 @@
       try { var cfg = JSON.parse(jsonStr); loadConfig(cfg); return { ok: true }; }
       catch(e) { toast('Invalid JSON: ' + e.message, 'error'); return { ok: false, error: e.message }; }
     };
-    window.studioFit         = fitCanvas;
-    window.studioAutoLayout  = autoLayout;
+    window.studioFit              = fitCanvas;
+    window.studioAutoLayout       = autoLayout;
+    window.studioAutoLayoutH      = autoLayoutHorizontal;
     window.studioClearCanvas = function() { nodes=[]; connections=[]; document.getElementById('canvas-nodes').innerHTML=''; document.getElementById('connections-group').innerHTML=''; deselectAll(); updateStatus(); };
-    window.studioShowEmpty   = showEmptyProps;
+    window.studioShowEmpty        = showEmptyProps;
   }
 
   if (document.readyState === 'loading') {
