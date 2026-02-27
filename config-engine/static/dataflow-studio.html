@@ -683,6 +683,24 @@
           </label>
         </section>
         <section class="settings-section">
+          <h2 class="settings-section-title">Bucket prefixes</h2>
+          <label class="settings-row settings-row-input">
+            <span class="settings-label">Validation bucket prefix</span>
+            <input type="text" id="settings-validation-bucket-prefix" placeholder="s3://my-bucket/validation/" class="settings-input" />
+            <span class="settings-hint">Pre-populates the Validation Bucket field on Validate nodes.</span>
+          </label>
+          <label class="settings-row settings-row-input">
+            <span class="settings-label">Error bucket prefix</span>
+            <input type="text" id="settings-error-bucket-prefix" placeholder="s3://my-bucket/errors/" class="settings-input" />
+            <span class="settings-hint">Pre-populates the Error Bucket field on Validate nodes.</span>
+          </label>
+          <label class="settings-row settings-row-input">
+            <span class="settings-label">Raw bucket prefix</span>
+            <input type="text" id="settings-raw-bucket-prefix" placeholder="s3://my-bucket/raw/" class="settings-input" />
+            <span class="settings-hint">Used as the raw landing zone prefix for ingestion pipelines.</span>
+          </label>
+        </section>
+        <section class="settings-section">
           <h2 class="settings-section-title">Other</h2>
           <label class="settings-row settings-row-input">
             <span class="settings-label">Config directory override</span>

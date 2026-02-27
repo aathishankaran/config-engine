@@ -2310,3 +2310,197 @@ html, body { overflow: hidden; height: 100%; margin: 0; }
 }
 #settings-modal-close:hover { color: #fff; }
 .settings-modal-body { flex: 1; overflow: auto; padding: 20px; }
+
+/* ================================================================
+   CLICK-TO-EDIT PROPS PANEL
+   Inputs appear as plain text by default; show full border on focus.
+================================================================ */
+#props-body .form-row input[type="text"],
+#props-body .form-row input[type="number"],
+#props-body .form-row select,
+#props-body .form-row textarea {
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: default;
+  transition: border-color 0.15s, background 0.15s;
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+#props-body .form-row input[type="text"]:hover,
+#props-body .form-row input[type="number"]:hover,
+#props-body .form-row select:hover,
+#props-body .form-row textarea:hover {
+  background: rgba(0,0,0,.04);
+  border-color: var(--border);
+  cursor: text;
+}
+#props-body .form-row input[type="text"]:focus,
+#props-body .form-row input[type="number"]:focus,
+#props-body .form-row select:focus,
+#props-body .form-row textarea:focus {
+  background: var(--bg-primary, #fff);
+  border-color: var(--usb-blue);
+  outline: none;
+  cursor: text;
+  box-shadow: 0 0 0 2px rgba(0,56,168,.12);
+}
+/* Keep multi-select always visible */
+#props-body .form-row select[multiple],
+#props-body .form-row .multi-source-select,
+#props-body .form-row .single-source-select {
+  border: 1px solid var(--border) !important;
+  background: var(--bg-primary, #fff) !important;
+  cursor: default !important;
+}
+/* Checkboxes stay normal */
+#props-body .form-row input[type="checkbox"] {
+  border: none;
+  background: none;
+}
+
+/* ================================================================
+   FIELD-INFO TOOLTIP  (i-icon next to label, reveals on hover)
+================================================================ */
+.field-info-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.field-info-tooltip .info-icon {
+  color: var(--usb-blue);
+  font-size: 13px;
+  cursor: help;
+  opacity: .75;
+}
+.field-info-tooltip:hover .info-icon { opacity: 1; }
+.field-info-tooltip .tooltip-text {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 260px;
+  max-width: 340px;
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 12px;
+  line-height: 1.55;
+  padding: 9px 12px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s;
+  z-index: 9999;
+  white-space: normal;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+}
+.field-info-tooltip .tooltip-text::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #1e293b;
+}
+.field-info-tooltip:hover .tooltip-text { opacity: 1; }
+
+/* ================================================================
+   VALIDATION RULE CARDS
+================================================================ */
+.vr-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  margin-bottom: 6px;
+}
+.vr-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 36px 10px 10px; /* right padding leaves room for X button */
+  background: var(--bg-secondary, #f8f9fa);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.vr-card:hover {
+  border-color: var(--usb-blue);
+  box-shadow: 0 1px 4px rgba(0,56,168,.08);
+}
+.vr-card-remove {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  width: 22px;
+  height: 22px;
+  line-height: 20px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #64748b;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+}
+.vr-card-remove:hover {
+  color: var(--usb-red, #dc2626);
+  background: rgba(220,38,38,.08);
+  border-color: rgba(220,38,38,.25);
+}
+.vr-card-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.vr-card-row2 {
+  align-items: center;
+}
+.vr-field {
+  flex: 1;
+  min-width: 90px;
+}
+.vr-dtype {
+  min-width: 80px;
+}
+.vr-nullable-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.vr-nullable-wrap input[type="checkbox"] {
+  margin: 0;
+}
+.vr-sub-lbl {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+}
+.vr-maxlen {
+  width: 64px;
+}
+.vr-fmt {
+  min-width: 80px;
+}
+.vr-pattern {
+  flex: 1;
+  min-width: 90px;
+}
+/* Override click-to-edit inside vr-cards so inputs always look editable */
+.vr-card input[type="text"],
+.vr-card input[type="number"],
+.vr-card select {
+  border: 1px solid var(--border) !important;
+  background: #fff !important;
+  cursor: text !important;
+}

@@ -40,6 +40,9 @@ DEFAULT_SETTINGS = {
     "llm_model": "qwen2.5-coder:7b",
     "llm_timeout_seconds": 900,  # Increased timeout for larger model
     "config_dir": "",
+    "validation_bucket_prefix": "",
+    "error_bucket_prefix": "",
+    "raw_bucket_prefix": "",
 }
 
 
@@ -842,4 +845,5 @@ def api_save_node_copybook(filename):
 
 if __name__ == "__main__":
     _get_config_dir().mkdir(parents=True, exist_ok=True)
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, port=port)

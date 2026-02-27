@@ -761,6 +761,9 @@
         var llmModel = $('settings-llm-model');
         var llmTimeout = $('settings-llm-timeout');
         var configDir = $('settings-config-dir');
+        var validationBucketPrefix = $('settings-validation-bucket-prefix');
+        var errorBucketPrefix = $('settings-error-bucket-prefix');
+        var rawBucketPrefix = $('settings-raw-bucket-prefix');
         if (useLlm) useLlm.checked = !!data.use_llm;
         if (pathPrefix) pathPrefix.value = data.input_output_path_prefix || '';
         if (inputPrefix) inputPrefix.value = data.input_dataset_prefix || '';
@@ -769,6 +772,9 @@
         if (llmModel) llmModel.value = data.llm_model || '';
         if (llmTimeout) llmTimeout.value = data.llm_timeout_seconds != null ? data.llm_timeout_seconds : 600;
         if (configDir) configDir.value = data.config_dir || '';
+        if (validationBucketPrefix) validationBucketPrefix.value = data.validation_bucket_prefix || '';
+        if (errorBucketPrefix) errorBucketPrefix.value = data.error_bucket_prefix || '';
+        if (rawBucketPrefix) rawBucketPrefix.value = data.raw_bucket_prefix || '';
         updateLlmPanelVisibility();
       }).catch(function () {});
     }
@@ -782,6 +788,9 @@
       var llmModel = $('settings-llm-model');
       var llmTimeout = $('settings-llm-timeout');
       var configDir = $('settings-config-dir');
+      var validationBucketPrefix = $('settings-validation-bucket-prefix');
+      var errorBucketPrefix = $('settings-error-bucket-prefix');
+      var rawBucketPrefix = $('settings-raw-bucket-prefix');
       var msg = $('settings-message');
       var api = window.CodeParser && window.CodeParser.API;
       if (!api || !api.saveSettings) return;
@@ -796,7 +805,10 @@
         llm_base_url: (llmBase && llmBase.value) ? llmBase.value.trim() : '',
         llm_model: (llmModel && llmModel.value) ? llmModel.value.trim() : '',
         llm_timeout_seconds: timeoutVal,
-        config_dir: (configDir && configDir.value) ? configDir.value.trim() : ''
+        config_dir: (configDir && configDir.value) ? configDir.value.trim() : '',
+        validation_bucket_prefix: (validationBucketPrefix && validationBucketPrefix.value) ? validationBucketPrefix.value.trim() : '',
+        error_bucket_prefix: (errorBucketPrefix && errorBucketPrefix.value) ? errorBucketPrefix.value.trim() : '',
+        raw_bucket_prefix: (rawBucketPrefix && rawBucketPrefix.value) ? rawBucketPrefix.value.trim() : ''
       };
       if (msg) msg.textContent = 'Saving...';
       api.saveSettings(payload).then(function (res) {
