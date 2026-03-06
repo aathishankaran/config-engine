@@ -1,0 +1,15 @@
+{
+  "use_llm": false,
+  "input_output_path_prefix": "",
+  "input_dataset_prefix": "",
+  "output_dataset_prefix": "",
+  "llm_base_url": "",
+  "llm_model": "",
+  "llm_timeout_seconds": 600,
+  "config_dir": "",
+  "raw_bucket_prefix": "file:///opt/data/s3/raw/",
+  "validation_bucket_prefix": "file:///opt/data/s3/validated/",
+  "error_bucket_prefix": "file:///opt/data/s3/error/",
+  "curated_bucket_prefix": "file:///opt/data/s3/curated/",
+  "usa_holidays": []
+}
