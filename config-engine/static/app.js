@@ -1,13 +1,18 @@
 (function () {
   var API = window.CodeParser && window.CodeParser.API;
-  var $ = window.CodeParser && window.CodeParser.$;
   var escapeHtml = window.CodeParser && window.CodeParser.escapeHtml;
   var showMessagePopup = window.CodeParser && window.CodeParser.showMessagePopup;
   var showErrorPopup = window.CodeParser && window.CodeParser.showErrorPopup;
   var closeMessageModal = window.CodeParser && window.CodeParser.closeMessageModal;
   var closeErrorModal = window.CodeParser && window.CodeParser.closeErrorModal;
+  /* Slide-in toast helper — non-blocking success/info notifications.
+     Falls back to showMessagePopup if studio is not loaded yet. */
+  function toast(msg, type) {
+    if (window.studioToast) { window.studioToast(msg, type || 'success'); return; }
+    if (showMessagePopup) showMessagePopup(type === 'error' ? 'Error' : 'Info', msg, type || 'info');
+  }
 
-  if (!API || !$) { console.error('CodeParser modules not loaded'); return; }
+  if (!API) { console.error('CodeParser API not loaded'); return; }
 
   let currentConfig = null;
   let currentPath = null;
@@ -15,7 +20,27 @@
   let configViewMode = 'diagram'; // 'diagram' | 'json'
   let jsonEditorDirty = false;
   let jsonEditorView = 'tree'; // always tree
+  let canvasDirtySnapshot = null; // JSON snapshot for dirty detection
   window.CodeParser.hoverPopupsEnabled = true;
+
+  /* ── Canvas dirty tracking ── */
+  function getCanvasStateJson() {
+    if (window.studioGetJson) {
+      try { return JSON.stringify(window.studioGetJson()); } catch(e) { return null; }
+    }
+    return null;
+  }
+  function isCanvasDirty() {
+    if (!canvasDirtySnapshot) return false;
+    var current = getCanvasStateJson();
+    if (!current) return false;
+    return current !== canvasDirtySnapshot;
+  }
+  function updateCanvasSnapshot() {
+    canvasDirtySnapshot = getCanvasStateJson();
+  }
+  window.updateCanvasSnapshot = updateCanvasSnapshot;
+  window._isCanvasDirty = isCanvasDirty;
 
   function getByPath(obj, path) {
     var p = obj;
@@ -106,38 +131,40 @@
   }
 
   function renderJsonViewer() {
-    var viewerEl = document.getElementById('json-viewer');
-    if (!viewerEl) return;
+    var $viewerEl = $('#json-viewer');
+    if (!$viewerEl.length) return;
     if (!currentConfig) {
-      viewerEl.innerHTML = '<span class="json-null">null</span>';
+      $viewerEl.html('<span class="json-null">null</span>');
       return;
     }
     try {
-      viewerEl.innerHTML = buildJsonViewerHtml(currentConfig, 0);
+      $viewerEl.html(buildJsonViewerHtml(currentConfig, 0));
     } catch (e) {
-      viewerEl.innerHTML = '<span class="json-null">Invalid config</span>';
+      $viewerEl.html('<span class="json-null">Invalid config</span>');
     }
-    viewerEl.querySelectorAll('.json-fold-toggle').forEach(function (el) {
-      el.addEventListener('click', function (e) {
+    $viewerEl.find('.json-fold-toggle').each(function () {
+      var $el = $(this);
+      $el.on('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        var line = el.closest('.json-line');
-        var block = line && line.nextElementSibling;
-        if (block && block.classList.contains('json-block')) {
-          block.classList.toggle('collapsed');
-          if (line) line.classList.toggle('is-collapsed', block.classList.contains('collapsed'));
+        var $line = $el.closest('.json-line');
+        var $block = $line.next();
+        if ($block.length && $block.hasClass('json-block')) {
+          $block.toggleClass('collapsed');
+          if ($line.length) $line.toggleClass('is-collapsed', $block.hasClass('collapsed'));
         }
       });
-      el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } });
+      $el.on('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $el[0].click(); } });
     });
     // Default: collapse root-level sections (Inputs, Outputs, Transformations) for readable first view
-    var rootBlock = viewerEl.querySelector(':scope > .json-block');
-    var rootInner = rootBlock && rootBlock.querySelector(':scope > .json-block-inner');
-    if (rootInner) {
-      rootInner.querySelectorAll(':scope > .json-block').forEach(function (block) {
-        block.classList.add('collapsed');
-        var prev = block.previousElementSibling;
-        if (prev && prev.classList.contains('json-line')) prev.classList.add('is-collapsed');
+    var $rootBlock = $viewerEl.children('.json-block').first();
+    var $rootInner = $rootBlock.children('.json-block-inner').first();
+    if ($rootInner.length) {
+      $rootInner.children('.json-block').each(function () {
+        var $block = $(this);
+        $block.addClass('collapsed');
+        var $prev = $block.prev();
+        if ($prev.length && $prev.hasClass('json-line')) $prev.addClass('is-collapsed');
       });
     }
   }
@@ -233,112 +260,115 @@
   }
 
   function startTreeValueEdit(span) {
-    var pathStr = span.getAttribute('data-path');
-    var type = span.getAttribute('data-type') || 'string';
+    var $span = $(span);
+    var pathStr = $span.attr('data-path');
+    var type = $span.attr('data-type') || 'string';
     if (!pathStr || !currentConfig) return;
     var path = JSON.parse(pathStr);
     var current = getByPath(currentConfig, path);
     var displayVal = type === 'string' ? (typeof current === 'string' ? current : '') : String(current);
-    var input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'json-tree-edit-input';
-    input.value = displayVal;
-    input.setAttribute('data-path', pathStr);
-    input.setAttribute('data-type', type);
-    span.style.display = 'none';
-    span.parentNode.appendChild(input);
-    input.focus();
-    input.select();
+    var $input = $('<input>');
+    $input.attr('type', 'text');
+    $input.addClass('json-tree-edit-input');
+    $input.val(displayVal);
+    $input.attr('data-path', pathStr);
+    $input.attr('data-type', type);
+    $span.hide();
+    $span.parent().append($input);
+    $input.focus();
+    $input[0].select();
     function finish() {
-      var val = parseTreeValue(input.value, type);
+      var val = parseTreeValue($input.val(), type);
       setByPath(currentConfig, path, val);
-      input.remove();
-      span.style.display = '';
+      $input.remove();
+      $span.show();
       renderJsonTreeView();
       setJsonEditorDirty(true);
-      var applyBtn = document.getElementById('json-editor-apply-btn');
-      if (applyBtn) applyBtn.classList.remove('hidden');
+      var $applyBtn = $('#json-editor-apply-btn');
+      if ($applyBtn.length) $applyBtn.removeClass('hidden');
     }
-    input.addEventListener('blur', finish);
-    input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    $input.on('blur', finish);
+    $input.on('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); $input[0].blur(); }
       if (e.key === 'Escape') {
         e.preventDefault();
-        input.value = displayVal;
-        input.remove();
-        span.style.display = '';
+        $input.val(displayVal);
+        $input.remove();
+        $span.show();
       }
     });
   }
 
   function getJsonTreeSearchTerm() {
-    var input = document.getElementById('json-editor-search-input');
-    return input && input.value ? input.value.trim() : '';
+    var $input = $('#json-editor-search-input');
+    return $input.length && $input.val() ? $input.val().trim() : '';
   }
   function renderJsonTreeView() {
-    var treeEl = document.getElementById('json-tree-view');
-    if (!treeEl) return;
+    var $treeEl = $('#json-tree-view');
+    if (!$treeEl.length) return;
     if (!currentConfig) {
-      treeEl.innerHTML = '<span class="json-null">null</span>';
+      $treeEl.html('<span class="json-null">null</span>');
       return;
     }
     var searchTerm = getJsonTreeSearchTerm();
     try {
-      treeEl.innerHTML = buildJsonTreeHtml(currentConfig, null, 0, [], searchTerm);
+      $treeEl.html(buildJsonTreeHtml(currentConfig, null, 0, [], searchTerm));
     } catch (e) {
-      treeEl.innerHTML = '<span class="json-null">Invalid config</span>';
+      $treeEl.html('<span class="json-null">Invalid config</span>');
     }
-    if (jsonTreeFontSize) treeEl.style.fontSize = jsonTreeFontSize + 'px';
-    treeEl.querySelectorAll('.json-tree-row').forEach(function (row) {
-      var node = row.closest('.json-tree-node');
-      if (!node || !node.classList.contains('json-tree-branch')) return;
-      row.addEventListener('click', function (e) {
-        if (e.target.closest('.json-tree-value')) return;
+    if (jsonTreeFontSize) $treeEl.css('fontSize', jsonTreeFontSize + 'px');
+    $treeEl.find('.json-tree-row').each(function () {
+      var $row = $(this);
+      var $node = $row.closest('.json-tree-node');
+      if (!$node.length || !$node.hasClass('json-tree-branch')) return;
+      $row.on('click', function (e) {
+        if ($(e.target).closest('.json-tree-value').length) return;
         e.preventDefault();
         e.stopPropagation();
-        node.classList.toggle('collapsed');
+        $node.toggleClass('collapsed');
       });
-      row.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); } });
+      $row.on('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $row[0].click(); } });
     });
-    treeEl.querySelectorAll('.json-tree-value[data-path]').forEach(function (span) {
-      span.classList.add('json-tree-value-editable');
-      span.addEventListener('click', function (e) {
+    $treeEl.find('.json-tree-value[data-path]').each(function () {
+      var $span = $(this);
+      $span.addClass('json-tree-value-editable');
+      $span.on('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        startTreeValueEdit(span);
+        startTreeValueEdit($span[0]);
       });
     });
-    var root = treeEl.querySelector('.json-tree-node.json-tree-branch');
-    if (root) {
-      root.querySelectorAll(':scope > .json-tree-children > .json-tree-node.json-tree-branch').forEach(function (child) {
-        child.classList.add('collapsed');
+    var $root = $treeEl.find('.json-tree-node.json-tree-branch').first();
+    if ($root.length) {
+      $root.children('.json-tree-children').children('.json-tree-node.json-tree-branch').each(function () {
+        $(this).addClass('collapsed');
       });
     }
   }
 
   function setJsonEditorView(view) {
     jsonEditorView = view;
-    var textTab = document.getElementById('json-editor-tab-text');
-    var treeTab = document.getElementById('json-editor-tab-tree');
-    var textEl = document.getElementById('json-editor-text');
-    var treeEl = document.getElementById('json-tree-view');
-    if (textTab) { textTab.classList.toggle('active', view === 'text'); textTab.setAttribute('aria-selected', view === 'text'); }
-    if (treeTab) { treeTab.classList.toggle('active', view === 'tree'); treeTab.setAttribute('aria-selected', view === 'tree'); }
-    if (textEl) textEl.classList.toggle('hidden', view !== 'text');
-    if (treeEl) {
-      treeEl.classList.toggle('hidden', view !== 'tree');
+    var $textTab = $('#json-editor-tab-text');
+    var $treeTab = $('#json-editor-tab-tree');
+    var $textEl = $('#json-editor-text');
+    var $treeEl = $('#json-tree-view');
+    if ($textTab.length) { $textTab.toggleClass('active', view === 'text'); $textTab.attr('aria-selected', view === 'text'); }
+    if ($treeTab.length) { $treeTab.toggleClass('active', view === 'tree'); $treeTab.attr('aria-selected', view === 'tree'); }
+    if ($textEl.length) $textEl.toggleClass('hidden', view !== 'text');
+    if ($treeEl.length) {
+      $treeEl.toggleClass('hidden', view !== 'tree');
       if (view === 'tree') renderJsonTreeView();
     }
   }
 
   function updateJsonEditorMode() {
-    var treeEl = document.getElementById('json-tree-view');
-    var applyBtn = document.getElementById('json-editor-apply-btn');
-    if (treeEl) {
-      treeEl.classList.remove('hidden');
+    var $treeEl = $('#json-tree-view');
+    var $applyBtn = $('#json-editor-apply-btn');
+    if ($treeEl.length) {
+      $treeEl.removeClass('hidden');
       renderJsonTreeView();
     }
-    if (applyBtn) applyBtn.classList.toggle('hidden', !jsonEditorDirty);
+    if ($applyBtn.length) $applyBtn.toggleClass('hidden', !jsonEditorDirty);
   }
 
   function getConfigJsonString() {
@@ -348,43 +378,43 @@
 
   function setJsonEditorDirty(dirty) {
     jsonEditorDirty = dirty;
-    var applyBtn = document.getElementById('json-editor-apply-btn');
-    if (applyBtn) applyBtn.classList.toggle('hidden', !dirty);
+    var $applyBtn = $('#json-editor-apply-btn');
+    if ($applyBtn.length) $applyBtn.toggleClass('hidden', !dirty);
   }
 
-  const configList = $('config-list');
-  const searchInput = $('search-input');
-  const searchResults = $('search-results');
-  const diagramContainer = $('diagram-container');
-  const emptyState = $('empty-state');
-  const currentFileEl = $('current-file');
-  const detailDrawer = $('detail-drawer');
-  const logicModalTitle = $('logic-modal-title');
-  const logicModalClose = $('logic-modal-close');
-  const detailDrawerBackdrop = $('detail-drawer-backdrop');
-  const stepEditPanel = $('step-edit-panel');
-  const stepEditPanelClose = $('step-edit-panel-close');
-  const stepEditPanelBackdrop = $('step-edit-panel-backdrop');
-  const editSave = $('edit-save');
-  const editDelete = $('edit-delete');
-  const renameModal = $('rename-modal');
-  const renameInput = $('rename-input');
-  const renameCancel = $('rename-cancel');
-  const renameSubmit = $('rename-submit');
-  const renameModalClose = $('rename-modal-close');
-  const deleteModal = $('delete-modal');
-  const deleteMessage = $('delete-message');
-  const deleteCancel = $('delete-cancel');
-  const deleteConfirm = $('delete-confirm');
-  const deleteModalClose = $('delete-modal-close');
-  const errorModal = $('error-modal');
-  const errorModalTitle = $('error-modal-title');
-  const errorModalMessage = $('error-modal-message');
-  const errorModalDetails = $('error-modal-details');
-  const messageModal = $('message-modal');
-  const messageModalTitle = $('message-modal-title');
-  const messageModalBody = $('message-modal-body');
-  const messageModalHeader = $('message-modal-header');
+  const $configList = $('#config-list');
+  const $searchInput = $('#search-input');
+  const $searchResults = $('#search-results');
+  const $diagramContainer = $('#diagram-container');
+  const $emptyState = $('#empty-state');
+  const $currentFileEl = $('#current-file');
+  const $detailDrawer = $('#detail-drawer');
+  const $logicModalTitle = $('#logic-modal-title');
+  const $logicModalClose = $('#logic-modal-close');
+  const $detailDrawerBackdrop = $('#detail-drawer-backdrop');
+  const $stepEditPanel = $('#step-edit-panel');
+  const $stepEditPanelClose = $('#step-edit-panel-close');
+  const $stepEditPanelBackdrop = $('#step-edit-panel-backdrop');
+  const $editSave = $('#edit-save');
+  const $editDelete = $('#edit-delete');
+  const $renameModal = $('#rename-modal');
+  const $renameInput = $('#rename-input');
+  const $renameCancel = $('#rename-cancel');
+  const $renameSubmit = $('#rename-submit');
+  const $renameModalClose = $('#rename-modal-close');
+  const $deleteModal = $('#delete-modal');
+  const $deleteMessage = $('#delete-message');
+  const $deleteCancel = $('#delete-cancel');
+  const $deleteConfirm = $('#delete-confirm');
+  const $deleteModalClose = $('#delete-modal-close');
+  const $errorModal = $('#error-modal');
+  const $errorModalTitle = $('#error-modal-title');
+  const $errorModalMessage = $('#error-modal-message');
+  const $errorModalDetails = $('#error-modal-details');
+  const $messageModal = $('#message-modal');
+  const $messageModalTitle = $('#message-modal-title');
+  const $messageModalBody = $('#message-modal-body');
+  const $messageModalHeader = $('#message-modal-header');
   let renameDeleteTargetPath = null;
 
   window.CodeParser.nodeClickHandler = function (nodeId, info) {
@@ -403,86 +433,86 @@
 
   function openEditStep(info) {
     const s = info.data;
-    $('edit-id').value = s.id || '';
-    $('edit-description').value = s.description || '';
-    $('edit-type').value = s.type || 'select';
-    $('edit-logic').value = JSON.stringify(s.logic || {}, null, 2);
-    $('edit-source-inputs').value = Array.isArray(s.source_inputs) ? s.source_inputs.join(', ') : '';
-    $('edit-output-alias').value = s.output_alias || '';
-    if (stepEditPanel) {
-      stepEditPanel.dataset.stepIndex = String(info.index);
-      stepEditPanel.classList.add('open');
+    $('#edit-id').val(s.id || '');
+    $('#edit-description').val(s.description || '');
+    $('#edit-type').val(s.type || 'select');
+    $('#edit-logic').val(JSON.stringify(s.logic || {}, null, 2));
+    $('#edit-source-inputs').val(Array.isArray(s.source_inputs) ? s.source_inputs.join(', ') : '');
+    $('#edit-output-alias').val(s.output_alias || '');
+    if ($stepEditPanel.length) {
+      $stepEditPanel.attr('data-step-index', String(info.index));
+      $stepEditPanel.addClass('open');
     }
   }
 
   function closeStepEditPanel() {
-    if (stepEditPanel) stepEditPanel.classList.remove('open');
+    if ($stepEditPanel.length) $stepEditPanel.removeClass('open');
   }
 
   function closeModals() {
-    if (detailDrawer) detailDrawer.classList.remove('open');
+    if ($detailDrawer.length) $detailDrawer.removeClass('open');
     closeStepEditPanel();
   }
 
-  if (logicModalClose) logicModalClose.addEventListener('click', closeModals);
-  if (detailDrawerBackdrop) detailDrawerBackdrop.addEventListener('click', closeModals);
-  if (stepEditPanelClose) stepEditPanelClose.addEventListener('click', closeStepEditPanel);
-  if (stepEditPanelBackdrop) stepEditPanelBackdrop.addEventListener('click', closeStepEditPanel);
+  if ($logicModalClose.length) $logicModalClose.on('click', closeModals);
+  if ($detailDrawerBackdrop.length) $detailDrawerBackdrop.on('click', closeModals);
+  if ($stepEditPanelClose.length) $stepEditPanelClose.on('click', closeStepEditPanel);
+  if ($stepEditPanelBackdrop.length) $stepEditPanelBackdrop.on('click', closeStepEditPanel);
 
-  var logicToggleVisual = $('logic-toggle-visual');
-  var logicToggleKv = $('logic-toggle-kv');
-  var logicToggleJson = $('logic-toggle-json');
-  if (logicToggleVisual) logicToggleVisual.addEventListener('click', function () { (window.CodeParser.setLogicViewMode)('visual'); });
-  if (logicToggleKv) logicToggleKv.addEventListener('click', function () { (window.CodeParser.setLogicViewMode)('kv'); });
-  if (logicToggleJson) logicToggleJson.addEventListener('click', function () { (window.CodeParser.setLogicViewMode)('json'); });
+  var $logicToggleVisual = $('#logic-toggle-visual');
+  var $logicToggleKv = $('#logic-toggle-kv');
+  var $logicToggleJson = $('#logic-toggle-json');
+  if ($logicToggleVisual.length) $logicToggleVisual.on('click', function () { (window.CodeParser.setLogicViewMode)('visual'); });
+  if ($logicToggleKv.length) $logicToggleKv.on('click', function () { (window.CodeParser.setLogicViewMode)('kv'); });
+  if ($logicToggleJson.length) $logicToggleJson.on('click', function () { (window.CodeParser.setLogicViewMode)('json'); });
 
-  editSave.addEventListener('click', () => {
-    const stepIndex = parseInt(stepEditPanel && stepEditPanel.dataset.stepIndex, 10);
+  $editSave.on('click', () => {
+    const stepIndex = parseInt($stepEditPanel.length && $stepEditPanel.attr('data-step-index'), 10);
     if (isNaN(stepIndex) || !currentConfig) return;
     const steps = (currentConfig.Transformations || currentConfig.transformations || {}).steps || [];
     if (!steps[stepIndex]) return;
     let logic = {};
     try {
-      logic = JSON.parse($('edit-logic').value);
+      logic = JSON.parse($('#edit-logic').val());
     } catch (e) {
       showMessagePopup('Invalid Logic', 'The Logic field must be valid JSON.', 'error');
       return;
     }
-    const srcInput = $('edit-source-inputs').value || '';
+    const srcInput = $('#edit-source-inputs').val() || '';
     const source_inputs = srcInput.split(',').map(x => x.trim()).filter(Boolean);
     steps[stepIndex] = {
-      id: $('edit-id').value || steps[stepIndex].id,
-      description: $('edit-description').value,
-      type: $('edit-type').value,
+      id: $('#edit-id').val() || steps[stepIndex].id,
+      description: $('#edit-description').val(),
+      type: $('#edit-type').val(),
       source_inputs,
       logic,
-      output_alias: $('edit-output-alias').value
+      output_alias: $('#edit-output-alias').val()
     };
     currentConfig.Transformations = currentConfig.Transformations || {};
     currentConfig.Transformations.steps = steps;
     closeStepEditPanel();
-    initNetwork($('network'), currentConfig);
+    initNetwork($('#network')[0], currentConfig);
     if (currentPath) {
       API.saveConfig(currentPath, currentConfig).then(function (res) {
         if (res.error) showMessagePopup('Save failed', res.error, 'error');
-        else showMessagePopup('Saved', 'Configuration saved.', 'success');
+        else toast('Interface saved', 'success');
       }).catch(function (err) { showMessagePopup('Save failed', err.message || String(err), 'error'); });
     }
   });
 
-  editDelete.addEventListener('click', () => {
-    const stepIndex = parseInt(stepEditPanel && stepEditPanel.dataset.stepIndex, 10);
+  $editDelete.on('click', () => {
+    const stepIndex = parseInt($stepEditPanel.length && $stepEditPanel.attr('data-step-index'), 10);
     if (isNaN(stepIndex) || !currentConfig) return;
     const steps = (currentConfig.Transformations || currentConfig.transformations || {}).steps || [];
     steps.splice(stepIndex, 1);
     currentConfig.Transformations = currentConfig.Transformations || {};
     currentConfig.Transformations.steps = steps;
     closeStepEditPanel();
-    initNetwork($('network'), currentConfig);
+    initNetwork($('#network')[0], currentConfig);
     if (currentPath) {
       API.saveConfig(currentPath, currentConfig).then(function (res) {
         if (res.error) showMessagePopup('Save failed', res.error, 'error');
-        else showMessagePopup('Saved', 'Configuration saved.', 'success');
+        else toast('Interface saved', 'success');
       }).catch(function (err) { showMessagePopup('Save failed', err.message || String(err), 'error'); });
     }
   });
@@ -492,26 +522,32 @@
     currentConfig = config;
     currentPath = path;
     editMode = false;
-    if (currentFileEl) currentFileEl.textContent = path || '';
-    if (emptyState) emptyState.classList.add('hidden');
-    if (diagramContainer) diagramContainer.classList.add('visible');
-    if ($('btn-download-json')) $('btn-download-json').style.display = 'inline-block';
-    var diagramEditBtn = document.getElementById('diagram-edit-btn');
-    if (diagramEditBtn) diagramEditBtn.classList.remove('active');
+    if ($currentFileEl.length) $currentFileEl.text(path || '');
+    if ($emptyState.length) $emptyState.addClass('hidden');
+    if ($diagramContainer.length) $diagramContainer.addClass('visible');
+    var $diagramEditBtn = $('#diagram-edit-btn');
+    if ($diagramEditBtn.length) $diagramEditBtn.removeClass('active');
     if (configViewMode === 'json' && typeof syncJsonEditorFromConfig === 'function') syncJsonEditorFromConfig();
-    if ($('btn-test')) $('btn-test').style.display = 'inline-block';
-    if ($('btn-rename')) $('btn-rename').style.display = 'inline-block';
-    if ($('btn-delete')) $('btn-delete').style.display = 'inline-block';
-    var container = $('network');
-    if (container) {
+    /* Show the full header toolbar (buttons moved from cmb-actions to header) */
+    var $hab = $('#header-action-btns');
+    if ($hab.length) $hab.css('display', 'flex');
+    /* Highlight active config in left panel list */
+    $('#config-list li').each(function () {
+      var $li = $(this);
+      $li.toggleClass('active', $li.attr('data-path') === path);
+    });
+    var $container = $('#network');
+    if ($container.length) {
       requestAnimationFrame(function () {
         requestAnimationFrame(function () {
           try {
-            initNetwork(container, config);
+            initNetwork($container[0], config);
           } catch (e) {
             console.error(e);
             (window.CodeParser.showErrorPopup || showErrorPopup)('Diagram error', e.message || String(e), e.stack || '');
           }
+          /* Snapshot clean state after canvas is built */
+          setTimeout(updateCanvasSnapshot, 150);
         });
       });
     }
@@ -520,7 +556,7 @@
   function loadConfig(path) {
     API.getConfig(path).then(config => {
       if (config && config.error) {
-        showErrorPopup('Error loading configuration', config.error, config.details != null ? String(config.details) : '');
+        showErrorPopup('Error loading interface', config.error, config.details != null ? String(config.details) : '');
         return;
       }
       applyConfigInView(path, config);
@@ -545,6 +581,30 @@
     API.configs().then(data => renderConfigList(data.configs || [])).catch(() => renderConfigList([]));
   }
   window.refreshConfigList = refreshConfigList;
+  /* Expose so index.html bottom-panel toggle can trigger it */
+  window.loadTestSampleData = loadTestSampleData;
+
+  /* Allow the studio inline scripts to fully reset the "current config" state */
+  window.studioResetCurrentPath = function () {
+    currentPath   = null;
+    currentConfig = null;
+    /* Hide header toolbar (shown only when a config is loaded) */
+    var $hab = $('#header-action-btns');
+    if ($hab.length) $hab.hide();
+    /* Remove the active highlight from whichever row was selected */
+    $('#config-list li').removeClass('active');
+    /* Clear header config display */
+    var $headerDisplay = $('#header-config-display');
+    var $headerName    = $('#header-config-name');
+    if ($headerDisplay.length) $headerDisplay.hide();
+    if ($headerName.length)    $headerName.text('');
+    /* Clear the center-mode title strip */
+    var $centerTitle = $('#center-config-title');
+    if ($centerTitle.length) $centerTitle.text('');
+    /* Clear hidden toolbar input */
+    var $cnInput = $('#toolbar-config-name');
+    if ($cnInput.length) $cnInput.val('');
+  };
 
   /* ── Expose JSON-tree helpers for Studio overlay ── */
   window.buildJsonTreeHtml = buildJsonTreeHtml;
@@ -554,41 +614,85 @@
   window.escapeHtmlForJson = escapeHtmlForJson;
 
   function renderConfigList(configs) {
-    configList.innerHTML = '';
+    $configList.html('');
+    /* Expose configs list globally so the new-config modal can check for duplicates */
+    window._currentConfigsList = configs || [];
     (configs || []).forEach(c => {
       const path = c.path || c.name;
-      const li = document.createElement('li');
-      li.dataset.path = path;
-      li.className = 'config-list-item';
-      const label = document.createElement('span');
-      label.className = 'config-list-label';
-      label.textContent = path;
-      li.appendChild(label);
+      /* Display without .json extension */
+      const displayName = path.replace(/\.json$/i, '');
+      const $li = $('<li>');
+      $li.attr('data-path', path);
+      $li[0].className = 'config-list-item';
+      /* Highlight if this is the currently loaded config */
+      if (currentPath && currentPath === path) $li.addClass('active');
+      const $label = $('<span>');
+      $label.addClass('config-list-label');
+      $label.text(displayName);
+      $li.append($label);
 
-      li.addEventListener('click', () => {
-        document.querySelectorAll('.config-list li').forEach(el => el.classList.remove('active'));
-        li.classList.add('active');
+      $li.on('click', () => {
+        /* Guard: warn about unsaved canvas changes before switching */
+        if (currentPath && currentPath !== path && isCanvasDirty()) {
+          var _targetPath = path;
+          var _$li = $li;
+          window.studioConfirm(
+            'You have unsaved changes. Do you want to save before switching?',
+            function() {
+              /* Save current, then switch */
+              var saveName = currentPath;
+              if (!saveName.toLowerCase().endsWith('.json')) saveName += '.json';
+              var cfg = window.studioGetJson ? window.studioGetJson() : null;
+              if (cfg && window.CodeParser && window.CodeParser.API) {
+                window.CodeParser.API.saveConfig(saveName, cfg).then(function() {
+                  updateCanvasSnapshot();
+                  $('#config-list li').removeClass('active');
+                  _$li.addClass('active');
+                  loadConfig(_targetPath);
+                }).catch(function() {
+                  $('#config-list li').removeClass('active');
+                  _$li.addClass('active');
+                  loadConfig(_targetPath);
+                });
+              } else {
+                $('#config-list li').removeClass('active');
+                _$li.addClass('active');
+                loadConfig(_targetPath);
+              }
+            },
+            function() {
+              /* Discard and switch */
+              canvasDirtySnapshot = null;
+              $('#config-list li').removeClass('active');
+              _$li.addClass('active');
+              loadConfig(_targetPath);
+            }
+          );
+          return;
+        }
+        $('#config-list li').removeClass('active');
+        $li.addClass('active');
         loadConfig(path);
       });
 
-      configList.appendChild(li);
+      $configList.append($li);
     });
   }
 
   function closeRenameModal() {
-    renameModal.classList.remove('visible');
+    $renameModal.addClass("hidden");
     renameDeleteTargetPath = null;
   }
   function closeDeleteModal() {
-    deleteModal.classList.remove('visible');
+    $deleteModal.addClass("hidden");
     renameDeleteTargetPath = null;
   }
 
-  if (renameModalClose) renameModalClose.addEventListener('click', closeRenameModal);
-  if (renameCancel) renameCancel.addEventListener('click', closeRenameModal);
-  if (renameSubmit) renameSubmit.addEventListener('click', () => {
+  if ($renameModalClose.length) $renameModalClose.on('click', closeRenameModal);
+  if ($renameCancel.length) $renameCancel.on('click', closeRenameModal);
+  if ($renameSubmit.length) $renameSubmit.on('click', () => {
     const path = renameDeleteTargetPath;
-    const raw = renameInput.value.trim();
+    const raw = $renameInput.val().trim();
     if (!raw || !path) { closeRenameModal(); return; }
     const name = raw.replace(/\.json$/i, '') + '.json';
     API.renameConfig(path, name).then(res => {
@@ -598,21 +702,21 @@
         refreshConfigList();
         if (currentPath === path) {
           currentPath = res.path;
-          currentFileEl.textContent = res.path;
+          $currentFileEl.text(res.path);
           loadConfig(res.path);
         }
-        showMessagePopup('Success', 'Configuration renamed to <strong>' + escapeHtml(name) + '</strong>.', 'success', true);
+        toast('Interface renamed to <strong>' + escapeHtml(name) + '</strong>', 'success');
       }
-    }).catch(() => showMessagePopup('Rename failed', 'Could not rename configuration.', 'error'));
+    }).catch(() => showMessagePopup('Rename failed', 'Could not rename interface.', 'error'));
   });
-  renameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') renameSubmit.click();
+  $renameInput.on('keydown', (e) => {
+    if (e.key === 'Enter') $renameSubmit[0].click();
     if (e.key === 'Escape') closeRenameModal();
   });
 
-  if (deleteModalClose) deleteModalClose.addEventListener('click', closeDeleteModal);
-  if (deleteCancel) deleteCancel.addEventListener('click', closeDeleteModal);
-  if (deleteConfirm) deleteConfirm.addEventListener('click', () => {
+  if ($deleteModalClose.length) $deleteModalClose.on('click', closeDeleteModal);
+  if ($deleteCancel.length) $deleteCancel.on('click', closeDeleteModal);
+  if ($deleteConfirm.length) $deleteConfirm.on('click', () => {
     const path = renameDeleteTargetPath;
     if (!path) { closeDeleteModal(); return; }
     API.deleteConfig(path).then(res => {
@@ -622,223 +726,311 @@
         if (currentPath === path) {
           currentPath = null;
           currentConfig = null;
-          currentFileEl.textContent = 'Select a configuration';
-          diagramContainer.classList.remove('visible');
-          emptyState.classList.remove('hidden');
-          if ($('btn-download-json')) $('btn-download-json').style.display = 'none';
-          if ($('btn-test')) $('btn-test').style.display = 'none';
-          if ($('btn-rename')) $('btn-rename').style.display = 'none';
-          if ($('btn-delete')) $('btn-delete').style.display = 'none';
+          $currentFileEl.text('Select an interface');
+          $diagramContainer.removeClass('visible');
+          $emptyState.removeClass('hidden');
+          /* Hide header toolbar */
+          var $hd = $('#header-action-btns');
+          if ($hd.length) $hd.hide();
+          var $cn = $('#toolbar-config-name');
+          if ($cn.length) $cn.val('');
         }
         refreshConfigList();
-        showMessagePopup('Success', 'Configuration <strong>' + escapeHtml(path) + '</strong> has been deleted.', 'success', true);
+        toast('Interface <strong>' + escapeHtml(path) + '</strong> has been deleted', 'success');
       }
-    }).catch(() => showMessagePopup('Delete failed', 'Could not delete configuration.', 'error'));
+    }).catch(() => showMessagePopup('Delete failed', 'Could not delete interface.', 'error'));
   });
 
-  renameModal.addEventListener('click', (e) => { if (e.target === renameModal) closeRenameModal(); });
-  deleteModal.addEventListener('click', (e) => { if (e.target === deleteModal) closeDeleteModal(); });
+  $renameModal.on('click', (e) => { if (e.target === $renameModal[0]) closeRenameModal(); });
+  $deleteModal.on('click', (e) => { if (e.target === $deleteModal[0]) closeDeleteModal(); });
 
-  if (errorModal) {
-    const errClose = $('error-modal-close');
-    const errCloseBtn = $('error-modal-close-btn');
-    if (errClose) errClose.addEventListener('click', closeErrorModal);
-    if (errCloseBtn) errCloseBtn.addEventListener('click', closeErrorModal);
-    errorModal.addEventListener('click', (e) => { if (e.target === errorModal) closeErrorModal(); });
+  if ($errorModal.length) {
+    const $errClose = $('#error-modal-close');
+    const $errCloseBtn = $('#error-modal-close-btn');
+    if ($errClose.length) $errClose.on('click', closeErrorModal);
+    if ($errCloseBtn.length) $errCloseBtn.on('click', closeErrorModal);
+    $errorModal.on('click', (e) => { if (e.target === $errorModal[0]) closeErrorModal(); });
   }
-  if (messageModal) {
-    const msgClose = $('message-modal-close');
-    const msgCloseBtn = $('message-modal-close-btn');
-    if (msgClose) msgClose.addEventListener('click', closeMessageModal);
-    if (msgCloseBtn) msgCloseBtn.addEventListener('click', closeMessageModal);
-    messageModal.addEventListener('click', (e) => { if (e.target === messageModal) closeMessageModal(); });
+  if ($messageModal.length) {
+    const $msgClose = $('#message-modal-close');
+    const $msgCloseBtn = $('#message-modal-close-btn');
+    if ($msgClose.length) $msgClose.on('click', closeMessageModal);
+    if ($msgCloseBtn.length) $msgCloseBtn.on('click', closeMessageModal);
+    $messageModal.on('click', (e) => { if (e.target === $messageModal[0]) closeMessageModal(); });
   }
 
   (function () {
-    var layout = $('layout');
-    var toggleBtn = $('sidebar-toggle');
-    var toggleIcon = $('sidebar-toggle-icon');
+    var $layout = $('#layout');
+    var $toggleBtn = $('#sidebar-toggle');
+    var $toggleIcon = $('#sidebar-toggle-icon');
     var collapsedKey = 'config-engine-sidebar-collapsed';
-    if (layout && toggleBtn) {
-      if (localStorage.getItem(collapsedKey) === '1') layout.classList.add('sidebar-collapsed');
-      if (toggleIcon) toggleIcon.className = layout.classList.contains('sidebar-collapsed') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-bars';
-      toggleBtn.addEventListener('click', function () {
-        layout.classList.toggle('sidebar-collapsed');
-        if (toggleIcon) toggleIcon.className = layout.classList.contains('sidebar-collapsed') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-bars';
-        localStorage.setItem(collapsedKey, layout.classList.contains('sidebar-collapsed') ? '1' : '0');
+    if ($layout.length && $toggleBtn.length) {
+      if (localStorage.getItem(collapsedKey) === '1') $layout.addClass('sidebar-collapsed');
+      if ($toggleIcon.length) $toggleIcon[0].className = $layout.hasClass('sidebar-collapsed') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-bars';
+      $toggleBtn.on('click', function () {
+        $layout.toggleClass('sidebar-collapsed');
+        if ($toggleIcon.length) $toggleIcon[0].className = $layout.hasClass('sidebar-collapsed') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-bars';
+        localStorage.setItem(collapsedKey, $layout.hasClass('sidebar-collapsed') ? '1' : '0');
       });
     }
   })();
 
   (function () {
-    var layout = $('layout');
-    var importPage = $('import-page');
-    var testPage = $('test-page');
-    var settingsPage = $('settings-page');
-    var navConfig = $('nav-configurations');
-    var navImport = $('nav-import');
-    var navSettings = $('nav-settings');
+    var $layout = $('#layout');
+    var $importPage = $('#import-page');
+    var $testPage = $('#test-page');
+    var $settingsPage = $('#settings-page');
+    var $navConfig = $('#nav-configurations');
+    var $navImport = $('#nav-import');
+    var $navSettings = $('#nav-settings');
     var pageKey = 'config-engine-page';
-    function setNavActive(which) {
-      [navConfig, navImport, navSettings].forEach(function (n) {
-        if (n) {
-          n.classList.toggle('active', n === which);
-          n.setAttribute('aria-current', n === which ? 'page' : null);
+    function setNavActive($which) {
+      [$navConfig, $navImport, $navSettings].forEach(function ($n) {
+        if ($n.length) {
+          $n.toggleClass('active', $n[0] === ($which && $which[0]));
+          $n.attr('aria-current', $n[0] === ($which && $which[0]) ? 'page' : null);
         }
       });
     }
     function showConfigurations() {
-      if (layout) layout.classList.remove('hidden');
-      if (importPage) importPage.classList.add('hidden');
-      if (testPage) testPage.classList.add('hidden');
-      if (settingsPage) settingsPage.classList.add('hidden');
-      setNavActive(navConfig);
+      if ($layout.length) $layout.removeClass('hidden');
+      if ($importPage.length) $importPage.addClass('hidden');
+      if ($testPage.length) $testPage.addClass('hidden');
+      if ($settingsPage.length) $settingsPage.addClass('hidden');
+      setNavActive($navConfig);
       localStorage.setItem(pageKey, 'configurations');
     }
     function showTest() {
-      if (layout) layout.classList.add('hidden');
-      if (importPage) importPage.classList.add('hidden');
-      if (testPage) testPage.classList.remove('hidden');
-      if (settingsPage) settingsPage.classList.add('hidden');
+      if ($importPage.length) $importPage.addClass('hidden');
+      if ($settingsPage.length) $settingsPage.addClass('hidden');
       setNavActive(null);
       localStorage.setItem(pageKey, 'test');
       if (typeof loadTestSampleData === 'function') loadTestSampleData();
+
+      /* Open test panel with slide-up animation (half screen).
+         Delegate to studio's animated opener if available (set by inline script),
+         otherwise fall back to direct DOM manipulation. */
+      if (typeof window.__studioOpenTestPanel === 'function') {
+        window.__studioOpenTestPanel();
+      } else if ($testPage.length) {
+        $testPage.removeClass('hidden');
+        void $testPage[0].offsetHeight; /* force reflow so CSS transition starts from height:0 */
+        var _savedTH = parseInt(localStorage.getItem('studio_bottom_h'), 10);
+        var _maxTH   = Math.floor(window.innerHeight * 0.80);
+        $testPage.css('height', (_savedTH >= 120 && _savedTH <= _maxTH)
+          ? _savedTH + 'px'
+          : Math.floor(window.innerHeight * 0.50) + 'px'); /* half screen */
+      }
+
+      /* Diagram and panels stay as-is — no collapse, no auto-layout, no fit */
     }
     function showImport() {
-      if (layout) layout.classList.add('hidden');
-      if (importPage) importPage.classList.remove('hidden');
-      if (testPage) testPage.classList.add('hidden');
-      if (settingsPage) settingsPage.classList.add('hidden');
-      setNavActive(navImport);
+      if ($layout.length) $layout.addClass('hidden');
+      if ($importPage.length) $importPage.removeClass('hidden');
+      if ($testPage.length) $testPage.addClass('hidden');
+      if ($settingsPage.length) $settingsPage.addClass('hidden');
+      setNavActive($navImport);
       localStorage.setItem(pageKey, 'import');
       updateImportParsingMode();
     }
     function updateImportParsingMode() {
-      var el = $('import-parsing-mode');
+      var $el = $('#import-parsing-mode');
       var api = window.CodeParser && window.CodeParser.API;
       if (!api || !api.getSettings) {
-        if (el) el.textContent = '';
+        if ($el.length) $el.text('');
         return;
       }
       api.getSettings().then(function (data) {
         if (data.error) {
-          if (el) el.textContent = '';
+          if ($el.length) $el.text('');
           return;
         }
-        if (el) {
-          el.textContent = data.use_llm
+        if ($el.length) {
+          $el.text(data.use_llm
             ? 'Config will be generated using the LLM (as set in Settings).'
-            : 'Config will be generated using the simple Python parser (as set in Settings).';
+            : 'Config will be generated using the simple Python parser (as set in Settings).');
         }
       }).catch(function () {
-        if (el) el.textContent = '';
+        if ($el.length) $el.text('');
       });
     }
     function showSettings() {
-      if (layout) layout.classList.add('hidden');
-      if (importPage) importPage.classList.add('hidden');
-      if (testPage) testPage.classList.add('hidden');
-      if (settingsPage) settingsPage.classList.remove('hidden');
-      setNavActive(navSettings);
+      if ($layout.length) $layout.addClass('hidden');
+      if ($importPage.length) $importPage.addClass('hidden');
+      if ($testPage.length) $testPage.addClass('hidden');
+      if ($settingsPage.length) $settingsPage.removeClass('hidden');
+      setNavActive($navSettings);
       localStorage.setItem(pageKey, 'settings');
       loadSettingsIntoForm();
     }
     function updateLlmPanelVisibility() {
-      var useLlm = $('settings-use-llm');
-      var panel = $('settings-llm-panel');
-      if (panel) panel.classList.toggle('hidden', !(useLlm && useLlm.checked));
+      var $useLlm = $('#settings-use-llm');
+      var $panel = $('#settings-llm-panel');
+      if ($panel.length) $panel.toggleClass('hidden', !($useLlm.length && $useLlm[0].checked));
     }
+
+    /* ---- Holiday table helpers ---- */
+    function _makeHolidayRow(active, name, date) {
+      var $tr = $('<tr class="settings-hol-row">');
+      $tr.append(
+        $('<td class="settings-hol-td-active">').append(
+          $('<input type="checkbox" class="settings-hol-active">').prop('checked', active !== false)
+        ),
+        $('<td class="settings-hol-td-name">').append(
+          $('<input type="text" class="settings-hol-name settings-input-sm" placeholder="Holiday name">').val(name || '')
+        ),
+        $('<td class="settings-hol-td-date">').append(
+          $('<input type="date" class="settings-hol-date settings-input-sm">').val(date || '')
+        ),
+        $('<td class="settings-hol-td-del">').append(
+          $('<button type="button" class="settings-hol-del" title="Remove">&times;</button>').on('click', function() {
+            $tr.remove();
+          })
+        )
+      );
+      return $tr;
+    }
+    function _renderHolidaysTable(holidays) {
+      var $tbody = $('#settings-holidays-tbody');
+      if (!$tbody.length) return;
+      $tbody.empty();
+      (holidays || []).forEach(function(h) {
+        var active, name, date;
+        if (typeof h === 'string') {
+          active = true; name = ''; date = h;
+        } else {
+          active = h.active !== false; name = h.name || ''; date = h.date || '';
+        }
+        $tbody.append(_makeHolidayRow(active, name, date));
+      });
+    }
+    function _readHolidaysTable() {
+      var result = [];
+      $('#settings-holidays-tbody .settings-hol-row').each(function() {
+        var active = $(this).find('.settings-hol-active').prop('checked');
+        var name   = $(this).find('.settings-hol-name').val().trim();
+        var date   = $(this).find('.settings-hol-date').val().trim();
+        if (date) result.push({ active: active, name: name, date: date });
+      });
+      return result;
+    }
+
     function loadSettingsIntoForm() {
       var api = window.CodeParser && window.CodeParser.API;
       if (!api || !api.getSettings) return;
       api.getSettings().then(function (data) {
         if (data.error) return;
-        var useLlm = $('settings-use-llm');
-        var pathPrefix = $('settings-input-output-path-prefix');
-        var inputPrefix = $('settings-input-dataset-prefix');
-        var outputPrefix = $('settings-output-dataset-prefix');
-        var llmBase = $('settings-llm-base-url');
-        var llmModel = $('settings-llm-model');
-        var llmTimeout = $('settings-llm-timeout');
-        var configDir = $('settings-config-dir');
-        var validationBucketPrefix = $('settings-validation-bucket-prefix');
-        var errorBucketPrefix = $('settings-error-bucket-prefix');
-        var rawBucketPrefix = $('settings-raw-bucket-prefix');
-        if (useLlm) useLlm.checked = !!data.use_llm;
-        if (pathPrefix) pathPrefix.value = data.input_output_path_prefix || '';
-        if (inputPrefix) inputPrefix.value = data.input_dataset_prefix || '';
-        if (outputPrefix) outputPrefix.value = data.output_dataset_prefix || '';
-        if (llmBase) llmBase.value = data.llm_base_url || '';
-        if (llmModel) llmModel.value = data.llm_model || '';
-        if (llmTimeout) llmTimeout.value = data.llm_timeout_seconds != null ? data.llm_timeout_seconds : 600;
-        if (configDir) configDir.value = data.config_dir || '';
-        if (validationBucketPrefix) validationBucketPrefix.value = data.validation_bucket_prefix || '';
-        if (errorBucketPrefix) errorBucketPrefix.value = data.error_bucket_prefix || '';
-        if (rawBucketPrefix) rawBucketPrefix.value = data.raw_bucket_prefix || '';
+        var $useLlm = $('#settings-use-llm');
+        var $pathPrefix = $('#settings-input-output-path-prefix');
+        var $inputPrefix = $('#settings-input-dataset-prefix');
+        var $outputPrefix = $('#settings-output-dataset-prefix');
+        var $llmBase = $('#settings-llm-base-url');
+        var $llmModel = $('#settings-llm-model');
+        var $llmTimeout = $('#settings-llm-timeout');
+        var $configDir = $('#settings-config-dir');
+        var $validationBucketPrefix = $('#settings-validation-bucket-prefix');
+        var $errorBucketPrefix = $('#settings-error-bucket-prefix');
+        var $rawBucketPrefix = $('#settings-raw-bucket-prefix');
+        var $curatedBucketPrefix = $('#settings-curated-bucket-prefix');
+        if ($useLlm.length) $useLlm[0].checked = !!data.use_llm;
+        if ($pathPrefix.length) $pathPrefix.val(data.input_output_path_prefix || '');
+        if ($inputPrefix.length) $inputPrefix.val(data.input_dataset_prefix || '');
+        if ($outputPrefix.length) $outputPrefix.val(data.output_dataset_prefix || '');
+        if ($llmBase.length) $llmBase.val(data.llm_base_url || '');
+        if ($llmModel.length) $llmModel.val(data.llm_model || '');
+        if ($llmTimeout.length) $llmTimeout.val(data.llm_timeout_seconds != null ? data.llm_timeout_seconds : 600);
+        if ($configDir.length) $configDir.val(data.config_dir || '');
+        if ($rawBucketPrefix.length) $rawBucketPrefix.val(data.raw_bucket_prefix || '');
+        if ($validationBucketPrefix.length) $validationBucketPrefix.val(data.validation_bucket_prefix || '');
+        if ($errorBucketPrefix.length) $errorBucketPrefix.val(data.error_bucket_prefix || '');
+        if ($curatedBucketPrefix.length) $curatedBucketPrefix.val(data.curated_bucket_prefix || '');
+        /* Holidays table */
+        _renderHolidaysTable(data.usa_holidays || []);
         updateLlmPanelVisibility();
       }).catch(function () {});
     }
     function saveSettingsFromForm(e) {
       if (e) e.preventDefault();
-      var useLlm = $('settings-use-llm');
-      var pathPrefix = $('settings-input-output-path-prefix');
-      var inputPrefix = $('settings-input-dataset-prefix');
-      var outputPrefix = $('settings-output-dataset-prefix');
-      var llmBase = $('settings-llm-base-url');
-      var llmModel = $('settings-llm-model');
-      var llmTimeout = $('settings-llm-timeout');
-      var configDir = $('settings-config-dir');
-      var validationBucketPrefix = $('settings-validation-bucket-prefix');
-      var errorBucketPrefix = $('settings-error-bucket-prefix');
-      var rawBucketPrefix = $('settings-raw-bucket-prefix');
-      var msg = $('settings-message');
+      var $useLlm = $('#settings-use-llm');
+      var $pathPrefix = $('#settings-input-output-path-prefix');
+      var $inputPrefix = $('#settings-input-dataset-prefix');
+      var $outputPrefix = $('#settings-output-dataset-prefix');
+      var $llmBase = $('#settings-llm-base-url');
+      var $llmModel = $('#settings-llm-model');
+      var $llmTimeout = $('#settings-llm-timeout');
+      var $configDir = $('#settings-config-dir');
+      var $validationBucketPrefix = $('#settings-validation-bucket-prefix');
+      var $errorBucketPrefix = $('#settings-error-bucket-prefix');
+      var $rawBucketPrefix = $('#settings-raw-bucket-prefix');
+      var $curatedBucketPrefix = $('#settings-curated-bucket-prefix');
+      var $msg = $('#settings-message');
       var api = window.CodeParser && window.CodeParser.API;
       if (!api || !api.saveSettings) return;
-      var timeoutVal = (llmTimeout && llmTimeout.value) ? parseInt(llmTimeout.value, 10) : 600;
+      var timeoutVal = ($llmTimeout.length && $llmTimeout.val()) ? parseInt($llmTimeout.val(), 10) : 600;
       if (isNaN(timeoutVal) || timeoutVal < 60) timeoutVal = 600;
       if (timeoutVal > 3600) timeoutVal = 3600;
       var payload = {
-        use_llm: !!(useLlm && useLlm.checked),
-        input_output_path_prefix: (pathPrefix && pathPrefix.value) ? pathPrefix.value.trim() : '',
-        input_dataset_prefix: (inputPrefix && inputPrefix.value) ? inputPrefix.value.trim() : '',
-        output_dataset_prefix: (outputPrefix && outputPrefix.value) ? outputPrefix.value.trim() : '',
-        llm_base_url: (llmBase && llmBase.value) ? llmBase.value.trim() : '',
-        llm_model: (llmModel && llmModel.value) ? llmModel.value.trim() : '',
+        use_llm: !!($useLlm.length && $useLlm[0].checked),
+        input_output_path_prefix: ($pathPrefix.length && $pathPrefix.val()) ? $pathPrefix.val().trim() : '',
+        input_dataset_prefix: ($inputPrefix.length && $inputPrefix.val()) ? $inputPrefix.val().trim() : '',
+        output_dataset_prefix: ($outputPrefix.length && $outputPrefix.val()) ? $outputPrefix.val().trim() : '',
+        llm_base_url: ($llmBase.length && $llmBase.val()) ? $llmBase.val().trim() : '',
+        llm_model: ($llmModel.length && $llmModel.val()) ? $llmModel.val().trim() : '',
         llm_timeout_seconds: timeoutVal,
-        config_dir: (configDir && configDir.value) ? configDir.value.trim() : '',
-        validation_bucket_prefix: (validationBucketPrefix && validationBucketPrefix.value) ? validationBucketPrefix.value.trim() : '',
-        error_bucket_prefix: (errorBucketPrefix && errorBucketPrefix.value) ? errorBucketPrefix.value.trim() : '',
-        raw_bucket_prefix: (rawBucketPrefix && rawBucketPrefix.value) ? rawBucketPrefix.value.trim() : ''
+        config_dir: ($configDir.length && $configDir.val()) ? $configDir.val().trim() : '',
+        raw_bucket_prefix: ($rawBucketPrefix.length && $rawBucketPrefix.val()) ? $rawBucketPrefix.val().trim() : '',
+        validation_bucket_prefix: ($validationBucketPrefix.length && $validationBucketPrefix.val()) ? $validationBucketPrefix.val().trim() : '',
+        error_bucket_prefix: ($errorBucketPrefix.length && $errorBucketPrefix.val()) ? $errorBucketPrefix.val().trim() : '',
+        curated_bucket_prefix: ($curatedBucketPrefix.length && $curatedBucketPrefix.val()) ? $curatedBucketPrefix.val().trim() : '',
+        usa_holidays: _readHolidaysTable()
       };
-      if (msg) msg.textContent = 'Saving...';
+      if ($msg.length) { $msg.text('Saving\u2026'); $msg[0].className = 'import-message'; }
       api.saveSettings(payload).then(function (res) {
-        if (msg) msg.textContent = res.error ? res.error : 'Settings saved.';
-        if (msg) msg.className = 'import-message' + (res.error ? ' error' : ' success');
+        if ($msg.length) { $msg.text(''); $msg[0].className = ''; }
+        if (res.error) {
+          if (typeof window.studioToast === 'function') window.studioToast(res.error, 'error');
+          else alert(res.error);
+        } else {
+          if (typeof window.studioToast === 'function') window.studioToast('Settings saved.', 'success');
+          else alert('Settings saved.');
+          /* Refresh the studio's in-memory settings so node prop panels
+             pre-populate with the newly saved bucket prefixes immediately. */
+          if (typeof window.studioReloadSettings === 'function') window.studioReloadSettings();
+        }
       }).catch(function () {
-        if (msg) { msg.textContent = 'Failed to save.'; msg.className = 'import-message error'; }
+        if ($msg.length) { $msg.text(''); $msg[0].className = ''; }
+        if (typeof window.studioToast === 'function') window.studioToast('Failed to save settings.', 'error');
+        else alert('Failed to save settings.');
       });
     }
     function backToConfigAndSelect() {
       showConfigurations();
-      if (currentPath && configList) {
-        configList.querySelectorAll('li').forEach(function (el) {
-          el.classList.toggle('active', el.dataset.path === currentPath);
+      if (currentPath && $configList.length) {
+        $configList.find('li').each(function () {
+          var $el = $(this);
+          $el.toggleClass('active', $el.attr('data-path') === currentPath);
         });
       }
+      /* Panels stay as-is — they were not collapsed when Test opened */
     }
-    if (navConfig) navConfig.addEventListener('click', function (e) { e.preventDefault(); showConfigurations(); });
-    if (navImport) navImport.addEventListener('click', function (e) { e.preventDefault(); showImport(); });
-    if (navSettings) navSettings.addEventListener('click', function (e) { e.preventDefault(); showSettings(); });
-    var settingsForm = $('settings-form');
-    if (settingsForm) settingsForm.addEventListener('submit', saveSettingsFromForm);
-    var useLlmCheck = $('settings-use-llm');
-    if (useLlmCheck) useLlmCheck.addEventListener('change', updateLlmPanelVisibility);
-    var importLinkSettings = $('import-link-settings');
-    if (importLinkSettings) importLinkSettings.addEventListener('click', function (e) { e.preventDefault(); showSettings(); });
-    var btnTest = $('btn-test');
-    if (btnTest) btnTest.addEventListener('click', function (e) { e.preventDefault(); showTest(); });
-    var testPageBackBtn = $('test-page-back-btn');
-    if (testPageBackBtn) testPageBackBtn.addEventListener('click', function (e) { e.preventDefault(); backToConfigAndSelect(); });
+    if ($navConfig.length) $navConfig.on('click', function (e) { e.preventDefault(); showConfigurations(); });
+    if ($navImport.length) $navImport.on('click', function (e) { e.preventDefault(); showImport(); });
+    if ($navSettings.length) $navSettings.on('click', function (e) { e.preventDefault(); showSettings(); });
+    /* Expose so the studio can reload settings when the drawer opens */
+    window.studioLoadSettings = loadSettingsIntoForm;
+    var $settingsForm = $('#settings-form');
+    if ($settingsForm.length) $settingsForm.on('submit', saveSettingsFromForm);
+    var $useLlmCheck = $('#settings-use-llm');
+    if ($useLlmCheck.length) $useLlmCheck.on('change', updateLlmPanelVisibility);
+    $(document).on('click', '#settings-holidays-add', function() {
+      $('#settings-holidays-tbody').append(_makeHolidayRow(true, '', ''));
+    });
+    var $importLinkSettings = $('#import-link-settings');
+    if ($importLinkSettings.length) $importLinkSettings.on('click', function (e) { e.preventDefault(); showSettings(); });
+    var $btnTest = $('#btn-test');
+    if ($btnTest.length) $btnTest.on('click', function (e) { e.preventDefault(); showTest(); });
+    var $testPageBackBtn = $('#test-page-back-btn');
+    if ($testPageBackBtn.length) $testPageBackBtn.on('click', function (e) { e.preventDefault(); backToConfigAndSelect(); });
     showConfigurations();
     window.showConfigurationsView = showConfigurations;
     window.showTestPage = showTest;
@@ -846,46 +1038,49 @@
   })();
 
   (function () {
-    var tabs = document.querySelectorAll('.import-tab');
-    var panels = document.querySelectorAll('.import-panel');
-    tabs.forEach(function (tab) {
-      tab.addEventListener('click', function () {
-        var id = tab.getAttribute('data-tab');
-        tabs.forEach(function (t) {
-          t.classList.toggle('active', t.getAttribute('data-tab') === id);
-          t.setAttribute('aria-selected', t.getAttribute('data-tab') === id ? 'true' : 'false');
+    var $tabs = $('.import-tab');
+    var $panels = $('.import-panel');
+    $tabs.each(function () {
+      var $tab = $(this);
+      $tab.on('click', function () {
+        var id = $tab.attr('data-tab');
+        $tabs.each(function () {
+          var $t = $(this);
+          $t.toggleClass('active', $t.attr('data-tab') === id);
+          $t.attr('aria-selected', $t.attr('data-tab') === id ? 'true' : 'false');
         });
-        panels.forEach(function (p) {
-          var panelId = p.id ? p.id.replace('import-panel-', '') : '';
-          var match = p.id === 'import-panel-' + id;
-          p.classList.toggle('active', match);
-          p.classList.toggle('hidden', !match);
+        $panels.each(function () {
+          var $p = $(this);
+          var match = $p.attr('id') === 'import-panel-' + id;
+          $p.toggleClass('active', match);
+          $p.toggleClass('hidden', !match);
         });
       });
     });
   })();
 
   function switchTestTab(tabId) {
-    var testTabs = document.querySelectorAll('#test-page .test-tab');
-    var testPanels = document.querySelectorAll('#test-page .test-panel');
-    testTabs.forEach(function (t) {
-      t.classList.toggle('active', t.getAttribute('data-tab') === tabId);
-      t.setAttribute('aria-selected', t.getAttribute('data-tab') === tabId ? 'true' : 'false');
+    var $testTabs = $('#test-page .test-tab');
+    var $testPanels = $('#test-page .test-panel');
+    $testTabs.each(function () {
+      var $t = $(this);
+      $t.toggleClass('active', $t.attr('data-tab') === tabId);
+      $t.attr('aria-selected', $t.attr('data-tab') === tabId ? 'true' : 'false');
     });
-    testPanels.forEach(function (p) {
-      var match = p.id === 'test-panel-' + tabId;
-      p.classList.toggle('active', match);
-      p.classList.toggle('hidden', !match);
+    $testPanels.each(function () {
+      var $p = $(this);
+      var match = $p.attr('id') === 'test-panel-' + tabId;
+      $p.toggleClass('active', match);
+      $p.toggleClass('hidden', !match);
     });
     if (tabId === 'reconciliation' && typeof renderReconciliation === 'function') renderReconciliation();
   }
 
   (function testPageTabs() {
-    var testTabs = document.querySelectorAll('#test-page .test-tab');
-    var testPanels = document.querySelectorAll('#test-page .test-panel');
-    testTabs.forEach(function (tab) {
-      tab.addEventListener('click', function () {
-        switchTestTab(tab.getAttribute('data-tab'));
+    $('#test-page .test-tab').each(function () {
+      var $tab = $(this);
+      $tab.on('click', function () {
+        switchTestTab($tab.attr('data-tab'));
       });
     });
   })();
@@ -926,31 +1121,31 @@
     return parts.length ? parts.join(', ') : '';
   }
 
-  var overwriteModal = $('overwrite-modal');
-  var overwriteMessage = $('overwrite-message');
-  var overwriteCancelBtn = $('overwrite-cancel');
-  var overwriteConfirmBtn = $('overwrite-confirm');
-  var overwriteModalClose = $('overwrite-modal-close');
+  var $overwriteModal = $('#overwrite-modal');
+  var $overwriteMessage = $('#overwrite-message');
+  var $overwriteCancelBtn = $('#overwrite-cancel');
+  var $overwriteConfirmBtn = $('#overwrite-confirm');
+  var $overwriteModalClose = $('#overwrite-modal-close');
   var overwriteCallback = null;
 
   function showOverwriteConfirm(path, onConfirm) {
-    if (overwriteMessage) overwriteMessage.innerHTML = 'A configuration named <strong class="overwrite-filename">' + escapeHtml(path || '') + '</strong> already exists. Overwrite?';
+    if ($overwriteMessage.length) $overwriteMessage.html('An interface named <strong class="overwrite-filename">' + escapeHtml(path || '') + '</strong> already exists. Overwrite?');
     overwriteCallback = onConfirm;
-    if (overwriteModal) overwriteModal.classList.add('visible');
+    if ($overwriteModal.length) $overwriteModal.removeClass("hidden");
   }
 
   function closeOverwriteModal() {
     overwriteCallback = null;
-    if (overwriteModal) overwriteModal.classList.remove('visible');
+    if ($overwriteModal.length) $overwriteModal.addClass("hidden");
   }
 
-  if (overwriteConfirmBtn) overwriteConfirmBtn.addEventListener('click', function () {
+  if ($overwriteConfirmBtn.length) $overwriteConfirmBtn.on('click', function () {
     if (typeof overwriteCallback === 'function') overwriteCallback();
     closeOverwriteModal();
   });
-  if (overwriteCancelBtn) overwriteCancelBtn.addEventListener('click', closeOverwriteModal);
-  if (overwriteModalClose) overwriteModalClose.addEventListener('click', closeOverwriteModal);
-  if (overwriteModal) overwriteModal.addEventListener('click', function (e) { if (e.target === overwriteModal) closeOverwriteModal(); });
+  if ($overwriteCancelBtn.length) $overwriteCancelBtn.on('click', closeOverwriteModal);
+  if ($overwriteModalClose.length) $overwriteModalClose.on('click', closeOverwriteModal);
+  if ($overwriteModal.length) $overwriteModal.on('click', function (e) { if (e.target === $overwriteModal[0]) closeOverwriteModal(); });
 
   function configPathExists(path, configsList) {
     if (!path || !configsList || !Array.isArray(configsList)) return false;
@@ -983,7 +1178,8 @@
 
   function showValidationErrors(containerEl, errors, parseError) {
     if (!containerEl) return;
-    containerEl.classList.remove('hidden');
+    var $el = $(containerEl);
+    $el.removeClass('hidden');
     var html = '';
     if (parseError) html += '<p class="import-validation-parse-error"><strong>Parse error:</strong> ' + escapeHtml(parseError) + '</p>';
     if (errors && errors.length) {
@@ -993,44 +1189,44 @@
       });
       html += '</ul>';
     }
-    containerEl.innerHTML = html || '';
+    $el.html(html || '');
   }
 
   function hideValidationErrors(containerEl) {
-    if (containerEl) { containerEl.classList.add('hidden'); containerEl.innerHTML = ''; }
+    if (containerEl) { var $el = $(containerEl); $el.addClass('hidden'); $el.html(''); }
   }
 
-  $('import-json-file').addEventListener('change', function () {
-    var nameInput = $('import-json-name');
-    if (!nameInput || !this.files || this.files.length === 0) return;
+  $('#import-json-file').on('change', function () {
+    var $nameInput = $('#import-json-name');
+    if (!$nameInput.length || !this.files || this.files.length === 0) return;
     var name = this.files[0].name.replace(/\.json$/i, '');
-    if (name) nameInput.value = name;
+    if (name) $nameInput.val(name);
   });
 
-  $('btn-import-json-file').addEventListener('click', function () {
-    var fileInput = $('import-json-file');
-    var nameInput = $('import-json-name');
-    var msgEl = $('import-json-message');
-    var validationEl = $('import-json-validation');
-    if (!fileInput.files || fileInput.files.length === 0) {
+  $('#btn-import-json-file').on('click', function () {
+    var $fileInput = $('#import-json-file');
+    var $nameInput = $('#import-json-name');
+    var $msgEl = $('#import-json-message');
+    var $validationEl = $('#import-json-validation');
+    if (!$fileInput[0].files || $fileInput[0].files.length === 0) {
       showMessagePopup('Import JSON', 'Please select a JSON file first.', 'error');
       return;
     }
-    var path = configNameToPath(nameInput ? nameInput.value : '');
+    var path = configNameToPath($nameInput.length ? $nameInput.val() : '');
     if (!path) {
       showMessagePopup('Import JSON', 'Please enter a config name.', 'error');
       return;
     }
-    hideValidationErrors(validationEl);
-    if (msgEl) { msgEl.textContent = ''; msgEl.className = 'import-message'; }
-    var file = fileInput.files[0];
+    hideValidationErrors($validationEl[0]);
+    if ($msgEl.length) { $msgEl.text(''); $msgEl[0].className = 'import-message'; }
+    var file = $fileInput[0].files[0];
     var reader = new FileReader();
     reader.onload = function () {
       try {
         var data = JSON.parse(reader.result);
         var validation = validateDataflowConfig(data);
         if (!validation.valid) {
-          showValidationErrors(validationEl, validation.errors, null);
+          showValidationErrors($validationEl[0], validation.errors, null);
           showMessagePopup('Invalid dataflow config', 'The JSON does not match the expected dataflow format. See errors below.', 'error');
           return;
         }
@@ -1042,13 +1238,13 @@
             }
             var counts = getConfigCounts(data);
             var countHtml = formatCountsHtml(counts);
-            var msg = 'Configuration <strong>' + escapeHtml(path) + '</strong> imported and saved.';
+            var msg = 'Interface <strong>' + escapeHtml(path) + '</strong> imported and saved.';
             if (countHtml) msg += ' ' + countHtml + '.';
-            showMessagePopup('Success', msg, 'success', true);
-            fileInput.value = '';
-            if (nameInput) nameInput.value = '';
-            if (msgEl) { msgEl.textContent = ''; msgEl.className = 'import-message'; }
-            hideValidationErrors(validationEl);
+            toast(msg, 'success');
+            $fileInput.val('');
+            if ($nameInput.length) $nameInput.val('');
+            if ($msgEl.length) { $msgEl.text(''); $msgEl[0].className = 'import-message'; }
+            hideValidationErrors($validationEl[0]);
             refreshConfigList();
             loadConfig(path);
             if (window.showConfigurationsView) window.showConfigurationsView();
@@ -1064,27 +1260,27 @@
           }
         }).catch(function () { doSave(); });
       } catch (e) {
-        showValidationErrors(validationEl, [], e.message || 'The file is not valid JSON.');
+        showValidationErrors($validationEl[0], e.message || 'The file is not valid JSON.');
         showMessagePopup('Invalid JSON', e.message || 'The file is not valid JSON.', 'error');
       }
     };
     reader.readAsText(file, 'UTF-8');
   });
 
-  var pasteTextarea = $('import-json-paste');
-  var pasteValidationEl = $('import-paste-validation');
-  if (pasteTextarea) pasteTextarea.addEventListener('input', function () {
-    pasteTextarea.classList.remove('has-error');
-    hideValidationErrors(pasteValidationEl);
+  var $pasteTextarea = $('#import-json-paste');
+  var $pasteValidationEl = $('#import-paste-validation');
+  if ($pasteTextarea.length) $pasteTextarea.on('input', function () {
+    $pasteTextarea.removeClass('has-error');
+    hideValidationErrors($pasteValidationEl[0]);
   });
 
-  $('btn-save-paste-json').addEventListener('click', function () {
-    var textarea = $('import-json-paste');
-    var nameInput = $('import-json-paste-name');
-    var msgEl = $('import-paste-message');
-    var validationEl = $('import-paste-validation');
-    var raw = textarea && textarea.value ? textarea.value.trim() : '';
-    var path = configNameToPath(nameInput ? nameInput.value : '');
+  $('#btn-save-paste-json').on('click', function () {
+    var $textarea = $('#import-json-paste');
+    var $nameInput = $('#import-json-paste-name');
+    var $msgEl = $('#import-paste-message');
+    var $validationEl = $('#import-paste-validation');
+    var raw = $textarea.length && $textarea.val() ? $textarea.val().trim() : '';
+    var path = configNameToPath($nameInput.length ? $nameInput.val() : '');
     if (!path) {
       showMessagePopup('Save config', 'Please enter a config name.', 'error');
       return;
@@ -1093,9 +1289,9 @@
       showMessagePopup('Save config', 'Please paste JSON into the text area.', 'error');
       return;
     }
-    if (textarea) textarea.classList.remove('has-error');
-    hideValidationErrors(validationEl);
-    if (msgEl) { msgEl.textContent = ''; msgEl.className = 'import-message'; }
+    if ($textarea.length) $textarea.removeClass('has-error');
+    hideValidationErrors($validationEl[0]);
+    if ($msgEl.length) { $msgEl.text(''); $msgEl[0].className = 'import-message'; }
     var parseError = null;
     var data;
     try {
@@ -1103,15 +1299,15 @@
     } catch (e) {
       parseError = e.message || 'The pasted text is not valid JSON.';
       if (e.message && /line \d+/i.test(e.message)) parseError = e.message;
-      showValidationErrors(validationEl, [], parseError);
-      if (textarea) textarea.classList.add('has-error');
+      showValidationErrors($validationEl[0], [], parseError);
+      if ($textarea.length) $textarea.addClass('has-error');
       showMessagePopup('Invalid JSON', parseError, 'error');
       return;
     }
     var validation = validateDataflowConfig(data);
     if (!validation.valid) {
-      showValidationErrors(validationEl, validation.errors, null);
-      if (textarea) textarea.classList.add('has-error');
+      showValidationErrors($validationEl[0], validation.errors, null);
+      if ($textarea.length) $textarea.addClass('has-error');
       showMessagePopup('Invalid dataflow config', 'The JSON does not match the expected dataflow format. See errors below.', 'error');
       return;
     }
@@ -1123,14 +1319,14 @@
         }
         var counts = getConfigCounts(data);
         var countHtml = formatCountsHtml(counts);
-        var msg = 'Configuration <strong>' + escapeHtml(path) + '</strong> saved.';
+        var msg = 'Interface <strong>' + escapeHtml(path) + '</strong> saved.';
         if (countHtml) msg += ' ' + countHtml + '.';
-        showMessagePopup('Success', msg, 'success', true);
-        textarea.value = '';
-        if (nameInput) nameInput.value = '';
-        if (msgEl) { msgEl.textContent = ''; msgEl.className = 'import-message'; }
-        if (textarea) textarea.classList.remove('has-error');
-        hideValidationErrors(validationEl);
+        toast(msg, 'success');
+        $textarea.val('');
+        if ($nameInput.length) $nameInput.val('');
+        if ($msgEl.length) { $msgEl.text(''); $msgEl[0].className = 'import-message'; }
+        if ($textarea.length) $textarea.removeClass('has-error');
+        hideValidationErrors($validationEl[0]);
         refreshConfigList();
         loadConfig(path);
         if (window.showConfigurationsView) window.showConfigurationsView();
@@ -1147,46 +1343,42 @@
     }).catch(function () { doSave(); });
   });
 
-  $('btn-download-json').addEventListener('click', () => {
-    if (!currentPath) return;
-    window.location.href = '/api/config/' + encodeURIComponent(currentPath) + '/download';
-  });
-  if ($('btn-rename')) $('btn-rename').addEventListener('click', () => {
+  if ($('#btn-rename').length) $('#btn-rename').on('click', () => {
     if (!currentPath) return;
     renameDeleteTargetPath = currentPath;
-    renameInput.value = currentPath.replace(/\.json$/i, '');
-    renameModal.classList.add('visible');
-    renameInput.focus();
+    $renameInput.val(currentPath.replace(/\.json$/i, ''));
+    $renameModal.removeClass("hidden");
+    $renameInput.focus();
   });
 
-  if ($('btn-delete')) $('btn-delete').addEventListener('click', () => {
+  if ($('#btn-delete').length) $('#btn-delete').on('click', () => {
     if (!currentPath) return;
     renameDeleteTargetPath = currentPath;
-    deleteMessage.textContent = 'Delete "' + currentPath + '"? This cannot be undone.';
-    deleteModal.classList.add('visible');
+    $deleteMessage.text('Delete "' + currentPath + '"? This cannot be undone.');
+    $deleteModal.removeClass("hidden");
   });
 
-  $('zip-file').addEventListener('change', function () {
-    var nameInput = $('import-config-name');
-    if (!nameInput) return;
+  $('#zip-file').on('change', function () {
+    var $nameInput = $('#import-config-name');
+    if (!$nameInput.length) return;
     var files = this.files;
     if (files && files.length > 0) {
       var name = files[0].name.replace(/\.zip$/i, '');
-      if (name) nameInput.value = name;
+      if (name) $nameInput.val(name);
     }
   });
 
-  $('btn-import-zip').addEventListener('click', () => {
-    const fileInput = $('zip-file');
-    const nameInput = $('import-config-name');
-    const msgEl = $('import-message');
-    if (!fileInput.files || fileInput.files.length === 0) {
-      msgEl.textContent = 'Please select a ZIP file.';
-      msgEl.className = 'import-message error';
+  $('#btn-import-zip').on('click', () => {
+    const $fileInput = $('#zip-file');
+    const $nameInput = $('#import-config-name');
+    const $msgEl = $('#import-message');
+    if (!$fileInput[0].files || $fileInput[0].files.length === 0) {
+      $msgEl.text('Please select a ZIP file.');
+      $msgEl[0].className = 'import-message error';
       showMessagePopup('Import', 'Please select a ZIP file first.', 'error');
       return;
     }
-    var configName = (nameInput && nameInput.value ? nameInput.value : 'imported_mainflow').trim() || 'imported_mainflow';
+    var configName = ($nameInput.length && $nameInput.val() ? $nameInput.val() : 'imported_mainflow').trim() || 'imported_mainflow';
     var path = configNameToPath(configName);
     function formatElapsed(ms) {
       var sec = Math.floor(ms / 1000);
@@ -1210,44 +1402,44 @@
     }
     function doImport() {
       const formData = new FormData();
-      formData.append('file', fileInput.files[0]);
+      formData.append('file', $fileInput[0].files[0]);
       formData.append('config_name', configName);
       formData.append('save', 'true');
-      msgEl.textContent = 'Generating config...';
-      msgEl.className = 'import-message';
-      var importPanelZip = $('import-panel-zip');
-      var importLogsEl = $('import-logs');
-      var importLogsProgress = $('import-logs-progress');
-      var importLogsTimer = $('import-logs-timer');
-      if (importPanelZip) importPanelZip.classList.add('has-logs');
-      if (importLogsProgress) importLogsProgress.classList.remove('hidden');
-      if (importLogsTimer) importLogsTimer.textContent = '0:00';
-      if (importLogsEl) {
-        importLogsEl.textContent = 'Generating config...';
-        importLogsEl.dataset.raw = 'Generating config...';
+      $msgEl.text('Generating config...');
+      $msgEl[0].className = 'import-message';
+      var $importPanelZip = $('#import-panel-zip');
+      var $importLogsEl = $('#import-logs');
+      var $importLogsProgress = $('#import-logs-progress');
+      var $importLogsTimer = $('#import-logs-timer');
+      if ($importPanelZip.length) $importPanelZip.addClass('has-logs');
+      if ($importLogsProgress.length) $importLogsProgress.removeClass('hidden');
+      if ($importLogsTimer.length) $importLogsTimer.text('0:00');
+      if ($importLogsEl.length) {
+        $importLogsEl.text('Generating config...');
+        $importLogsEl.attr('data-raw', 'Generating config...');
       }
       var startTime = Date.now();
       var timerInterval = setInterval(function () {
-        if (importLogsTimer) importLogsTimer.textContent = formatElapsed(Date.now() - startTime);
+        if ($importLogsTimer.length) $importLogsTimer.text(formatElapsed(Date.now() - startTime));
       }, 1000);
       function stopTimer(success) {
         clearInterval(timerInterval);
         var duration = formatDuration(Date.now() - startTime);
-        if (importLogsProgress) importLogsProgress.classList.add('hidden');
+        if ($importLogsProgress.length) $importLogsProgress.addClass('hidden');
         return success ? 'Completed in ' + duration + '.' : 'Failed after ' + duration + '.';
       }
       API.importZip(formData).then(data => {
-        if (importPanelZip) importPanelZip.classList.add('has-logs');
+        if ($importPanelZip.length) $importPanelZip.addClass('has-logs');
         var durationLine = stopTimer(!data.error);
         var logLines = Array.isArray(data.logs) ? data.logs : [];
         logLines.push(durationLine);
-        if (importLogsEl) {
-          importLogsEl.textContent = logLines.length ? logLines.join('\n') : (data.error ? 'Import failed.' : '');
-          importLogsEl.dataset.raw = importLogsEl.textContent;
+        if ($importLogsEl.length) {
+          $importLogsEl.text(logLines.length ? logLines.join('\n') : (data.error ? 'Import failed.' : ''));
+          $importLogsEl.attr('data-raw', $importLogsEl.text());
         }
         if (data.error) {
-          msgEl.textContent = 'Import failed. See error details below.';
-          msgEl.className = 'import-message error';
+          $msgEl.text('Import failed. See error details below.');
+          $msgEl[0].className = 'import-message error';
           showErrorPopup('Import failed', data.error, data.details != null ? String(data.details) : '');
           return;
         }
@@ -1278,10 +1470,10 @@
         if (!d.copybook || d.copybook === 0) {
           body += '<br><br>' + escapeHtml('Schema fields are empty because no copybook files (.cpy) were found in the ZIP. To populate field definitions, add COBOL copybook files to the ZIP (e.g. names matching your input/output DD names like CUSTIN.cpy, ACCTIN.cpy) and re-import.');
         }
-        msgEl.textContent = 'Config generated. See message below.';
-        msgEl.className = 'import-message success';
-        fileInput.value = '';
-        nameInput.value = '';
+        $msgEl.text('Config generated. See message below.');
+        $msgEl[0].className = 'import-message success';
+        $fileInput.val('');
+        $nameInput.val('');
         if (data.filename && (data.input_data || data.expected_output)) {
           uploadedTestData[data.filename] = {
             input_data: data.input_data || {},
@@ -1300,18 +1492,18 @@
         });
       }).catch(err => {
         const msg = err.message || String(err);
-        msgEl.textContent = 'Import failed. See error details below.';
-        msgEl.className = 'import-message error';
-        var importPanelZip = $('import-panel-zip');
-        var importLogsProgress = $('import-logs-progress');
-        var importLogsEl = $('import-logs');
+        $msgEl.text('Import failed. See error details below.');
+        $msgEl[0].className = 'import-message error';
+        var $importPanelZip2 = $('#import-panel-zip');
+        var $importLogsProgress2 = $('#import-logs-progress');
+        var $importLogsEl2 = $('#import-logs');
         var durationLine = stopTimer(false);
-        if (importPanelZip) importPanelZip.classList.add('has-logs');
-        if (importLogsProgress) importLogsProgress.classList.add('hidden');
-        if (importLogsEl) {
-          var prev = importLogsEl.textContent || '';
-          importLogsEl.textContent = prev + (prev ? '\n' : '') + 'Import failed: ' + msg + '\n' + durationLine;
-          importLogsEl.dataset.raw = importLogsEl.textContent;
+        if ($importPanelZip2.length) $importPanelZip2.addClass('has-logs');
+        if ($importLogsProgress2.length) $importLogsProgress2.addClass('hidden');
+        if ($importLogsEl2.length) {
+          var prev = $importLogsEl2.text() || '';
+          $importLogsEl2.text(prev + (prev ? '\n' : '') + 'Import failed: ' + msg + '\n' + durationLine);
+          $importLogsEl2.attr('data-raw', $importLogsEl2.text());
         }
         showErrorPopup('Import failed', msg, err.stack || '');
       });
@@ -1327,199 +1519,199 @@
   });
 
   (function () {
-    var importLogsCopyBtn = $('import-logs-copy-btn');
-    if (importLogsCopyBtn) importLogsCopyBtn.addEventListener('click', function () {
-      var logsEl = $('import-logs');
-      var raw = (logsEl && logsEl.dataset.raw) || (logsEl && logsEl.textContent) || '';
+    var $importLogsCopyBtn = $('#import-logs-copy-btn');
+    if ($importLogsCopyBtn.length) $importLogsCopyBtn.on('click', function () {
+      var $logsEl = $('#import-logs');
+      var raw = ($logsEl.length && $logsEl.attr('data-raw')) || ($logsEl.length && $logsEl.text()) || '';
       if (!raw) {
-        (window.CodeParser.showMessagePopup || showMessagePopup)('Copy', 'Import logs are empty.', 'info');
+        toast('Import logs are empty.', 'info');
         return;
       }
       navigator.clipboard.writeText(raw).then(function () {
-        (window.CodeParser.showMessagePopup || showMessagePopup)('Copied', 'Import logs copied to clipboard.', 'success', true);
+        toast('Import logs copied to clipboard.', 'success');
       }).catch(function () {
-        (window.CodeParser.showMessagePopup || showMessagePopup)('Copy failed', 'Could not copy to clipboard.', 'error');
+        toast('Could not copy to clipboard.', 'error');
       });
     });
   })();
 
   function toggleEditMode() {
     editMode = !editMode;
-    var diagramEdit = document.getElementById('diagram-edit-btn');
-    if (diagramEdit) diagramEdit.classList.toggle('active', editMode);
+    var $diagramEdit = $('#diagram-edit-btn');
+    if ($diagramEdit.length) $diagramEdit.toggleClass('active', editMode);
     if (configViewMode === 'json') updateJsonEditorMode();
   }
-  var diagramEditBtn = document.getElementById('diagram-edit-btn');
-  if (diagramEditBtn) diagramEditBtn.addEventListener('click', toggleEditMode);
+  var $diagramEditBtn = $('#diagram-edit-btn');
+  if ($diagramEditBtn.length) $diagramEditBtn.on('click', toggleEditMode);
 
   function toggleHoverPopups() {
     window.CodeParser.hoverPopupsEnabled = !window.CodeParser.hoverPopupsEnabled;
-    var diagramHover = document.getElementById('diagram-hover-popups-btn');
-    var popup = document.getElementById('step-hover-popup');
-    if (diagramHover) diagramHover.classList.toggle('active', window.CodeParser.hoverPopupsEnabled);
-    if (popup) {
-      popup.classList.add('hidden');
-      popup.setAttribute('aria-hidden', 'true');
+    var $diagramHover = $('#diagram-hover-popups-btn');
+    var $popup = $('#step-hover-popup');
+    if ($diagramHover.length) $diagramHover.toggleClass('active', window.CodeParser.hoverPopupsEnabled);
+    if ($popup.length) {
+      $popup.addClass('hidden');
+      $popup.attr('aria-hidden', 'true');
     }
   }
-  var diagramHoverBtn = document.getElementById('diagram-hover-popups-btn');
-  if (diagramHoverBtn) diagramHoverBtn.addEventListener('click', toggleHoverPopups);
+  var $diagramHoverBtn = $('#diagram-hover-popups-btn');
+  if ($diagramHoverBtn.length) $diagramHoverBtn.on('click', toggleHoverPopups);
 
-  var diagramFitBtn = document.getElementById('diagram-fit-btn');
-  if (diagramFitBtn) diagramFitBtn.addEventListener('click', function () {
+  var $diagramFitBtn = $('#diagram-fit-btn');
+  if ($diagramFitBtn.length) $diagramFitBtn.on('click', function () {
     if (window.CodeParser && window.CodeParser.fitDiagram) window.CodeParser.fitDiagram();
   });
 
-  var diagramZoomIn = document.getElementById('diagram-zoom-in-btn');
-  if (diagramZoomIn) diagramZoomIn.addEventListener('click', function () {
+  var $diagramZoomIn = $('#diagram-zoom-in-btn');
+  if ($diagramZoomIn.length) $diagramZoomIn.on('click', function () {
     if (window.CodeParser && window.CodeParser.zoomIn) window.CodeParser.zoomIn();
   });
-  var diagramZoomOut = document.getElementById('diagram-zoom-out-btn');
-  if (diagramZoomOut) diagramZoomOut.addEventListener('click', function () {
+  var $diagramZoomOut = $('#diagram-zoom-out-btn');
+  if ($diagramZoomOut.length) $diagramZoomOut.on('click', function () {
     if (window.CodeParser && window.CodeParser.zoomOut) window.CodeParser.zoomOut();
   });
 
   var moveMode = false;
-  var diagramMoveBtn = document.getElementById('diagram-move-btn');
-  if (diagramMoveBtn) diagramMoveBtn.addEventListener('click', function () {
+  var $diagramMoveBtn = $('#diagram-move-btn');
+  if ($diagramMoveBtn.length) $diagramMoveBtn.on('click', function () {
     moveMode = !moveMode;
-    diagramMoveBtn.classList.toggle('active', moveMode);
+    $diagramMoveBtn.toggleClass('active', moveMode);
     if (window.CodeParser && window.CodeParser.setMoveMode) window.CodeParser.setMoveMode(moveMode);
   });
 
   function setConfigViewMode(mode) {
     configViewMode = mode;
-    var diagramPanel = document.getElementById('diagram-view-panel');
-    var jsonWrap = document.getElementById('json-editor-wrap');
-    var tabDiagram = document.getElementById('diagram-view-tab-diagram');
-    var tabJson = document.getElementById('diagram-view-tab-json');
+    var $diagramPanel = $('#diagram-view-panel');
+    var $jsonWrap = $('#json-editor-wrap');
+    var $tabDiagram = $('#diagram-view-tab-diagram');
+    var $tabJson = $('#diagram-view-tab-json');
     if (mode === 'json') {
-      if (diagramPanel) diagramPanel.classList.add('hidden');
-      if (jsonWrap) {
-        jsonWrap.classList.remove('hidden');
-        jsonWrap.setAttribute('aria-hidden', 'false');
+      if ($diagramPanel.length) $diagramPanel.addClass('hidden');
+      if ($jsonWrap.length) {
+        $jsonWrap.removeClass('hidden');
+        $jsonWrap.attr('aria-hidden', 'false');
       }
-      if (tabDiagram) { tabDiagram.classList.remove('active'); tabDiagram.setAttribute('aria-selected', 'false'); }
-      if (tabJson) { tabJson.classList.add('active'); tabJson.setAttribute('aria-selected', 'true'); }
+      if ($tabDiagram.length) { $tabDiagram.removeClass('active'); $tabDiagram.attr('aria-selected', 'false'); }
+      if ($tabJson.length) { $tabJson.addClass('active'); $tabJson.attr('aria-selected', 'true'); }
       syncJsonEditorFromConfig();
       updateJsonEditorMode();
     } else {
-      if (jsonWrap) {
-        jsonWrap.classList.add('hidden');
-        jsonWrap.setAttribute('aria-hidden', 'true');
+      if ($jsonWrap.length) {
+        $jsonWrap.addClass('hidden');
+        $jsonWrap.attr('aria-hidden', 'true');
       }
-      if (diagramPanel) diagramPanel.classList.remove('hidden');
-      if (tabDiagram) { tabDiagram.classList.add('active'); tabDiagram.setAttribute('aria-selected', 'true'); }
-      if (tabJson) { tabJson.classList.remove('active'); tabJson.setAttribute('aria-selected', 'false'); }
+      if ($diagramPanel.length) $diagramPanel.removeClass('hidden');
+      if ($tabDiagram.length) { $tabDiagram.addClass('active'); $tabDiagram.attr('aria-selected', 'true'); }
+      if ($tabJson.length) { $tabJson.removeClass('active'); $tabJson.attr('aria-selected', 'false'); }
     }
   }
 
   function syncJsonEditorFromConfig() {
-    var statusEl = document.getElementById('json-editor-status');
+    var $statusEl = $('#json-editor-status');
     jsonEditorDirty = false;
-    var applyBtn = document.getElementById('json-editor-apply-btn');
-    if (applyBtn) applyBtn.classList.add('hidden');
+    var $applyBtn = $('#json-editor-apply-btn');
+    if ($applyBtn.length) $applyBtn.addClass('hidden');
     if (configViewMode === 'json') {
       updateJsonEditorMode();
     }
-    if (statusEl) statusEl.textContent = '';
+    if ($statusEl.length) $statusEl.text('');
   }
 
-  var tabDiagram = document.getElementById('diagram-view-tab-diagram');
-  var tabJson = document.getElementById('diagram-view-tab-json');
-  if (tabDiagram) tabDiagram.addEventListener('click', function () { setConfigViewMode('diagram'); });
-  if (tabJson) tabJson.addEventListener('click', function () { setConfigViewMode('json'); });
+  var $tabDiagram = $('#diagram-view-tab-diagram');
+  var $tabJson = $('#diagram-view-tab-json');
+  if ($tabDiagram.length) $tabDiagram.on('click', function () { setConfigViewMode('diagram'); });
+  if ($tabJson.length) $tabJson.on('click', function () { setConfigViewMode('json'); });
 
 
-  var jsonEditorApply = document.getElementById('json-editor-apply-btn');
-  var jsonEditorStatus = document.getElementById('json-editor-status');
-  if (jsonEditorApply) {
-    jsonEditorApply.addEventListener('click', function () {
+  var $jsonEditorApply = $('#json-editor-apply-btn');
+  var $jsonEditorStatus = $('#json-editor-status');
+  if ($jsonEditorApply.length) {
+    $jsonEditorApply.on('click', function () {
       if (!currentConfig || !currentPath) return;
       try {
         jsonEditorDirty = false;
-        jsonEditorApply.classList.add('hidden');
-        if (jsonEditorStatus) jsonEditorStatus.textContent = 'Saving…';
-        var container = $('network');
-        if (container) initNetwork(container, currentConfig);
+        $jsonEditorApply.addClass('hidden');
+        if ($jsonEditorStatus.length) $jsonEditorStatus.text('Saving…');
+        var $container = $('#network');
+        if ($container.length) initNetwork($container[0], currentConfig);
         API.saveConfig(currentPath, currentConfig).then(function (res) {
           if (res.error) {
-            if (jsonEditorStatus) jsonEditorStatus.textContent = '';
+            if ($jsonEditorStatus.length) $jsonEditorStatus.text('');
             showMessagePopup('Save failed', res.error, 'error');
           } else {
-            if (jsonEditorStatus) jsonEditorStatus.textContent = 'Saved.';
-            showMessagePopup('Saved', 'Configuration saved.', 'success');
-            setTimeout(function () { if (jsonEditorStatus) jsonEditorStatus.textContent = ''; }, 2000);
+            if ($jsonEditorStatus.length) $jsonEditorStatus.text('Saved.');
+            toast('Interface saved', 'success');
+            setTimeout(function () { if ($jsonEditorStatus.length) $jsonEditorStatus.text(''); }, 2000);
           }
         }).catch(function (err) {
-          if (jsonEditorStatus) jsonEditorStatus.textContent = '';
+          if ($jsonEditorStatus.length) $jsonEditorStatus.text('');
           showMessagePopup('Save failed', err.message || String(err), 'error');
         });
       } catch (e) {
-        if (jsonEditorStatus) jsonEditorStatus.textContent = 'Error: ' + (e.message || String(e));
+        if ($jsonEditorStatus.length) $jsonEditorStatus.text('Error: ' + (e.message || String(e)));
       }
     });
   }
 
-  var jsonEditorFontIncrease = document.getElementById('json-editor-font-increase');
-  var jsonEditorFontDecrease = document.getElementById('json-editor-font-decrease');
-  if (jsonEditorFontIncrease) jsonEditorFontIncrease.addEventListener('click', function () {
+  var $jsonEditorFontIncrease = $('#json-editor-font-increase');
+  var $jsonEditorFontDecrease = $('#json-editor-font-decrease');
+  if ($jsonEditorFontIncrease.length) $jsonEditorFontIncrease.on('click', function () {
     jsonTreeFontSize = Math.min(24, jsonTreeFontSize + 2);
     if (typeof renderJsonTreeView === 'function') renderJsonTreeView();
   });
-  if (jsonEditorFontDecrease) jsonEditorFontDecrease.addEventListener('click', function () {
+  if ($jsonEditorFontDecrease.length) $jsonEditorFontDecrease.on('click', function () {
     jsonTreeFontSize = Math.max(10, jsonTreeFontSize - 2);
     if (typeof renderJsonTreeView === 'function') renderJsonTreeView();
   });
 
-  var jsonEditorSearchToggle = document.getElementById('json-editor-search-toggle');
-  var jsonEditorSearchInput = document.getElementById('json-editor-search-input');
-  if (jsonEditorSearchToggle && jsonEditorSearchInput) {
-    jsonEditorSearchToggle.addEventListener('click', function () {
-      jsonEditorSearchInput.classList.toggle('hidden');
-      if (!jsonEditorSearchInput.classList.contains('hidden')) jsonEditorSearchInput.focus();
+  var $jsonEditorSearchToggle = $('#json-editor-search-toggle');
+  var $jsonEditorSearchInput = $('#json-editor-search-input');
+  if ($jsonEditorSearchToggle.length && $jsonEditorSearchInput.length) {
+    $jsonEditorSearchToggle.on('click', function () {
+      $jsonEditorSearchInput.toggleClass('hidden');
+      if (!$jsonEditorSearchInput.hasClass('hidden')) $jsonEditorSearchInput.focus();
     });
-    jsonEditorSearchInput.addEventListener('input', function () {
+    $jsonEditorSearchInput.on('input', function () {
       if (typeof renderJsonTreeView === 'function') renderJsonTreeView();
     });
-    jsonEditorSearchInput.addEventListener('keydown', function (e) {
+    $jsonEditorSearchInput.on('keydown', function (e) {
       if (e.key === 'Escape') {
-        jsonEditorSearchInput.value = '';
-        jsonEditorSearchInput.classList.add('hidden');
+        $jsonEditorSearchInput.val('');
+        $jsonEditorSearchInput.addClass('hidden');
         if (typeof renderJsonTreeView === 'function') renderJsonTreeView();
       }
     });
   }
 
   (function diagramToolbarAutoHide() {
-    var container = document.getElementById('diagram-container');
-    var layer = document.getElementById('diagram-toolbar-layer');
-    var toolbar = document.getElementById('diagram-toolbar');
+    var $container = $('#diagram-container');
+    var $layer = $('#diagram-toolbar-layer');
+    var $toolbar = $('#diagram-toolbar');
     var hideTimer;
     var HIDE_DELAY_MS = 2500;
     var TOP_ZONE_HEIGHT = 70;
     var wasInZone = false;
 
     function isInDiagramTopZone(x, y) {
-      if (!container || !container.getBoundingClientRect) return false;
-      var r = container.getBoundingClientRect();
+      if (!$container.length) return false;
+      var r = $container[0].getBoundingClientRect();
       if (x < r.left || x > r.right || y < r.top || y > r.bottom) return false;
       return (y - r.top) <= TOP_ZONE_HEIGHT;
     }
 
     function showAutoHideLayer() {
-      if (layer) layer.classList.add('diagram-autohide-visible');
-      if (toolbar) toolbar.classList.add('diagram-toolbar-visible');
+      if ($layer.length) $layer.addClass('diagram-autohide-visible');
+      if ($toolbar.length) $toolbar.addClass('diagram-toolbar-visible');
     }
 
     function hideAutoHideLayer() {
-      if (layer) layer.classList.remove('diagram-autohide-visible');
-      if (toolbar) toolbar.classList.remove('diagram-toolbar-visible');
+      if ($layer.length) $layer.removeClass('diagram-autohide-visible');
+      if ($toolbar.length) $toolbar.removeClass('diagram-toolbar-visible');
     }
 
     function onMouseMove(e) {
-      if (!container || !layer || !toolbar) return;
-      if (!container.classList.contains('visible')) return;
+      if (!$container.length || !$layer.length || !$toolbar.length) return;
+      if (!$container.hasClass('visible')) return;
       var inZone = isInDiagramTopZone(e.clientX, e.clientY);
       if (inZone) {
         clearTimeout(hideTimer);
@@ -1532,30 +1724,30 @@
       }
     }
 
-    if (container && layer && toolbar) {
-      document.addEventListener('mousemove', onMouseMove);
+    if ($container.length && $layer.length && $toolbar.length) {
+      $(document).on('mousemove', onMouseMove);
     }
   })();
 
   function syncDiagramToolbarState() {
-    var diagramEdit = document.getElementById('diagram-edit-btn');
-    var diagramHover = document.getElementById('diagram-hover-popups-btn');
-    var diagramMoveBtn = document.getElementById('diagram-move-btn');
-    if (diagramEdit) diagramEdit.classList.toggle('active', editMode);
-    if (diagramHover) diagramHover.classList.toggle('active', window.CodeParser.hoverPopupsEnabled);
-    if (diagramMoveBtn) {
-      diagramMoveBtn.classList.toggle('active', moveMode);
+    var $diagramEdit = $('#diagram-edit-btn');
+    var $diagramHover = $('#diagram-hover-popups-btn');
+    var $diagramMoveBtn = $('#diagram-move-btn');
+    if ($diagramEdit.length) $diagramEdit.toggleClass('active', editMode);
+    if ($diagramHover.length) $diagramHover.toggleClass('active', window.CodeParser.hoverPopupsEnabled);
+    if ($diagramMoveBtn.length) {
+      $diagramMoveBtn.toggleClass('active', moveMode);
       if (window.CodeParser && window.CodeParser.setMoveMode) window.CodeParser.setMoveMode(moveMode);
     }
   }
 
-  searchInput.addEventListener('input', () => {
-    const q = searchInput.value.trim();
+  $searchInput.on('input', () => {
+    const q = $searchInput.val().trim();
     console.log('Search input triggered with query:', q);
     if (q.length < 2) {
       console.log('Query too short, hiding results');
-      searchResults.classList.remove('visible');
-      searchResults.innerHTML = '';
+      $searchResults.removeClass('visible');
+      $searchResults.html('');
       return;
     }
     console.log('Calling API.search with:', q);
@@ -1563,20 +1755,21 @@
       console.log('API.search response:', data);
       const results = (data.results || []).slice(0, 20);
       console.log('Results to display:', results.length);
-      searchResults.innerHTML = results.map(r => {
+      $searchResults.html(results.map(r => {
         const snippet = (r.snippet || '').replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => '<mark>' + m + '</mark>');
         return '<div class="search-result-item" data-file="' + (r.file || '') + '">' +
           '<span class="file">' + (r.file || '') + '</span> <span class="path">' + (r.path || '') + '</span>' +
           '<div class="snippet">' + snippet + '</div></div>';
-      }).join('');
+      }).join(''));
       console.log('Search results HTML set, showing results');
-      searchResults.classList.add('visible');
-      searchResults.querySelectorAll('.search-result-item').forEach(el => {
-        el.addEventListener('click', () => {
-          const file = el.dataset.file;
+      $searchResults.addClass('visible');
+      $searchResults.find('.search-result-item').each(function () {
+        var $el = $(this);
+        $el.on('click', () => {
+          const file = $el.attr('data-file');
           if (file) loadConfig(file);
-          searchResults.classList.remove('visible');
-          searchInput.value = '';
+          $searchResults.removeClass('visible');
+          $searchInput.val('');
         });
       });
     }).catch(err => {
@@ -1584,9 +1777,9 @@
     });
   });
 
-  document.addEventListener('click', (e) => {
-    if (!searchResults.contains(e.target) && e.target !== searchInput)
-      searchResults.classList.remove('visible');
+  $(document).on('click', (e) => {
+    if (!$searchResults[0].contains(e.target) && e.target !== $searchInput[0])
+      $searchResults.removeClass('visible');
   });
 
   var lastTestSampleData = null;
@@ -1605,17 +1798,33 @@
   function highlightLogText(raw) {
     if (!raw) return '';
     var html = escapeLogHtml(raw);
-    // File paths: "/path/to/file.py" or /path/to/file.py
+
+    // ── Step 1: Full-line highlights (must run BEFORE token spans) ──────────────
+    // Error lines (containing [ERROR], ERROR:, Traceback, or ABORT keywords)
+    html = html.replace(/^([^\n]*(?:\[ERROR\]|ERROR:|Traceback|aborted:|Dataflow job failed|Process exited with code)[^\n]*)$/gm,
+      '<span class="log-err-line">$1</span>');
+    // Warning lines
+    html = html.replace(/^([^\n]*\[WARNING\][^\n]*)$/gm,
+      '<span class="log-warn-line">$1</span>');
+    // ServiceNow / Incident info lines
+    html = html.replace(/^([^\n]*\[INCIDENT\][^\n]*)$/gm,
+      '<span class="log-incident-line">$1</span>');
+
+    // ── Step 2: File path highlights ────────────────────────────────────────────
     html = html.replace(/(File\s+")([^"]+?)(")/g, '$1<span class="log-path">$2</span>$3');
     html = html.replace(/(["'])(\/[\w./\-]+\.py)(["']?)/g, '$1<span class="log-path">$2</span>$3');
     html = html.replace(/(\s)(\/[\w./\-]+\.[a-z]+)(\s|$)/g, '$1<span class="log-path">$2</span>$3');
     // line N
     html = html.replace(/(,\s*line\s+)(\d+)/g, '$1<span class="log-line-num">$2</span>');
+
+    // ── Step 3: Token-level highlights ──────────────────────────────────────────
     // [INFO], [ERROR], [WARNING], [DEBUG]
     html = html.replace(/\[(INFO)\]/g, '<span class="log-info">[$1]</span>');
     html = html.replace(/\[(WARNING)\]/g, '<span class="log-warn">[$1]</span>');
     html = html.replace(/\[(ERROR)\]/g, '<span class="log-err">[$1]</span>');
     html = html.replace(/\[(DEBUG)\]/g, '<span class="log-debug">[$1]</span>');
+    // ServiceNow / Incident token
+    html = html.replace(/\[INCIDENT\]/g, '<span class="log-incident">[INCIDENT]</span>');
     // Exception names
     html = html.replace(/\b(AnalysisException|ValueError|TypeError|AttributeError|KeyError|RuntimeError|Exception)(\b|:)/g, '<span class="log-exception">$1</span>$2');
     // "Did you mean ..." suggestion
@@ -1628,106 +1837,467 @@
 
   function setTestLogsContent(el, raw) {
     if (!el) return;
+    var $el = $(el);
     testLogsRaw = raw;
-    el.dataset.raw = raw;
-    el.innerHTML = highlightLogText(raw);
+    $el.attr('data-raw', raw);
+    $el.html(highlightLogText(raw));
   }
 
   function appendTestLogsContent(el, more) {
     if (!el) return;
+    var $el = $(el);
     testLogsRaw += more;
-    el.dataset.raw = testLogsRaw;
-    el.innerHTML = highlightLogText(testLogsRaw);
+    $el.attr('data-raw', testLogsRaw);
+    $el.html(highlightLogText(testLogsRaw));
   }
 
-  var testLogsCopyBtn = document.getElementById('test-logs-copy-btn');
-  if (testLogsCopyBtn) testLogsCopyBtn.addEventListener('click', function () {
-    var logsEl = document.getElementById('test-logs');
-    var raw = (logsEl && logsEl.dataset.raw) || testLogsRaw || '';
+  var $testLogsCopyBtn = $('#test-logs-copy-btn');
+  if ($testLogsCopyBtn.length) $testLogsCopyBtn.on('click', function () {
+    var $logsEl = $('#test-logs');
+    var raw = ($logsEl.length && $logsEl.attr('data-raw')) || testLogsRaw || '';
     if (!raw) {
-      (window.CodeParser.showMessagePopup || showMessagePopup)('Copy', 'Logs are empty.', 'info');
+      toast('Logs are empty.', 'info');
       return;
     }
     navigator.clipboard.writeText(raw).then(function () {
-      (window.CodeParser.showMessagePopup || showMessagePopup)('Copied', 'Logs copied to clipboard. Paste in your editor to debug.', 'success', true);
+      toast('Logs copied to clipboard.', 'success');
     }).catch(function () {
-      (window.CodeParser.showMessagePopup || showMessagePopup)('Copy failed', 'Could not copy to clipboard.', 'error');
+      toast('Could not copy to clipboard.', 'error');
     });
   });
 
   var lastTestConfigPath = null;
 
   function loadTestSampleData() {
-    var progressSection = document.getElementById('test-progress-section');
-    var progressText = document.getElementById('test-progress-text');
-    var sourceSection = document.getElementById('test-source-section');
-    var sourceTables = document.getElementById('test-source-tables');
-    var configNameEl = document.getElementById('test-page-config-name');
-    var logsEl = document.getElementById('test-logs');
-    if (!sourceSection) return;
+    var $sourceSection = $('#test-source-section');
+    var $configNameEl  = $('#test-page-config-name');
+    var $logsEl        = $('#test-logs');
+    if (!$sourceSection.length) return;
     if (!currentPath || !currentConfig) {
-      if (configNameEl) configNameEl.textContent = '';
+      if ($configNameEl.length) $configNameEl.text('');
       return;
     }
     if (currentPath !== lastTestConfigPath) {
       lastTestConfigPath = currentPath;
-      if (logsEl) setTestLogsContent(logsEl, '');
+      if ($logsEl.length) setTestLogsContent($logsEl[0], '');
     }
-    if (configNameEl) configNameEl.textContent = currentPath;
+    if ($configNameEl.length) $configNameEl.text(currentPath);
     switchTestTab('input');
-    var uploaded = currentPath && uploadedTestData[currentPath] && uploadedTestData[currentPath].input_data && Object.keys(uploadedTestData[currentPath].input_data).length > 0;
-    var hasExpectedOutput = currentPath && uploadedTestData[currentPath] && uploadedTestData[currentPath].expected_output && Object.keys(uploadedTestData[currentPath].expected_output).length > 0;
-    var reconBtnOutput = document.getElementById('btn-show-reconciliation-output');
-    var reconCtaOutput = document.getElementById('test-output-recon-cta');
-    if (reconBtnOutput) reconBtnOutput.classList.toggle('hidden', !hasExpectedOutput);
-    if (reconCtaOutput) reconCtaOutput.classList.toggle('hidden', !hasExpectedOutput);
-    var inputTitleEl = document.getElementById('test-input-panel-title');
-    if (inputTitleEl) inputTitleEl.textContent = uploaded ? 'Input datasets (from uploaded ZIP)' : 'Input datasets (sample)';
-    if (uploaded) {
-      if (progressSection) progressSection.classList.add('hidden');
-      lastTestSampleData = uploadedTestData[currentPath].input_data;
-      sourceTables.innerHTML = '';
-      Object.keys(lastTestSampleData).forEach(function (name) {
-        var rows = lastTestSampleData[name] || [];
-        var cols = rows[0] ? Object.keys(rows[0]).filter(function (k) { return !String(k).startsWith('_'); }) : [];
-        if (cols.length === 0 && rows[0]) cols = Object.keys(rows[0]).filter(function (k) { return !String(k).startsWith('_'); });
-        var html = '<div class="test-table-wrap"><h3>' + (window.CodeParser.escapeHtml || escapeHtml)(name) + '</h3><table class="test-table"><thead><tr>' +
-          cols.map(function (c) { return '<th>' + (window.CodeParser.escapeHtml || escapeHtml)(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
-        rows.slice(0, 10).forEach(function (r) {
-          html += '<tr>' + cols.map(function (c) { return '<td>' + (window.CodeParser.escapeHtml || escapeHtml)(String(r[c] != null ? r[c] : '')) + '</td>'; }).join('') + '</tr>';
-        });
-        html += '</tbody></table></div>';
-        sourceTables.insertAdjacentHTML('beforeend', html);
+
+    /* Always fetch fresh test data from server so node-uploaded files appear immediately */
+    API.getConfigTestData(currentPath).then(function (data) {
+      uploadedTestData[currentPath] = {
+        input_data:      data.input_data      || {},
+        expected_output: data.expected_output || {}
+      };
+      _renderTestInputSection();
+    }).catch(function () {
+      _renderTestInputSection();
+    });
+  }
+
+  /* Renders the Input Datasets panel content after fresh data is loaded */
+  function _renderTestInputSection() {
+    var $sourceTables    = $('#test-source-tables');
+    var $dataSection     = $('#test-data-available-section');
+    var $noDataSection   = $('#test-no-data-section');
+    var $importNodesEl   = $('#test-import-nodes');
+    var $reconCtaOutput  = $('#test-output-recon-cta');
+    var $inputTitleEl    = $('#test-input-panel-title');
+    var esc             = window.CodeParser.escapeHtml || escapeHtml;
+
+    var rawInputData    = uploadedTestData[currentPath] && uploadedTestData[currentPath].input_data || {};
+    var hasExpected     = !!(uploadedTestData[currentPath] && Object.keys(uploadedTestData[currentPath].expected_output || {}).length > 0);
+
+    /* ── Filter stored data to only the input nodes defined in the current config.
+          This prevents stale/renamed entries from a previous upload from appearing
+          alongside the current inputs (the "duplicate inputs" issue).             */
+    var configInputKeys = Object.keys((currentConfig && currentConfig.Inputs) || {});
+    var inputData = {};
+    if (configInputKeys.length > 0) {
+      configInputKeys.forEach(function (k) {
+        if (rawInputData[k] !== undefined) inputData[k] = rawInputData[k];
       });
+    } else {
+      inputData = rawInputData; // no config loaded — show everything
+    }
+    var hasData = Object.keys(inputData).length > 0;
+
+    if ($reconCtaOutput.length) $reconCtaOutput.toggleClass('hidden', !hasExpected);
+
+    if (hasData) {
+      /* ── Show data tables ── */
+      if ($dataSection.length)   $dataSection.removeClass('hidden');
+      if ($noDataSection.length) $noDataSection.addClass('hidden');
+      if ($inputTitleEl.length)  $inputTitleEl.text('Input Datasets');
+      lastTestSampleData = inputData;
+      if ($sourceTables.length) {
+        $sourceTables.html('');
+        /* Render in config-defined order (not alphabetical / insertion order of stored JSON) */
+        var displayKeys = configInputKeys.length > 0
+          ? configInputKeys.filter(function (k) { return inputData[k] !== undefined; })
+          : Object.keys(inputData);
+        displayKeys.forEach(function (name) {
+          var rows = inputData[name] || [];
+          var cols = rows[0] ? Object.keys(rows[0]).filter(function (k) { return !String(k).startsWith('_'); }) : [];
+          var html = '<div class="test-table-wrap"><h3>' + esc(name) + '</h3><table class="test-table"><thead><tr>' +
+            cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+          rows.slice(0, 10).forEach(function (r) {
+            html += '<tr>' + cols.map(function (c) { return '<td>' + esc(String(r[c] != null ? r[c] : '')) + '</td>'; }).join('') + '</tr>';
+          });
+          html += '</tbody></table></div>';
+          $sourceTables.append(html);
+        });
+      }
+    } else {
+      /* ── No test data — show import UI ── */
+      if ($dataSection.length)   $dataSection.addClass('hidden');
+      if ($noDataSection.length) $noDataSection.removeClass('hidden');
+      if ($inputTitleEl.length)  $inputTitleEl.text('Input Datasets');
+      _renderTestImportNodes($importNodesEl[0]);
+    }
+
+    /* ── Expected Control Files section ── */
+    _renderCtrlFileImportNodes($('#test-ctrl-import-nodes')[0]);
+  }
+
+  /* Renders expected control file import buttons for validate steps with ctrl_file_create */
+  function _renderCtrlFileImportNodes(container) {
+    var $section = $('#test-ctrl-files-section');
+    if (!container || !$section.length) return;
+    var steps = (currentConfig && currentConfig.Transformations && currentConfig.Transformations.steps) || [];
+    var ctrlSteps = steps.filter(function(s) {
+      return s.type === 'validate' && s.logic && s.logic.ctrl_file_create;
+    });
+    if (!ctrlSteps.length) {
+      $section.hide();
       return;
     }
-    if (progressSection) {
-      progressSection.classList.remove('hidden');
-      if (progressText) progressText.textContent = 'Generating sample data...';
-    }
-    API.generateTestSample({ config_path: currentPath, num_rows: 5 }).then(function (res) {
-      if (progressSection) progressSection.classList.add('hidden');
-      if (res.error) {
-        (window.CodeParser.showMessagePopup || showMessagePopup)('Error', res.error, 'error');
-        return;
+    $section.show();
+    var $container = $(container);
+    $container.html('');
+    var esc = window.CodeParser.escapeHtml || escapeHtml;
+    ctrlSteps.forEach(function(step) {
+      var stepId = step.id || step.output_alias || 'validate';
+      var storageKey = '__ctrl__' + stepId;
+      var $item = $('<div>').addClass('test-import-node-item');
+
+      var $label = $('<div>').addClass('test-import-node-name');
+      $label.html('<i class="fa-solid fa-file-lines" style="margin-right:5px;color:#0d9488"></i>' + esc(stepId));
+
+      var $btn = $('<button>').attr('type', 'button').addClass('test-import-node-btn');
+      $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Import Expected Control File');
+
+      var $badge = $('<div>').addClass('test-import-file-badge');
+
+      /* Check if already uploaded */
+      var existing = uploadedTestData[currentPath] && uploadedTestData[currentPath].expected_output &&
+                     uploadedTestData[currentPath].expected_output[storageKey];
+      if (existing) {
+        $btn[0].className = 'test-import-node-btn has-file';
+        $btn.html('<i class="fa-solid fa-check"></i> Expected control file loaded');
+        $badge.text('✓ Saved'); $badge.addClass('visible');
       }
-      lastTestSampleData = res.inputs || {};
-      sourceTables.innerHTML = '';
-      Object.keys(lastTestSampleData).forEach(function (name) {
-        var rows = lastTestSampleData[name] || [];
-        var cols = rows[0] ? Object.keys(rows[0]) : [];
-        var html = '<div class="test-table-wrap"><h3>' + (window.CodeParser.escapeHtml || escapeHtml)(name) + '</h3><table class="test-table"><thead><tr>' +
-          cols.map(function (c) { return '<th>' + (window.CodeParser.escapeHtml || escapeHtml)(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
-        rows.slice(0, 10).forEach(function (r) {
-          html += '<tr>' + cols.map(function (c) { return '<td>' + (window.CodeParser.escapeHtml || escapeHtml)(String(r[c] != null ? r[c] : '')) + '</td>'; }).join('') + '</tr>';
+
+      $btn.on('click', function() {
+        var $fileInput = $('<input>').attr('type', 'file').attr('accept', '*').hide();
+        $(document.body).append($fileInput);
+        $fileInput.on('change', function() {
+          var file = $fileInput[0].files && $fileInput[0].files[0];
+          $fileInput.remove();
+          if (!file) return;
+          var fd = new FormData();
+          fd.append('file', file);
+          fd.append('node_name', storageKey);
+          fd.append('node_type', 'expected_output');
+          fd.append('format', 'CSV');
+          fd.append('fields', JSON.stringify([]));
+          $btn.prop('disabled', true);
+          $btn.html('<i class="fa-solid fa-spinner fa-spin"></i> Uploading…');
+          fetch('/api/config/' + encodeURIComponent(currentPath) + '/node-test-file', { method: 'POST', body: fd })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+              $btn.prop('disabled', false);
+              if (res.error) {
+                $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Import Expected Control File');
+                (window.CodeParser.showMessagePopup || showMessagePopup)('Upload failed', res.error, 'error');
+                return;
+              }
+              $btn[0].className = 'test-import-node-btn has-file';
+              $btn.html('<i class="fa-solid fa-check"></i> ' + file.name + ' (' + (res.rows || 0) + ' rows)');
+              $badge.text('✓ Saved'); $badge.addClass('visible');
+              loadTestSampleData();
+            })
+            .catch(function(e) {
+              $btn.prop('disabled', false);
+              $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Import Expected Control File');
+              (window.CodeParser.showMessagePopup || showMessagePopup)('Upload failed', e.message || String(e), 'error');
+            });
         });
-        html += '</tbody></table></div>';
-        sourceTables.insertAdjacentHTML('beforeend', html);
+        $fileInput[0].click();
       });
-    }).catch(function () {
-      if (progressSection) progressSection.classList.add('hidden');
-      (window.CodeParser.showMessagePopup || showMessagePopup)('Error', 'Failed to generate sample data.', 'error');
+
+      $item.append($label).append($btn).append($badge);
+      $container.append($item);
     });
+  }
+
+  /* Renders per-node import buttons inside #test-import-nodes */
+  function _renderTestImportNodes(container) {
+    if (!container) return;
+    var $container = $(container);
+    var inputs = (currentConfig && currentConfig.Inputs) || {};
+    var inputKeys = Object.keys(inputs);
+    if (!inputKeys.length) {
+      $container.html('<p style="font-size:12px;color:#94a3b8;text-align:center">No input nodes defined in this interface.</p>');
+      return;
+    }
+    $container.html('');
+    inputKeys.forEach(function (key) {
+      /* displayName is shown in the UI; key is the canonical ID used for storage.
+         Using key (not inputs[key].name) for uploads ensures data is always stored
+         under the config-defined key — prevents "ghost" entries from older uploads. */
+      var displayName = (inputs[key] && inputs[key].name) || key;
+      var $item = $('<div>').addClass('test-import-node-item');
+
+      var $label = $('<div>').addClass('test-import-node-name');
+      $label.text(displayName);
+
+      var $btn = $('<button>').attr('type', 'button').addClass('test-import-node-btn');
+      $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Import Test Data');
+
+      var $badge = $('<div>').addClass('test-import-file-badge');
+
+      $btn.on('click', function () {
+        var $fileInput = $('<input>').attr('type', 'file').attr('accept', '.csv,.txt,.tsv,.dat,.fixed,.del').hide();
+        $(document.body).append($fileInput);
+        $fileInput.on('change', function () {
+          var file = $fileInput[0].files && $fileInput[0].files[0];
+          $fileInput.remove();
+          if (!file) return;
+          var fd = new FormData();
+          fd.append('file', file);
+          fd.append('node_name', key);   /* always use config key, not display name */
+          fd.append('node_type', 'input');
+          var nodeCfg = (currentConfig && currentConfig.Inputs && currentConfig.Inputs[key]) || {};
+          fd.append('format', (nodeCfg.format || '').toUpperCase());
+          fd.append('fields', JSON.stringify(nodeCfg.fields || []));
+          $btn.prop('disabled', true);
+          $btn.html('<i class="fa-solid fa-spinner fa-spin"></i> Uploading…');
+          fetch('/api/config/' + encodeURIComponent(currentPath) + '/node-test-file', { method: 'POST', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+              $btn.prop('disabled', false);
+              if (res.error) {
+                $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Import Test Data');
+                (window.CodeParser.showMessagePopup || showMessagePopup)('Upload failed', res.error, 'error');
+                return;
+              }
+              $btn[0].className = 'test-import-node-btn has-file';
+              $btn.html('<i class="fa-solid fa-check"></i> ' + file.name + ' (' + (res.rows || 0) + ' rows)');
+              $badge.text('✓ Saved');
+              $badge.addClass('visible');
+              /* Refresh data panel — server now has the file */
+              loadTestSampleData();
+            })
+            .catch(function (e) {
+              $btn.prop('disabled', false);
+              $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Import Test Data');
+              (window.CodeParser.showMessagePopup || showMessagePopup)('Upload failed', e.message || String(e), 'error');
+            });
+        });
+        $fileInput[0].click();
+      });
+
+      $item.append($label).append($btn).append($badge);
+      $container.append($item);
+    });
+  }
+
+  /* Renders per-output-node upload buttons for expected output files AND
+     per-validate-step ctrl file upload buttons in the Reconciliation tab.
+     Users can upload fixed-width / CSV expected outputs directly from here
+     without needing to go back to the Input Datasets tab.                    */
+  function _renderReconExpectedUpload(container) {
+    if (!container) return;
+    var $container = $(container);
+    var outputs = (currentConfig && currentConfig.Outputs) || {};
+    var outputKeys = Object.keys(outputs);
+    // Ctrl file steps (validate steps with ctrl_file_create)
+    var allSteps = (currentConfig && currentConfig.Transformations && currentConfig.Transformations.steps) || [];
+    var ctrlSteps = allSteps.filter(function (s) {
+      return s.type === 'validate' && s.logic && s.logic.ctrl_file_create;
+    });
+
+    if (!outputKeys.length && !ctrlSteps.length) {
+      $container.html('<p style="font-size:12px;color:#94a3b8;padding:8px 0">No output nodes defined in this interface.</p>');
+      return;
+    }
+    $container.html('');
+
+    // ── Output dataset upload buttons ─────────────────────────────────────
+    outputKeys.forEach(function (key) {
+      var nodeCfg  = outputs[key] || {};
+      var displayName = nodeCfg.name || key;
+      var nodeFmt  = (nodeCfg.format || '').toUpperCase();
+
+      var $item = $('<div>').addClass('test-import-node-item');
+
+      var $label = $('<div>').addClass('test-import-node-name');
+      $label.text(displayName);
+      if (nodeFmt) {
+        var $fmtBadge = $('<span>').css({fontSize:'10px',marginLeft:'8px',color:'#64748b',textTransform:'uppercase',fontWeight:'600'});
+        $fmtBadge.text(nodeFmt);
+        $label.append($fmtBadge);
+      }
+
+      var $btn = $('<button>').attr('type', 'button').addClass('test-import-node-btn');
+      var $badge = $('<div>').addClass('test-import-file-badge');
+
+      // Show existing row count if data already uploaded
+      var existingData  = uploadedTestData[currentPath] && uploadedTestData[currentPath].expected_output;
+      var existingRows  = existingData && existingData[key];
+      if (existingRows && existingRows.length > 0) {
+        $btn[0].className = 'test-import-node-btn has-file';
+        $btn.html('<i class="fa-solid fa-check"></i> ' + key + ' (' + existingRows.length + ' rows) — Re-upload');
+      } else {
+        $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Upload Expected Output');
+      }
+
+      $btn.on('click', function () {
+        var $fileInput = $('<input>').attr('type', 'file').attr('accept', '.csv,.txt,.tsv,.dat,.fixed,.del').hide();
+        $(document.body).append($fileInput);
+
+        $fileInput.on('change', function () {
+          var file = $fileInput[0].files && $fileInput[0].files[0];
+          $fileInput.remove();
+          if (!file) return;
+
+          var fd = new FormData();
+          fd.append('file', file);
+          fd.append('node_name', key);
+          fd.append('node_type', 'output');
+          fd.append('format', (nodeCfg.format || '').toUpperCase());
+          fd.append('fields', JSON.stringify(nodeCfg.fields || []));
+
+          $btn.prop('disabled', true);
+          $btn.html('<i class="fa-solid fa-spinner fa-spin"></i> Uploading…');
+
+          fetch('/api/config/' + encodeURIComponent(currentPath) + '/node-test-file', { method: 'POST', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+              $btn.prop('disabled', false);
+              if (res.error) {
+                $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Upload Expected Output');
+                (window.CodeParser.showMessagePopup || showMessagePopup)('Upload failed', res.error, 'error');
+                return;
+              }
+              $btn[0].className = 'test-import-node-btn has-file';
+              $btn.html('<i class="fa-solid fa-check"></i> ' + file.name + ' (' + (res.rows || 0) + ' rows)');
+              $badge.text('✓ Saved');
+              $badge.addClass('visible');
+              // Refresh expected output data then re-render the comparison
+              API.getConfigTestData(currentPath).then(function (data) {
+                uploadedTestData[currentPath] = {
+                  input_data:      data.input_data      || {},
+                  expected_output: data.expected_output || {}
+                };
+                renderReconciliation();
+              }).catch(function () { renderReconciliation(); });
+            })
+            .catch(function (e) {
+              $btn.prop('disabled', false);
+              $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Upload Expected Output');
+              (window.CodeParser.showMessagePopup || showMessagePopup)('Upload failed', e.message || String(e), 'error');
+            });
+        });
+        $fileInput[0].click();
+      });
+
+      $item.append($label).append($btn).append($badge);
+      $container.append($item);
+    });
+
+    // ── Control file upload buttons (one per validate step with ctrl_file_create) ──
+    if (ctrlSteps.length) {
+      var $ctrlDivider = $('<div>').css({
+        fontSize: '11px', fontWeight: '600', color: '#0d9488',
+        textTransform: 'uppercase', letterSpacing: '0.05em',
+        margin: '8px 0 4px', padding: '4px 0 2px',
+        borderTop: '1px solid #e2e8f0'
+      }).text('Expected Control Files');
+      $container.append($ctrlDivider);
+
+      ctrlSteps.forEach(function (step) {
+        var stepId     = step.id || step.output_alias || 'validate';
+        var storageKey = '__ctrl__' + stepId;
+
+        var $item  = $('<div>').addClass('test-import-node-item');
+        var $label = $('<div>').addClass('test-import-node-name');
+        $label.html('<i class="fa-solid fa-file-lines" style="margin-right:5px;color:#0d9488"></i>' +
+                    (window.CodeParser.escapeHtml || escapeHtml)(stepId) +
+                    '<span style="font-size:10px;margin-left:8px;color:#64748b;text-transform:uppercase;font-weight:600">CTL</span>');
+
+        var $btn   = $('<button>').attr('type', 'button').addClass('test-import-node-btn');
+        var $badge = $('<div>').addClass('test-import-file-badge');
+
+        var existingCtrlData  = uploadedTestData[currentPath] && uploadedTestData[currentPath].expected_output;
+        var existingCtrlRows  = existingCtrlData && existingCtrlData[storageKey];
+        if (existingCtrlRows && existingCtrlRows.length > 0) {
+          $btn[0].className = 'test-import-node-btn has-file';
+          $btn.html('<i class="fa-solid fa-check"></i> Control file (' + existingCtrlRows.length + ' row' + (existingCtrlRows.length !== 1 ? 's' : '') + ') — Re-upload');
+        } else {
+          $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Upload Expected Control File');
+        }
+
+        $btn.on('click', function () {
+          var $fileInput = $('<input>').attr('type', 'file').attr('accept', '*').hide();
+          $(document.body).append($fileInput);
+          $fileInput.on('change', function () {
+            var file = $fileInput[0].files && $fileInput[0].files[0];
+            $fileInput.remove();
+            if (!file) return;
+            var fd = new FormData();
+            fd.append('file', file);
+            fd.append('node_name', storageKey);
+            fd.append('node_type', 'expected_output');
+            fd.append('format', 'FIXED');
+            fd.append('fields', JSON.stringify([]));
+            $btn.prop('disabled', true);
+            $btn.html('<i class="fa-solid fa-spinner fa-spin"></i> Uploading…');
+            fetch('/api/config/' + encodeURIComponent(currentPath) + '/node-test-file', { method: 'POST', body: fd })
+              .then(function (r) { return r.json(); })
+              .then(function (res) {
+                $btn.prop('disabled', false);
+                if (res.error) {
+                  $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Upload Expected Control File');
+                  (window.CodeParser.showMessagePopup || showMessagePopup)('Upload failed', res.error, 'error');
+                  return;
+                }
+                $btn[0].className = 'test-import-node-btn has-file';
+                $btn.html('<i class="fa-solid fa-check"></i> ' + file.name + ' (' + (res.rows || 0) + ' row' + (res.rows !== 1 ? 's' : '') + ')');
+                $badge.text('✓ Saved'); $badge.addClass('visible');
+                API.getConfigTestData(currentPath).then(function (data) {
+                  uploadedTestData[currentPath] = {
+                    input_data:      data.input_data      || {},
+                    expected_output: data.expected_output || {}
+                  };
+                  renderReconciliation();
+                }).catch(function () { renderReconciliation(); });
+              })
+              .catch(function (e) {
+                $btn.prop('disabled', false);
+                $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Upload Expected Control File');
+                (window.CodeParser.showMessagePopup || showMessagePopup)('Upload failed', e.message || String(e), 'error');
+              });
+          });
+          $fileInput[0].click();
+        });
+
+        $item.append($label).append($btn).append($badge);
+        $container.append($item);
+      });
+    }
   }
 
   // --- Reconciliation helpers ---
@@ -1872,24 +2442,46 @@
   }
 
   function renderReconciliation() {
-    var container = document.getElementById('test-reconciliation-content');
-    if (!container) return;
+    var $reconContainer = $('#test-reconciliation-content');
+    if (!$reconContainer.length) return;
     var expected = (currentPath && uploadedTestData[currentPath] && uploadedTestData[currentPath].expected_output) || {};
     var generated = lastGeneratedOutput || {};
     var escape = window.CodeParser.escapeHtml || escapeHtml;
-    if (!expected || Object.keys(expected).length === 0) {
-      container.innerHTML = '<p class="test-recon-placeholder">Upload a ZIP that contains an <code>output/</code> or <code>expected_output/</code> folder with CSV or Parquet files named to match your config (e.g. DAILY_REVENUE.csv). Include <code>input/</code> with input files to run the test using your data; then run the dataflow and open this tab to compare.</p>';
+    var hasExpected  = expected && Object.keys(expected).length > 0;
+    var hasGenerated = generated && Object.keys(generated).length > 0;
+
+    // ── Always show the "Expected Output Files" upload section ──────────────
+    // This lets users upload or re-upload expected output files (fixed-width,
+    // CSV, etc.) directly, without needing a ZIP import.
+    var uploadHtml =
+      '<details class="recon-upload-section"' + (hasExpected ? '' : ' open') + '>' +
+      '<summary class="recon-upload-summary">⬆ Expected Output Files' +
+        (hasExpected ? ' <span class="recon-upload-hint">(click to re-upload)</span>' : ' — upload to enable reconciliation') +
+      '</summary>' +
+      '<div id="recon-expected-upload-nodes" class="recon-upload-nodes"></div>' +
+      '</details>';
+
+    if (!hasExpected) {
+      $reconContainer.html(uploadHtml +
+        '<p class="test-recon-placeholder" style="margin-top:12px">' +
+        'Upload expected output files above for each output node, then run the dataflow and return here to compare results.' +
+        '</p>');
+      _renderReconExpectedUpload($('#recon-expected-upload-nodes')[0]);
       return;
     }
-    if (!generated || Object.keys(generated).length === 0) {
-      container.innerHTML = '<p class="test-recon-placeholder">Run the dataflow from the Input datasets tab first (use uploaded input files from your ZIP if you included an <code>input/</code> folder). After it completes, open this tab to compare generated output with the expected output from your ZIP.</p>';
+    if (!hasGenerated) {
+      $reconContainer.html(uploadHtml +
+        '<p class="test-recon-placeholder" style="margin-top:12px">' +
+        'Run the dataflow from the <strong>Input Datasets</strong> tab first. After it completes, open this tab to compare generated output with your expected output.' +
+        '</p>');
+      _renderReconExpectedUpload($('#recon-expected-upload-nodes')[0]);
       return;
     }
     var allNames = {};
     Object.keys(expected).forEach(function (n) { allNames[n] = true; });
     Object.keys(generated).forEach(function (n) { allNames[n] = true; });
     var names = Object.keys(allNames);
-    var html = '';
+    var html = uploadHtml;
 
     names.forEach(function (name, ni) {
       var expRows = expected[name] || [];
@@ -1901,6 +2493,30 @@
       var colMap = reconResult.colMap;
       var keyCol = reconResult.keyCol;
       var genKeyCol = reconResult.genKeyCol;
+
+      // Filter expected columns against current output schema to remove stale columns
+      // from previously uploaded expected files parsed with an older copybook
+      var configOutputs = (currentConfig && currentConfig.Outputs) || {};
+      var outputCfg = configOutputs[name];
+      if (outputCfg && outputCfg.fields && outputCfg.fields.length) {
+        var schemaColSet = {};
+        outputCfg.fields.forEach(function (f) {
+          if (f.name) {
+            schemaColSet[f.name.toUpperCase()] = true;
+            schemaColSet[f.name.replace(/-/g, '_').toUpperCase()] = true;
+          }
+        });
+        var staleExpCols = expCols.filter(function (ec) {
+          return !schemaColSet[ec.toUpperCase()] && !schemaColSet[ec.replace(/-/g, '_').toUpperCase()];
+        });
+        if (staleExpCols.length > 0) {
+          expCols = expCols.filter(function (ec) {
+            return schemaColSet[ec.toUpperCase()] || schemaColSet[ec.replace(/-/g, '_').toUpperCase()];
+          });
+          // Also clean colMap of stale columns
+          staleExpCols.forEach(function (sc) { delete colMap[sc]; });
+        }
+      }
 
       // Build unified column list: expected cols first, then extra gen cols with no match
       var matchedGenCols = {};
@@ -1914,8 +2530,9 @@
         if (!pair.gen) { onlyExpCount++; return; }
         if (!pair.exp) { onlyGenCount++; return; }
         var hasDiff = allCols.some(function (ec) {
-          var gc = colMap[ec] || ec;
-          return normalizeReconValue(pair.exp[ec]) !== normalizeReconValue(pair.gen[gc]);
+          var gc = colMap[ec];  // null when no matching generated column found
+          var genVal = (gc != null) ? normalizeReconValue(pair.gen[gc]) : '';
+          return normalizeReconValue(pair.exp[ec]) !== genVal;
         });
         if (hasDiff) diffCount++; else matchCount++;
       });
@@ -1925,12 +2542,28 @@
       var statusText = statusMatch ? '✓ Match' : '✗ Mismatch';
       var tableId = 'recon-tbl-' + ni;
 
+      // Check whether this output name exists in the current config's Outputs
+      var configOutputs = (currentConfig && currentConfig.Outputs) || {};
+      var isStaleKey = !configOutputs[name] && Object.keys(expected).indexOf(name) >= 0 && !genRows.length;
+
       html += '<div class="test-recon-dataset">';
       // Header row: title + hide-matching toggle
       html += '<div class="recon-dataset-header">';
-      html += '<h4 class="test-recon-dataset-title">' + escape(name) + ' <span class="' + statusClass + '">' + statusText + '</span></h4>';
+      html += '<h4 class="test-recon-dataset-title">' + escape(name) + ' <span class="' + statusClass + '">' + statusText + '</span>';
+      if (isStaleKey) {
+        // Suggest which config output this stale key might correspond to
+        var configOutKeys = Object.keys(configOutputs);
+        var staleSuggest = configOutKeys.length
+          ? ' Did you rename it to: <strong>' + configOutKeys.map(escape).join('</strong>, <strong>') + '</strong>?'
+          : '';
+        html += ' <span class="recon-stale-badge" title="This key is not in the current config\'s Outputs">⚠ stale key</span>';
+        html += '</h4>';
+        html += '<div class="recon-stale-note">Expected data stored under <code>' + escape(name) + '</code> does not match any output in the current config.' + staleSuggest + ' Use the <strong>Expected Output Files</strong> section above to upload expected data for the correct output node.</div>';
+      } else {
+        html += '</h4>';
+      }
       if (matchCount > 0) {
-        html += '<label class="recon-toggle-match"><input type="checkbox" onchange="var t=document.getElementById(\'' + tableId + '\');if(t)t.classList.toggle(\'recon-hide-match\',this.checked)"> Hide ' + matchCount + ' matching row' + (matchCount !== 1 ? 's' : '') + '</label>';
+        html += '<label class="recon-toggle-match"><input type="checkbox" onchange="$(\'#' + tableId + '\').toggleClass(\'recon-hide-match\',this.checked)"> Hide ' + matchCount + ' matching row' + (matchCount !== 1 ? 's' : '') + '</label>';
       }
       html += '</div>';
 
@@ -1994,8 +2627,8 @@
           html += '<td class="recon-td-row">' + rowNum + '</td>';
           html += '<td class="recon-source-label recon-source-gen">Gen only</td>';
           allCols.forEach(function (ec) {
-            var gc = colMap[ec] || ec;
-            var v = pair.gen[gc];
+            var gc = colMap[ec];  // null when no matching generated column
+            var v = (gc != null) ? pair.gen[gc] : undefined;
             html += '<td>' + escape(v != null ? String(v) : '') + '</td>';
           });
           html += '</tr>';
@@ -2004,8 +2637,9 @@
           // Matched pair — find which cells differ
           var diffCols = {};
           allCols.forEach(function (ec) {
-            var gc = colMap[ec] || ec;
-            if (normalizeReconValue(pair.exp[ec]) !== normalizeReconValue(pair.gen[gc])) {
+            var gc = colMap[ec];  // null when no matching generated column
+            var genVal = (gc != null) ? normalizeReconValue(pair.gen[gc]) : '';
+            if (normalizeReconValue(pair.exp[ec]) !== genVal) {
               diffCols[ec] = true;
             }
           });
@@ -2036,8 +2670,8 @@
             html += '<tr class="recon-row-diff-gen">';
             html += '<td class="recon-source-label recon-source-gen">Gen</td>';
             allCols.forEach(function (ec) {
-              var gc = colMap[ec] || ec;
-              var v = pair.gen[gc];
+              var gc = colMap[ec];  // null when no matching generated column
+              var v = (gc != null) ? pair.gen[gc] : undefined;
               var cls = diffCols[ec] ? ' class="recon-cell-diff recon-cell-gen-val"' : '';
               html += '<td' + cls + '>' + escape(v != null ? String(v) : '') + '</td>';
             });
@@ -2053,37 +2687,38 @@
       html += '</div>'; // test-recon-dataset
     });
 
-    container.innerHTML = html || '<p class="test-recon-placeholder">No output datasets to compare.</p>';
+    $reconContainer.html(html || (uploadHtml + '<p class="test-recon-placeholder">No output datasets to compare.</p>'));
+    _renderReconExpectedUpload($('#recon-expected-upload-nodes')[0]);
   }
 
-  var outputCtaEl = document.getElementById('test-logs-output-cta');
-  var showOutputBtn = document.getElementById('btn-show-output');
-  var showReconciliationBtnOutput = document.getElementById('btn-show-reconciliation-output');
+  var $outputCtaEl = $('#test-logs-output-cta');
+  var $showOutputBtn = $('#btn-show-output');
+  var $showReconciliationBtnOutput = $('#btn-show-reconciliation-output');
   function goToReconciliation() {
     switchTestTab('reconciliation');
     if (typeof renderReconciliation === 'function') renderReconciliation();
   }
-  if (showOutputBtn) showOutputBtn.addEventListener('click', function () { switchTestTab('output'); });
-  if (showReconciliationBtnOutput) showReconciliationBtnOutput.addEventListener('click', goToReconciliation);
+  if ($showOutputBtn.length) $showOutputBtn.on('click', function () { switchTestTab('output'); });
+  if ($showReconciliationBtnOutput.length) $showReconciliationBtnOutput.on('click', goToReconciliation);
 
-  var runDataflowBtn = document.getElementById('btn-run-dataflow');
-  if (runDataflowBtn) runDataflowBtn.addEventListener('click', function () {
+  var $runDataflowBtn = $('#btn-run-dataflow');
+  if ($runDataflowBtn.length) $runDataflowBtn.on('click', function () {
     if (!currentPath) {
-      (window.CodeParser.showMessagePopup || showMessagePopup)('Error', 'Select a configuration first.', 'error');
+      (window.CodeParser.showMessagePopup || showMessagePopup)('Error', 'Select an interface first.', 'error');
       return;
     }
-    var logsEl = document.getElementById('test-logs');
-    var outputTables = document.getElementById('test-output-tables');
-    runDataflowBtn.disabled = true;
-    runDataflowBtn.textContent = 'Running...';
-    if (outputCtaEl) outputCtaEl.classList.add('hidden');
-    var reconCtaOutput = document.getElementById('test-output-recon-cta');
-    if (reconCtaOutput) reconCtaOutput.classList.add('hidden');
-    if (showReconciliationBtnOutput) showReconciliationBtnOutput.classList.add('hidden');
-    var logsProgressEl = document.getElementById('test-logs-progress');
-    if (logsProgressEl) logsProgressEl.classList.remove('hidden');
-    setTestLogsContent(logsEl, 'Dataflow job is running.\n');
-    if (outputTables) outputTables.innerHTML = '<p class="test-output-placeholder">Running… Results will appear here when the run completes.</p>';
+    var $logsEl = $('#test-logs');
+    var $outputTables = $('#test-output-tables');
+    $runDataflowBtn.prop('disabled', true);
+    $runDataflowBtn.text('Running...');
+    if ($outputCtaEl.length) $outputCtaEl.addClass('hidden');
+    var $reconCtaOutput = $('#test-output-recon-cta');
+    if ($reconCtaOutput.length) $reconCtaOutput.addClass('hidden');
+    if ($showReconciliationBtnOutput.length) $showReconciliationBtnOutput.addClass('hidden');
+    var $logsProgressEl = $('#test-logs-progress');
+    if ($logsProgressEl.length) $logsProgressEl.removeClass('hidden');
+    setTestLogsContent($logsEl[0], 'Dataflow job is running.\n');
+    if ($outputTables.length) $outputTables.html('<p class="test-output-placeholder">Running… Results will appear here when the run completes.</p>');
     switchTestTab('logs');
     API.runDataflowTestStream({
       config_path: currentPath,
@@ -2096,36 +2731,63 @@
     }).then(function (reader) {
       var decoder = new TextDecoder();
       var buf = '';
+      /* Track whether job was aborted so we can suppress "View Generated Output" */
+      var _jobAborted = false;
       function processLine(line) {
         if (line.startsWith('LOG: ')) {
-          appendTestLogsContent(logsEl, line.slice(5) + '\n');
-          if (logsEl) logsEl.scrollTop = logsEl.scrollHeight;
+          var logContent = line.slice(5);
+          /* Detect ABORT in the log stream */
+          if (logContent.indexOf('[VALIDATE] Dataflow aborted:') >= 0 ||
+              logContent.indexOf('[VALIDATE] Job aborted:') >= 0 ||
+              logContent.indexOf('Dataflow aborted') >= 0) {
+            _jobAborted = true;
+          }
+          appendTestLogsContent($logsEl[0], logContent + '\n');
+          if ($logsEl.length) $logsEl.scrollTop($logsEl[0].scrollHeight);
         } else if (line.startsWith('RESULT: ')) {
           try {
             var res = JSON.parse(line.slice(8));
-            lastGeneratedOutput = res.outputs || {};
-            runDataflowBtn.disabled = false;
-            runDataflowBtn.textContent = 'Run dataflow';
-            if (logsProgressEl) logsProgressEl.classList.add('hidden');
-            if (outputCtaEl) outputCtaEl.classList.remove('hidden');
-            if (logsEl) {
-              if (res.error) {
-                appendTestLogsContent(logsEl, '\nDataflow job failed.\nError: ' + (res.error || 'Unknown error') + '\n');
+            // Copy res.outputs so that merging __ctrl__ keys into lastGeneratedOutput
+            // does NOT mutate res.outputs (they would otherwise share the same object).
+            lastGeneratedOutput = Object.assign({}, res.outputs || {});
+            // Merge ctrl file outputs using the same key prefix as expected_output
+            // so renderReconciliation() can compare them side-by-side.
+            var _ctrlOuts = res.ctrl_outputs || {};
+            Object.keys(_ctrlOuts).forEach(function(stepId) {
+              lastGeneratedOutput['__ctrl__' + stepId] = _ctrlOuts[stepId];
+            });
+            $runDataflowBtn.prop('disabled', false);
+            $runDataflowBtn.text('Run Dataflow →');
+            if ($logsProgressEl.length) $logsProgressEl.addClass('hidden');
+            /* Only show "View Generated Output" if job succeeded (not aborted, no error) */
+            if ($outputCtaEl.length) {
+              if (res.error || _jobAborted) {
+                $outputCtaEl.addClass('hidden');
               } else {
-                appendTestLogsContent(logsEl, '\nDataflow completed.\n');
+                $outputCtaEl.removeClass('hidden');
+              }
+            }
+            if ($logsEl.length) {
+              if (_jobAborted) {
+                appendTestLogsContent($logsEl[0], '\nDataflow job aborted.\n');
+              } else if (res.error) {
+                appendTestLogsContent($logsEl[0], '\nDataflow job failed.\nError: ' + (res.error || 'Unknown error') + '\n');
+              } else {
+                appendTestLogsContent($logsEl[0], '\nDataflow completed successfully.\n');
               }
             }
             var hasExpected = currentPath && uploadedTestData[currentPath] && uploadedTestData[currentPath].expected_output && Object.keys(uploadedTestData[currentPath].expected_output).length > 0;
-            var reconCtaOutput = document.getElementById('test-output-recon-cta');
+            var $reconCtaOutput2 = $('#test-output-recon-cta');
             if (hasExpected && !res.error && Object.keys(res.outputs || {}).length > 0) {
-              if (reconCtaOutput) reconCtaOutput.classList.remove('hidden');
-              if (showReconciliationBtnOutput) showReconciliationBtnOutput.classList.remove('hidden');
+              if ($reconCtaOutput2.length) $reconCtaOutput2.removeClass('hidden');
+              if ($showReconciliationBtnOutput.length) $showReconciliationBtnOutput.removeClass('hidden');
             } else {
-              if (reconCtaOutput) reconCtaOutput.classList.add('hidden');
-              if (showReconciliationBtnOutput) showReconciliationBtnOutput.classList.add('hidden');
+              if ($reconCtaOutput2.length) $reconCtaOutput2.addClass('hidden');
+              if ($showReconciliationBtnOutput.length) $showReconciliationBtnOutput.addClass('hidden');
             }
-            if (outputTables) {
-              outputTables.innerHTML = '';
+            if ($outputTables.length) {
+              $outputTables.html('');
+              var esc2 = window.CodeParser.escapeHtml || escapeHtml;
               var outputs = res.outputs || {};
               var outputNames = Object.keys(outputs);
               outputNames.forEach(function (name) {
@@ -2133,20 +2795,35 @@
                 var cols = rows[0] ? Object.keys(rows[0]).filter(function (k) { return !k.startsWith('_'); }) : [];
                 if (cols.length === 0 && rows.length === 0) return;
                 if (cols.length === 0) cols = rows[0] ? Object.keys(rows[0]) : [];
-                var html = '<div class="test-table-wrap"><h3>' + (window.CodeParser.escapeHtml || escapeHtml)(name) + '</h3><table class="test-table"><thead><tr>' +
-                  cols.map(function (c) { return '<th>' + (window.CodeParser.escapeHtml || escapeHtml)(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+                var html = '<div class="test-table-wrap"><h3>' + esc2(name) + '</h3><table class="test-table"><thead><tr>' +
+                  cols.map(function (c) { return '<th>' + esc2(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
                 rows.slice(0, 10).forEach(function (r) {
-                  html += '<tr>' + cols.map(function (c) { return '<td>' + (window.CodeParser.escapeHtml || escapeHtml)(String(r[c] != null ? r[c] : '')) + '</td>'; }).join('') + '</tr>';
+                  html += '<tr>' + cols.map(function (c) { return '<td>' + esc2(String(r[c] != null ? r[c] : '')) + '</td>'; }).join('') + '</tr>';
                 });
                 html += '</tbody></table></div>';
-                outputTables.insertAdjacentHTML('beforeend', html);
+                $outputTables.append(html);
               });
-              if (outputNames.length === 0 && res.error) {
-                outputTables.innerHTML = '<p class="test-error">' + (window.CodeParser.escapeHtml || escapeHtml)(res.error) + '</p>';
-              } else if (outputNames.length === 0 && !res.error) {
-                outputTables.innerHTML = '<p class="test-output-empty">No output data was returned. The job may have written to a path we could not read.</p>';
-              } else if (outputNames.length > 0 && outputTables.innerHTML === '') {
-                outputTables.innerHTML = '<p class="test-output-empty">Output datasets are empty.</p>';
+              // Also render control file outputs (same table pattern as output datasets)
+              var ctrlOuts = res.ctrl_outputs || {};
+              Object.keys(ctrlOuts).forEach(function (stepId) {
+                var rows = ctrlOuts[stepId] || [];
+                if (!rows.length) return;
+                var cols = rows[0] ? Object.keys(rows[0]).filter(function (k) { return !k.startsWith('_'); }) : [];
+                if (!cols.length) cols = rows[0] ? Object.keys(rows[0]) : ['value'];
+                var html = '<div class="test-table-wrap"><h3>Control File: ' + esc2(stepId) + '</h3><table class="test-table"><thead><tr>' +
+                  cols.map(function (c) { return '<th>' + esc2(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+                rows.forEach(function (r) {
+                  html += '<tr>' + cols.map(function (c) { return '<td>' + esc2(String(r[c] != null ? r[c] : '')) + '</td>'; }).join('') + '</tr>';
+                });
+                html += '</tbody></table></div>';
+                $outputTables.append(html);
+              });
+              if (outputNames.length === 0 && Object.keys(ctrlOuts).length === 0 && res.error) {
+                $outputTables.html('<p class="test-error">' + (window.CodeParser.escapeHtml || escapeHtml)(res.error) + '</p>');
+              } else if (outputNames.length === 0 && Object.keys(ctrlOuts).length === 0 && !res.error) {
+                $outputTables.html('<p class="test-output-empty">No output data was returned. The job may have written to a path we could not read.</p>');
+              } else if (outputNames.length > 0 && $outputTables.html() === '') {
+                $outputTables.html('<p class="test-output-empty">Output datasets are empty.</p>');
               }
             }
           } catch (e) {}
@@ -2168,16 +2845,17 @@
       }
       return pump();
     }).catch(function (err) {
-      runDataflowBtn.disabled = false;
-      runDataflowBtn.textContent = 'Run dataflow';
-      var p = document.getElementById('test-logs-progress');
-      if (p) p.classList.add('hidden');
-      if (outputCtaEl) outputCtaEl.classList.remove('hidden');
-      var reconCtaOutput = document.getElementById('test-output-recon-cta');
-      if (reconCtaOutput) reconCtaOutput.classList.add('hidden');
-      if (showReconciliationBtnOutput) showReconciliationBtnOutput.classList.add('hidden');
+      $runDataflowBtn.prop('disabled', false);
+      $runDataflowBtn.text('Run Dataflow →');
+      var $p = $('#test-logs-progress');
+      if ($p.length) $p.addClass('hidden');
+      /* Job failed — do not show "View Generated Output" */
+      if ($outputCtaEl.length) $outputCtaEl.addClass('hidden');
+      var $reconCtaOutput3 = $('#test-output-recon-cta');
+      if ($reconCtaOutput3.length) $reconCtaOutput3.addClass('hidden');
+      if ($showReconciliationBtnOutput.length) $showReconciliationBtnOutput.addClass('hidden');
       var errMsg = err && (err.message || String(err)) ? (err.message || String(err)) : 'Request failed or stream ended unexpectedly.';
-      if (logsEl) appendTestLogsContent(logsEl, '\nDataflow job failed.\nError: ' + errMsg + '\n');
+      if ($logsEl.length) appendTestLogsContent($logsEl[0], '\nDataflow job failed.\nError: ' + errMsg + '\n');
     });
   });
 
@@ -2196,12 +2874,12 @@
     }
 
     function renderDatasetUploadItems() {
-      const uploadSection = document.getElementById('file-upload-section');
-      const startTestingContainer = document.getElementById('start-testing-container');
-      
+      const $uploadSection = $('#file-upload-section');
+      const $startTestingContainer = $('#start-testing-container');
+
       if (!selectedConfig) {
-        uploadSection.innerHTML = '<p style="color: var(--text-secondary); font-size: 12px;">Select a configuration to see dataset upload options</p>';
-        startTestingContainer.classList.add('hidden');
+        $uploadSection.html('<p style="color: var(--text-secondary); font-size: 12px;">Select an interface to see dataset upload options</p>');
+        $startTestingContainer.addClass('hidden');
         return;
       }
 
@@ -2210,12 +2888,12 @@
       const allDatasets = { ...inputs, ...outputs };
 
       if (Object.keys(allDatasets).length === 0) {
-        uploadSection.innerHTML = '<p style="color: var(--text-secondary); font-size: 12px;">No datasets found in selected configuration</p>';
-        startTestingContainer.classList.add('hidden');
+        $uploadSection.html('<p style="color: var(--text-secondary); font-size: 12px;">No datasets found in selected interface</p>');
+        $startTestingContainer.addClass('hidden');
         return;
       }
 
-      uploadSection.innerHTML = Object.entries(allDatasets).map(([datasetKey, dataset]) => {
+      $uploadSection.html(Object.entries(allDatasets).map(([datasetKey, dataset]) => {
         const hasFile = datasetFiles[datasetKey] && datasetFiles[datasetKey].file;
         const file = hasFile ? datasetFiles[datasetKey].file : null;
         const datasetType = inputs[datasetKey] ? 'input' : 'output';
@@ -2246,21 +2924,19 @@
             ` : ''}
           </div>
         `;
-      }).join('');
+      }).join(''));
 
       // Add event listeners for upload buttons
-      uploadSection.querySelectorAll('.btn-upload-file').forEach(btn => {
-        btn.addEventListener('click', function() {
-          const datasetKey = this.getAttribute('data-dataset-key');
-          const datasetType = this.getAttribute('data-dataset-type');
-          
+      $uploadSection.find('.btn-upload-file').each(function () {
+        var $btn = $(this);
+        $btn.on('click', function() {
+          const datasetKey = $btn.attr('data-dataset-key');
+          const datasetType = $btn.attr('data-dataset-type');
+
           // Create a hidden file input
-          const fileInput = document.createElement('input');
-          fileInput.type = 'file';
-          fileInput.accept = '.csv,.txt,.json,.parquet';
-          fileInput.style.display = 'none';
-          
-          fileInput.addEventListener('change', (e) => {
+          const $fileInput = $('<input>').attr('type', 'file').attr('accept', '.csv,.txt,.json,.parquet').hide();
+
+          $fileInput.on('change', (e) => {
             const file = e.target.files[0];
             if (file) {
               datasetFiles[datasetKey] = {
@@ -2270,18 +2946,19 @@
               };
               renderDatasetUploadItems();
             }
-            document.body.removeChild(fileInput);
+            $fileInput.remove();
           });
-          
-          document.body.appendChild(fileInput);
-          fileInput.click();
+
+          $(document.body).append($fileInput);
+          $fileInput[0].click();
         });
       });
 
       // Add event listeners for remove buttons
-      uploadSection.querySelectorAll('.btn-remove-file').forEach(btn => {
-        btn.addEventListener('click', function() {
-          const datasetKey = this.getAttribute('data-dataset-key');
+      $uploadSection.find('.btn-remove-file').each(function () {
+        var $btn = $(this);
+        $btn.on('click', function() {
+          const datasetKey = $btn.attr('data-dataset-key');
           delete datasetFiles[datasetKey];
           renderDatasetUploadItems();
         });
@@ -2292,21 +2969,21 @@
       const allInputsUploaded = inputDatasets.every(key => datasetFiles[key] && datasetFiles[key].file);
       
       if (allInputsUploaded && inputDatasets.length > 0) {
-        startTestingContainer.classList.remove('hidden');
+        $startTestingContainer.removeClass('hidden');
       } else {
-        startTestingContainer.classList.add('hidden');
+        $startTestingContainer.addClass('hidden');
       }
     }
 
     function loadExistingConfigs() {
       API.configs().then(data => {
         existingConfigs = data.configs || [];
-        const select = document.getElementById('existing-config-select');
-        if (select) {
-          select.innerHTML = '<option value="">-- Select existing configuration --</option>' +
-            existingConfigs.map(config => 
+        const $select = $('#existing-config-select');
+        if ($select.length) {
+          $select.html('<option value="">-- Select existing interface --</option>' +
+            existingConfigs.map(config =>
               `<option value="${config.path}">${config.name}</option>`
-            ).join('');
+            ).join(''));
         }
       }).catch(err => {
         console.error('Failed to load configs:', err);
@@ -2314,19 +2991,19 @@
     }
 
     function renderConfigDetails(config) {
-      const inputsContent = document.getElementById('config-inputs-content');
-      const outputsContent = document.getElementById('config-outputs-content');
-      const configInfo = document.getElementById('selected-config-info');
+      const $inputsContent = $('#config-inputs-content');
+      const $outputsContent = $('#config-outputs-content');
+      const $configInfo = $('#selected-config-info');
 
       if (!config) {
-        configInfo.classList.add('hidden');
+        $configInfo.addClass('hidden');
         renderDatasetUploadItems();
         return;
       }
 
       // Render inputs
       const inputs = config.Inputs || {};
-      inputsContent.innerHTML = Object.keys(inputs).length > 0 ? 
+      $inputsContent.html(Object.keys(inputs).length > 0 ?
         Object.entries(inputs).map(([key, input]) => `
           <div class="config-mapping-item">
             <div>
@@ -2336,11 +3013,11 @@
             <span class="config-mapping-format">${input.format || 'unknown'}</span>
           </div>
         `).join('') :
-        '<p style="color: var(--text-secondary); font-size: 12px;">No input datasets found</p>';
+        '<p style="color: var(--text-secondary); font-size: 12px;">No input datasets found</p>');
 
       // Render outputs
       const outputs = config.Outputs || {};
-      outputsContent.innerHTML = Object.keys(outputs).length > 0 ?
+      $outputsContent.html(Object.keys(outputs).length > 0 ?
         Object.entries(outputs).map(([key, output]) => `
           <div class="config-mapping-item">
             <div>
@@ -2350,17 +3027,17 @@
             <span class="config-mapping-format">${output.format || 'unknown'}</span>
           </div>
         `).join('') :
-        '<p style="color: var(--text-secondary); font-size: 12px;">No output datasets found</p>';
+        '<p style="color: var(--text-secondary); font-size: 12px;">No output datasets found</p>');
 
-      configInfo.classList.remove('hidden');
+      $configInfo.removeClass('hidden');
       renderDatasetUploadItems();
     }
 
     // Existing config selection handler
-    const configSelect = document.getElementById('existing-config-select');
-    if (configSelect) {
-      configSelect.addEventListener('change', async function() {
-        const selectedPath = this.value;
+    const $configSelect = $('#existing-config-select');
+    if ($configSelect.length) {
+      $configSelect.on('change', async function() {
+        const selectedPath = $(this).val();
         if (!selectedPath) {
           renderConfigDetails(null);
           selectedConfig = null;
@@ -2391,13 +3068,13 @@
     }
 
     // Start testing button handler
-    const startTestingBtn = document.getElementById('btn-start-testing');
-    if (startTestingBtn) {
-      startTestingBtn.addEventListener('click', function() {
+    const $startTestingBtn = $('#btn-start-testing');
+    if ($startTestingBtn.length) {
+      $startTestingBtn.on('click', function() {
         if (!selectedConfig) {
-          const messageEl = document.getElementById('import-json-message');
-          messageEl.textContent = 'Please select a configuration first';
-          messageEl.style.color = 'var(--error, #c62828)';
+          const $messageEl = $('#import-json-message');
+          $messageEl.text('Please select an interface first');
+          $messageEl.css('color', 'var(--error, #c62828)');
           return;
         }
 
@@ -2406,9 +3083,9 @@
         const missingInputs = Object.keys(inputs).filter(key => !datasetFiles[key]);
         
         if (missingInputs.length > 0) {
-          const messageEl = document.getElementById('import-json-message');
-          messageEl.textContent = `Please upload files for all input datasets. Missing: ${missingInputs.join(', ')}`;
-          messageEl.style.color = 'var(--error, #c62828)';
+          const $messageEl2 = $('#import-json-message');
+          $messageEl2.text(`Please upload files for all input datasets. Missing: ${missingInputs.join(', ')}`);
+          $messageEl2.css('color', 'var(--error, #c62828)');
           return;
         }
 
@@ -2424,17 +3101,17 @@
         sessionStorage.setItem('testingData', JSON.stringify(testingData));
         
         // Navigate to test page
-        const testPage = document.getElementById('test-page');
-        const importPage = document.getElementById('import-page');
-        const mainContent = document.querySelector('.main');
-        
-        if (testPage && importPage && mainContent) {
-          importPage.classList.add('hidden');
-          mainContent.classList.add('hidden');
-          testPage.classList.remove('hidden');
-          
+        const $testPage = $('#test-page');
+        const $importPage = $('#import-page');
+        const $mainContent = $('.main');
+
+        if ($testPage.length && $importPage.length && $mainContent.length) {
+          $importPage.addClass('hidden');
+          $mainContent.addClass('hidden');
+          $testPage.removeClass('hidden');
+
           // Update page title
-          document.getElementById('test-page-config-name').textContent = selectedConfig.name || 'Selected Configuration';
+          $('#test-page-config-name').text(selectedConfig.name || 'Selected Interface');
           
           // Switch to Input Datasets tab first
           setTimeout(() => {
