@@ -749,7 +749,8 @@ function loadConfig(config) {
   /* Last row — Outputs */
   outputKeys.forEach(function(name, idx) {
     var d = outputs[name];
-    var n = DS.fn.defaultNodeData('output');
+    var _outType = (d.target_storage || '').toLowerCase() === 'efs' ? 'efs_write' : 'output';
+    var n = DS.fn.defaultNodeData(_outType);
     n.id = name; n.name = name;
     n.format       = (d.format     || 'FIXED').toUpperCase();
     n.dataset_name = d.dataset_name || d.target_file_name || '';

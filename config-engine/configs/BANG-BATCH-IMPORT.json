@@ -214,7 +214,7 @@
       "name": "BANG-BATCH-IMPORT-EFS-OUTPUT-02",
       "format": "FIXED",
       "write_mode": "OVERWRITE",
-      "source_path": "file:///opt/data/s3/curated/BANG-BATCH-IMPORT/",
+      "target_storage": "efs",
       "source_inputs": [
         "BANG-BATCH-IMPORT-DATA-VALIDATION-OUT-01"
       ],
