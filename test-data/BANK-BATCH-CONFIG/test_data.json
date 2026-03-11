@@ -1,0 +1,194 @@
+{
+  "input_data": {
+    "BANK-BATCH-INPUT-01": [
+      {
+        "REC-TYPE":   "D",
+        "TXN-ID":     "TXN2026001",
+        "TXN-DATE":   "20260305",
+        "VAL-DATE":   "20260307",
+        "TXN-TYPE":   "DEP",
+        "ACCT-NUM":   "100200300001",
+        "TXN-AMOUNT": "000000500000",
+        "CURRENCY":   "USD",
+        "EXCH-RATE":  "0001000000",
+        "TXN-STATUS": "A",
+        "BRANCH-CD":  "10001",
+        "TXN-DESC":   "PAYROLL DEPOSIT MARCH 2026",
+        "TXN-MEMO":   "DIRECT DEP"
+      },
+      {
+        "REC-TYPE":   "D",
+        "TXN-ID":     "TXN2026002",
+        "TXN-DATE":   "20260305",
+        "VAL-DATE":   "20260305",
+        "TXN-TYPE":   "WDR",
+        "ACCT-NUM":   "100200300002",
+        "TXN-AMOUNT": "000000025050",
+        "CURRENCY":   "USD",
+        "EXCH-RATE":  "0001000000",
+        "TXN-STATUS": "A",
+        "BRANCH-CD":  "10001",
+        "TXN-DESC":   "ATM WITHDRAWAL MAIN ST",
+        "TXN-MEMO":   "ATM#4521"
+      },
+      {
+        "REC-TYPE":   "D",
+        "TXN-ID":     "TXN2026003",
+        "TXN-DATE":   "20260305",
+        "VAL-DATE":   "20260306",
+        "TXN-TYPE":   "TRF",
+        "ACCT-NUM":   "100200300003",
+        "TXN-AMOUNT": "000000250000",
+        "CURRENCY":   "USD",
+        "EXCH-RATE":  "0001000000",
+        "TXN-STATUS": "A",
+        "BRANCH-CD":  "10002",
+        "TXN-DESC":   "WIRE TRANSFER TO SAVINGS ACCT",
+        "TXN-MEMO":   "REF#W2026001"
+      },
+      {
+        "REC-TYPE":   "D",
+        "TXN-ID":     "TXN2026004",
+        "TXN-DATE":   "20260305",
+        "VAL-DATE":   "20260305",
+        "TXN-TYPE":   "FEE",
+        "ACCT-NUM":   "100200300001",
+        "TXN-AMOUNT": "000000000500",
+        "CURRENCY":   "USD",
+        "EXCH-RATE":  "0001000000",
+        "TXN-STATUS": "A",
+        "BRANCH-CD":  "10001",
+        "TXN-DESC":   "MONTHLY SERVICE CHARGE",
+        "TXN-MEMO":   "SVC FEE MAR26"
+      },
+      {
+        "REC-TYPE":   "D",
+        "TXN-ID":     "TXN2026005",
+        "TXN-DATE":   "20260305",
+        "VAL-DATE":   "20260308",
+        "TXN-TYPE":   "DEP",
+        "ACCT-NUM":   "100200300004",
+        "TXN-AMOUNT": "000000108500",
+        "CURRENCY":   "EUR",
+        "EXCH-RATE":  "0001085000",
+        "TXN-STATUS": "P",
+        "BRANCH-CD":  "10003",
+        "TXN-DESC":   "INTL WIRE RECEIPT EUR PAYMENT",
+        "TXN-MEMO":   "SWIFT REF#0305"
+      }
+    ]
+  },
+  "expected_output": {
+    "BANK-BATCH-VALIDATION-OUT-01": [
+      {
+        "TXN-ID":     "TXN2026001",
+        "TXN-DATE":   "20260305",
+        "VAL-DATE":   "20260307",
+        "TXN-TYPE":   "DEP",
+        "ACCT-NUM":   "100200300001",
+        "TXN-AMOUNT": "000000500000",
+        "CURRENCY":   "USD",
+        "EXCH-RATE":  "0001000000",
+        "TXN-STATUS": "A",
+        "BRANCH-CD":  "10001",
+        "TXN-DESC":   "PAYROLL DEPOSIT MARCH 2026",
+        "TXN-MEMO":   "DIRECT DEP",
+        "VAL-FLAG":   "Y",
+        "PROC-TS":    "20260305103041",
+        "ERR-CODE":   "0000"
+      },
+      {
+        "TXN-ID":     "TXN2026002",
+        "TXN-DATE":   "20260305",
+        "VAL-DATE":   "20260305",
+        "TXN-TYPE":   "WDR",
+        "ACCT-NUM":   "100200300002",
+        "TXN-AMOUNT": "000000025050",
+        "CURRENCY":   "USD",
+        "EXCH-RATE":  "0001000000",
+        "TXN-STATUS": "A",
+        "BRANCH-CD":  "10001",
+        "TXN-DESC":   "ATM WITHDRAWAL MAIN ST",
+        "TXN-MEMO":   "ATM#4521",
+        "VAL-FLAG":   "Y",
+        "PROC-TS":    "20260305103042",
+        "ERR-CODE":   "0000"
+      },
+      {
+        "TXN-ID":     "TXN2026003",
+        "TXN-DATE":   "20260305",
+        "VAL-DATE":   "20260306",
+        "TXN-TYPE":   "TRF",
+        "ACCT-NUM":   "100200300003",
+        "TXN-AMOUNT": "000000250000",
+        "CURRENCY":   "USD",
+        "EXCH-RATE":  "0001000000",
+        "TXN-STATUS": "A",
+        "BRANCH-CD":  "10002",
+        "TXN-DESC":   "WIRE TRANSFER TO SAVINGS ACCT",
+        "TXN-MEMO":   "REF#W2026001",
+        "VAL-FLAG":   "Y",
+        "PROC-TS":    "20260305103043",
+        "ERR-CODE":   "0000"
+      },
+      {
+        "TXN-ID":     "TXN2026004",
+        "TXN-DATE":   "20260305",
+        "VAL-DATE":   "20260305",
+        "TXN-TYPE":   "FEE",
+        "ACCT-NUM":   "100200300001",
+        "TXN-AMOUNT": "000000000500",
+        "CURRENCY":   "USD",
+        "EXCH-RATE":  "0001000000",
+        "TXN-STATUS": "A",
+        "BRANCH-CD":  "10001",
+        "TXN-DESC":   "MONTHLY SERVICE CHARGE",
+        "TXN-MEMO":   "SVC FEE MAR26",
+        "VAL-FLAG":   "Y",
+        "PROC-TS":    "20260305103044",
+        "ERR-CODE":   "0000"
+      },
+      {
+        "TXN-ID":     "TXN2026005",
+        "TXN-DATE":   "20260305",
+        "VAL-DATE":   "20260308",
+        "TXN-TYPE":   "DEP",
+        "ACCT-NUM":   "100200300004",
+        "TXN-AMOUNT": "000000108500",
+        "CURRENCY":   "EUR",
+        "EXCH-RATE":  "0001085000",
+        "TXN-STATUS": "P",
+        "BRANCH-CD":  "10003",
+        "TXN-DESC":   "INTL WIRE RECEIPT EUR PAYMENT",
+        "TXN-MEMO":   "SWIFT REF#0305",
+        "VAL-FLAG":   "N",
+        "PROC-TS":    "20260305103045",
+        "ERR-CODE":   "E001"
+      }
+    ]
+  },
+  "file_meta": {
+    "BANK-BATCH-INPUT-01": {
+      "test_file": "BANK-BATCH-INPUT.DAT",
+      "rows": 5,
+      "type": "input"
+    },
+    "BANK-BATCH-VALIDATION-OUT-01": {
+      "test_file": "BANK-BATCH-OUTPUT.DAT",
+      "rows": 5,
+      "type": "output"
+    }
+  },
+  "last_run_files": {
+    "BANK-BATCH-VALIDATION-01": {
+      "file": "BANK-BATCH-INPUT-PREV.DAT",
+      "path": "/Users/Alagushankar/WorkSpace/Claude/cloude-engine/config-engine/test_data/BANK-BATCH-CONFIG/last_run/BANK-BATCH-VALIDATION-01/BANK-BATCH-INPUT-PREV.DAT"
+    }
+  },
+  "test_ctrl_files": {
+    "BANK-BATCH-VALIDATION-01": {
+      "file": "BANK-BATCH-CTRL.DAT",
+      "path": "/Users/Alagushankar/WorkSpace/Claude/cloude-engine/config-engine/test_data/BANK-BATCH-CONFIG/test_ctrl/BANK-BATCH-VALIDATION-01/BANK-BATCH-CTRL.DAT"
+    }
+  }
+}

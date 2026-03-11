@@ -5,7 +5,6 @@
 (function (global) {
   global.CodeParser = global.CodeParser || {};
   var CP = global.CodeParser;
-  var $ = CP.$;
 
   CP.nodeDataMap = {};
   CP.network = null;
@@ -165,15 +164,15 @@
       CP.network.destroy();
       CP.network = null;
     }
-    var wrap = container.parentElement;
-    var w = (wrap && wrap.offsetWidth) || container.offsetWidth || 800;
-    var h = (wrap && wrap.offsetHeight) || container.offsetHeight || 500;
-    container.style.width = w + 'px';
-    container.style.height = h + 'px';
+    var wrap = $(container).parent();
+    var w = (wrap.length && wrap.outerWidth()) || $(container).outerWidth() || 800;
+    var h = (wrap.length && wrap.outerHeight()) || $(container).outerHeight() || 500;
+    $(container).css('width', w + 'px');
+    $(container).css('height', h + 'px');
 
     CP.network = new vis.Network(container, data, opts);
 
-    var diagramContainer = wrap && wrap.parentElement;
+    var diagramContainer = wrap.length && wrap.parent();
 
     CP.network.on('click', function (params) {
       if (params.nodes.length === 0) return;
@@ -183,14 +182,14 @@
       if (typeof CP.nodeClickHandler === 'function') CP.nodeClickHandler(nodeId, info);
     });
 
-    var stepHoverPopup = $('step-hover-popup');
-    var stepHoverPopupInner = stepHoverPopup && stepHoverPopup.querySelector('.step-hover-popup-inner');
+    var stepHoverPopup = $('#step-hover-popup');
+    var stepHoverPopupInner = stepHoverPopup.length && stepHoverPopup.find('.step-hover-popup-inner');
     var lastPointer = { x: 0, y: 0 };
 
     function positionStepHoverPopup() {
-      if (!stepHoverPopup || stepHoverPopup.classList.contains('hidden')) return;
-      var diagramEl = diagramContainer || container.parentElement;
-      var rect = diagramEl ? diagramEl.getBoundingClientRect() : { left: 0, top: 0, width: 400, height: 300 };
+      if (!stepHoverPopup.length || stepHoverPopup.hasClass('hidden')) return;
+      var diagramEl = (diagramContainer && diagramContainer.length) ? diagramContainer : $(container).parent();
+      var rect = diagramEl.length ? diagramEl[0].getBoundingClientRect() : { left: 0, top: 0, width: 400, height: 300 };
       var x = lastPointer.x - rect.left + 16;
       var y = lastPointer.y - rect.top + 16;
       var maxW = (rect.width || 400) - 40;
@@ -199,33 +198,33 @@
       if (y + 300 > maxH) y = maxH - 300;
       if (x < 8) x = 8;
       if (y < 8) y = 8;
-      stepHoverPopup.style.left = x + 'px';
-      stepHoverPopup.style.top = y + 'px';
+      stepHoverPopup.css('left', x + 'px');
+      stepHoverPopup.css('top', y + 'px');
     }
 
-    container.addEventListener('mousemove', function (e) {
+    $(container).on('mousemove', function (e) {
       lastPointer.x = e.clientX;
       lastPointer.y = e.clientY;
-      if (stepHoverPopup && !stepHoverPopup.classList.contains('hidden')) positionStepHoverPopup();
+      if (stepHoverPopup.length && !stepHoverPopup.hasClass('hidden')) positionStepHoverPopup();
     });
 
     CP.network.on('hoverNode', function (params) {
-      if (!stepHoverPopup || !stepHoverPopupInner) return;
+      if (!stepHoverPopup.length || !stepHoverPopupInner || !stepHoverPopupInner.length) return;
       if (CP.hoverPopupsEnabled === false) {
-        stepHoverPopup.classList.add('hidden');
-        stepHoverPopup.setAttribute('aria-hidden', 'true');
+        stepHoverPopup.addClass('hidden');
+        stepHoverPopup.attr('aria-hidden', 'true');
         return;
       }
       var nodeId = params.node;
       if (nodeId == null) {
-        stepHoverPopup.classList.add('hidden');
-        stepHoverPopup.setAttribute('aria-hidden', 'true');
+        stepHoverPopup.addClass('hidden');
+        stepHoverPopup.attr('aria-hidden', 'true');
         return;
       }
       var info = CP.nodeDataMap[nodeId];
       if (!info) {
-        stepHoverPopup.classList.add('hidden');
-        stepHoverPopup.setAttribute('aria-hidden', 'true');
+        stepHoverPopup.addClass('hidden');
+        stepHoverPopup.attr('aria-hidden', 'true');
         return;
       }
       if (info.type === 'step') {
@@ -233,46 +232,46 @@
         var logic = s && (s.logic || (s.config && s.config.logic) || s);
         var stepLabel = (s.id || 'step') + ' — ' + (s.type || 'step').toUpperCase();
         var iconClass = CP.getTransformIconClass(s && s.type);
-        stepHoverPopupInner.innerHTML = '<div class="step-hover-popup-step-header"><i class="' + iconClass + '" aria-hidden="true"></i> <span>' + CP.escapeHtml(stepLabel) + '</span></div>' + (CP.buildLogicVisualHtml ? CP.buildLogicVisualHtml(logic, s && s.type) : '');
+        stepHoverPopupInner.html('<div class="step-hover-popup-step-header"><i class="' + iconClass + '" aria-hidden="true"></i> <span>' + CP.escapeHtml(stepLabel) + '</span></div>' + (CP.buildLogicVisualHtml ? CP.buildLogicVisualHtml(logic, s && s.type) : ''));
       } else if (info.type === 'input' || info.type === 'output') {
-        stepHoverPopupInner.innerHTML = CP.buildIoSummaryHtml ? CP.buildIoSummaryHtml(info) : '';
+        stepHoverPopupInner.html(CP.buildIoSummaryHtml ? CP.buildIoSummaryHtml(info) : '');
       } else {
-        stepHoverPopup.classList.add('hidden');
-        stepHoverPopup.setAttribute('aria-hidden', 'true');
+        stepHoverPopup.addClass('hidden');
+        stepHoverPopup.attr('aria-hidden', 'true');
         return;
       }
-      stepHoverPopup.classList.remove('hidden');
-      stepHoverPopup.setAttribute('aria-hidden', 'false');
+      stepHoverPopup.removeClass('hidden');
+      stepHoverPopup.attr('aria-hidden', 'false');
       positionStepHoverPopup();
     });
 
     CP.network.on('blurNode', function () {
-      if (stepHoverPopup) {
-        stepHoverPopup.classList.add('hidden');
-        stepHoverPopup.setAttribute('aria-hidden', 'true');
+      if (stepHoverPopup.length) {
+        stepHoverPopup.addClass('hidden');
+        stepHoverPopup.attr('aria-hidden', 'true');
       }
     });
 
-    container.addEventListener('mouseleave', function () {
-      if (stepHoverPopup) {
-        stepHoverPopup.classList.add('hidden');
-        stepHoverPopup.setAttribute('aria-hidden', 'true');
+    $(container).on('mouseleave', function () {
+      if (stepHoverPopup.length) {
+        stepHoverPopup.addClass('hidden');
+        stepHoverPopup.attr('aria-hidden', 'true');
       }
     });
 
-    container.addEventListener('dragover', function (e) { e.preventDefault(); });
+    $(container).on('dragover', function (e) { e.preventDefault(); });
 
     function fitToContainer() {
-      if (!CP.network || !wrap) return;
-      wrap.style.width = '';
-      wrap.style.height = '';
-      wrap.style.minWidth = '';
-      wrap.style.minHeight = '';
-      var ww = wrap.offsetWidth;
-      var hh = wrap.offsetHeight;
+      if (!CP.network || !wrap.length) return;
+      wrap.css('width', '');
+      wrap.css('height', '');
+      wrap.css('min-width', '');
+      wrap.css('min-height', '');
+      var ww = wrap.outerWidth();
+      var hh = wrap.outerHeight();
       if (ww && hh) {
-        container.style.width = ww + 'px';
-        container.style.height = hh + 'px';
+        $(container).css('width', ww + 'px');
+        $(container).css('height', hh + 'px');
         try {
           CP.network.setSize(ww + 'px', hh + 'px');
           CP.network.fit({ animation: false });
@@ -302,8 +301,8 @@
     };
     setTimeout(fitToContainer, 100);
     setTimeout(fitToContainer, 400);
-    window.addEventListener('resize', function () {
-      if (CP.network && document.getElementById('network')) fitToContainer();
+    $(window).on('resize', function () {
+      if (CP.network && $('#network').length) fitToContainer();
     });
   };
 })(typeof window !== 'undefined' ? window : this);

@@ -120,6 +120,148 @@ def generate_sample_data(config: dict, num_rows: int = 5) -> dict[str, list[dict
     return out
 
 
+def _copy_last_run_file(
+    base_path: Path,
+    config_name: str,
+    step_id: str,
+    lr_temp: Path,
+    last_run_file_name: str,
+) -> str:
+    """
+    If the user uploaded a last-run-date file for this validate step via the UI,
+    copy it into *lr_temp* so the validate step can find it during a test run.
+
+    The persistent test-data directory mirrors the layout created by
+    ``api_save_last_run_file`` in app.py:
+        <test_data_root>/<config_key>/last_run/<step_id>/<original_filename>
+
+    Returns the actual filename used in the temp dir (may differ from
+    *last_run_file_name* if a user-uploaded file had a different name).
+    """
+    try:
+        import shutil as _shutil
+        safe_key = config_name.replace(".json", "").replace("/", "__").strip() or "default"
+        test_data_root = base_path.parent / "test_data"
+        lr_src_dir = test_data_root / safe_key / "last_run" / step_id
+        if not lr_src_dir.is_dir():
+            return ""
+        # Pick the first file found (there should only be one)
+        src_files = [f for f in lr_src_dir.iterdir() if f.is_file()]
+        if not src_files:
+            return ""
+        src_file = src_files[0]
+        lr_temp.mkdir(parents=True, exist_ok=True)
+        # Use the target name if given, otherwise keep the uploaded file's name
+        target_name = last_run_file_name or src_file.name
+        dest = lr_temp / target_name
+        _shutil.copy2(src_file, dest)
+        return target_name
+    except Exception:
+        return ""  # Non-fatal — the validate step will log the missing file
+
+
+def _write_fixed_input(
+    rows: list[dict], path: Path, cfg: dict,
+    trailer_data: dict | None = None,
+) -> None:
+    """
+    Write sample rows as a fixed-width text file matching the input field schema.
+
+    Field values are placed at their raw 1-based ``start`` positions — exactly
+    as the dataflow-engine runner reads them with ``F.substring(col("value"), start, length)``.
+    No position adjustment is applied: if the config has ``start=121`` the value
+    lands at character position 121 of the output line, so the runner can read it
+    correctly without any normalisation on its side.
+
+    Line width is ``max(start + length - 1)`` across all fields (or ``record_length``
+    when that is larger).
+
+    ``trailer_data``: optional dict of field-name -> value overrides written into
+    the trailer line(s).  Used in test mode to inject the correct record count so
+    the record_count_check validation passes.
+    """
+    fields = cfg.get("fields") or []
+    record_length = int(cfg.get("record_length") or 0)
+    header_count = int(cfg.get("header_count") or 0)
+    trailer_count = int(cfg.get("trailer_count") or 0)
+    header_fields = cfg.get("header_fields") or []
+    trailer_fields = cfg.get("trailer_fields") or []
+
+    # Line width = max end position across all fields, or record_length if larger
+    all_flds = fields + header_fields + trailer_fields
+    if all_flds:
+        max_end = max(
+            (int(f.get("start") or 1) + int(f.get("length") or 1) - 1
+             for f in all_flds if f.get("start")),
+            default=record_length or 80,
+        )
+        line_width = max(max_end, record_length)
+    else:
+        line_width = record_length or 80
+
+    def _make_line(row: dict, flds: list) -> str:
+        line = [" "] * line_width
+        for f in flds:
+            fname = f.get("name") or ""
+            # start is 1-based in the config (matching Spark's F.substring convention)
+            start = max(0, int(f.get("start") or 1) - 1)  # convert to 0-based
+            length = int(f.get("length") or 1)
+            val = str(row.get(fname, "") or "").ljust(length)[:length]
+            end = min(start + length, line_width)
+            line[start:end] = list(val[:end - start])
+        return "".join(line)
+
+    lines: list[str] = []
+    for _ in range(header_count):
+        lines.append(_make_line({}, header_fields) if header_fields else " " * line_width)
+    for row in rows:
+        lines.append(_make_line(row, fields))
+    # Trailer: merge injected data (e.g. record count) with empty defaults
+    _trl_row = dict(trailer_data) if trailer_data else {}
+    for _ in range(trailer_count):
+        lines.append(_make_line(_trl_row, trailer_fields) if trailer_fields else " " * line_width)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+
+
+def _write_input_file(
+    name: str, rows: list[dict], inp_cfg: dict, input_dir: Path,
+    trailer_data: dict | None = None,
+) -> str:
+    """
+    Write test input rows in the format specified by inp_cfg["format"].
+    Returns the relative path string (e.g. "input/NAME.csv" or "input/NAME.dat").
+    ``trailer_data`` is forwarded to ``_write_fixed_input`` for FIXED format only.
+    """
+    fmt = (inp_cfg.get("format") or "csv").strip().upper()
+    if fmt == "FIXED":
+        file_name = f"{name}.dat"
+        _write_fixed_input(rows, input_dir / file_name, inp_cfg, trailer_data=trailer_data)
+        return f"input/{file_name}"
+    elif fmt == "PARQUET":
+        try:
+            import pandas as pd
+            dir_path = input_dir / name
+            dir_path.mkdir(exist_ok=True)
+            pd.DataFrame(rows).to_parquet(str(dir_path / "part-00000.parquet"), index=False)
+        except Exception:
+            pass
+        return f"input/{name}"
+    else:
+        # CSV / DELIMITED / unknown — write as CSV with header
+        file_name = f"{name}.csv"
+        dest = input_dir / file_name
+        if rows:
+            with open(dest, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+                writer.writeheader()
+                writer.writerows(rows)
+        else:
+            dest.touch()
+        return f"input/{file_name}"
+
+
 def _prepare_run(
     config: dict,
     config_name: str,
@@ -129,7 +271,12 @@ def _prepare_run(
 ) -> tuple[Path, Path, Path]:
     """
     Write config and sample data to a temp dir. Returns (temp_dir, config_path, base_path).
-    Config is modified so Inputs point to temp/input/NAME.csv and Outputs to temp/output/NAME.
+
+    Inputs are written in the format declared in the config (FIXED → fixed-width
+    text, CSV/DELIMITED → CSV, PARQUET → parquet directory).  Outputs keep their
+    configured format and target_file_name — only the path is redirected to the
+    temp directory.  This mirrors exactly what a production run would do, so the
+    downloaded config JSON can be run unmodified in the dataflow-engine project.
     """
     temp_dir = Path(tempfile.mkdtemp(prefix="parser_test_"))
     input_dir = temp_dir / "input"
@@ -141,41 +288,169 @@ def _prepare_run(
     inputs = cfg.get("Inputs") or cfg.get("inputs") or {}
     outputs = cfg.get("Outputs") or cfg.get("outputs") or {}
 
-    if sample_data:
-        for name, rows in sample_data.items():
-            path = input_dir / f"{name}.csv"
-            if rows:
-                with open(path, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-                    writer.writeheader()
-                    writer.writerows(rows)
-            else:
-                path.touch()
-            inp_cfg = inputs.get(name)
-            if isinstance(inp_cfg, dict):
-                inp_cfg["path"] = f"input/{name}.csv"
-                inp_cfg["format"] = "csv"
-    else:
-        sample = generate_sample_data(cfg, num_rows=num_sample_rows)
-        for name, rows in sample.items():
-            path = input_dir / f"{name}.csv"
-            if rows:
-                with open(path, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-                    writer.writeheader()
-                    writer.writerows(rows)
-            else:
-                path.touch()
-            inp_cfg = inputs.get(name)
-            if isinstance(inp_cfg, dict):
-                inp_cfg["path"] = f"input/{name}.csv"
-                inp_cfg["format"] = "csv"
+    data_by_name = sample_data if sample_data else generate_sample_data(cfg, num_rows=num_sample_rows)
+
+    # ── Pre-scan validate steps for record_count_check ───────────────────────
+    # When record_count_check is enabled, the trailer field must contain the
+    # INCLUSIVE total record count (header rows + data rows + trailer rows),
+    # because that is what production mainframe files carry and what the
+    # engine subtracts header_count/trailer_count from before comparing.
+    # Build a mapping of input_name -> {field_name: inclusive_count} so the
+    # correct value is written into the trailer line of every FIXED test file.
+    _trailer_inject: dict[str, dict] = {}
+    trans_steps = (cfg.get("Transformations") or cfg.get("transformations") or {}).get("steps") or []
+    _all_inputs_cfg = cfg.get("Inputs") or cfg.get("inputs") or {}
+    for _vstep in trans_steps:
+        if not isinstance(_vstep, dict) or _vstep.get("type") != "validate":
+            continue
+        _vlogic = _vstep.get("logic") or {}
+        if not _vlogic.get("record_count_check"):
+            continue
+        _rc_field = (_vlogic.get("record_count_trailer_field") or "").strip()
+        if not _rc_field:
+            continue
+        for _src in (_vstep.get("source_inputs") or []):
+            _row_count = len(data_by_name.get(_src) or [])
+            # Look up the input config for this source to get header/trailer counts.
+            _inp_cfg = _all_inputs_cfg.get(_src) or {}
+            if not _inp_cfg:
+                # Case-insensitive fallback
+                for _k, _v in _all_inputs_cfg.items():
+                    if _k.upper() == _src.upper():
+                        _inp_cfg = _v
+                        break
+            _hdr_cnt = int(_inp_cfg.get("header_count") or 0)
+            _trl_cnt = int(_inp_cfg.get("trailer_count") or 0)
+            # Trailer field holds the inclusive total: header + data + trailer.
+            # The engine subtracts header_count + trailer_count before comparing
+            # to the actual DataFrame row count, so we mirror that here.
+            _total_count = _row_count + _hdr_cnt + _trl_cnt
+            if _src not in _trailer_inject:
+                _trailer_inject[_src] = {}
+            # Store under all hyphen/underscore variants so the runner can
+            # always find it regardless of name normalisation.
+            _trailer_inject[_src][_rc_field] = str(_total_count)
+            _trailer_inject[_src][_rc_field.replace("-", "_")] = str(_total_count)
+            _trailer_inject[_src][_rc_field.replace("_", "-")] = str(_total_count)
+    # ── End pre-scan ─────────────────────────────────────────────────────────
+
+    for name, rows in data_by_name.items():
+        inp_cfg = inputs.get(name)
+        if not isinstance(inp_cfg, dict):
+            continue
+        rel_path = _write_input_file(name, rows, inp_cfg, input_dir,
+                                     trailer_data=_trailer_inject.get(name))
+        # Use the legacy "path" key — get_input_path() falls through to this when
+        # source_path / source_file_name / dataset_name are all empty.
+        inp_cfg["path"] = rel_path
+        inp_cfg["source_path"] = ""
+        inp_cfg["source_file_name"] = ""
+        inp_cfg["dataset_name"] = ""
+        # Keep format, delimiter_char, fields, record_length etc. unchanged
 
     for name in outputs:
         out_cfg = outputs.get(name)
         if isinstance(out_cfg, dict):
+            # Redirect path to temp dir; everything else (format, target_file_name,
+            # delimiter_char, record_length, fields…) stays exactly as configured.
             out_cfg["path"] = f"output/{name}"
-            out_cfg["format"] = "parquet"
+            out_cfg["source_path"] = ""
+            out_cfg["source_file_name"] = ""
+            out_cfg["dataset_name"] = ""
+
+    # ── Redirect validate-step side-effect paths to the temp dir ───────────────
+    # Without this, validated_path / error_path / ctrl_output_path point at the
+    # real production S3/local directories and the test will read/write actual data.
+    validate_dir = temp_dir / "validated"
+    error_dir    = temp_dir / "errors"
+    ctrl_dir     = temp_dir / "ctrl"
+    validate_dir.mkdir(exist_ok=True)
+    error_dir.mkdir(exist_ok=True)
+    ctrl_dir.mkdir(exist_ok=True)
+
+    trans = cfg.get("Transformations") or cfg.get("transformations") or {}
+    for step in trans.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        if step.get("type") != "validate":
+            continue
+        logic = step.get("logic")
+        if not isinstance(logic, dict):
+            continue
+        step_id = step.get("id") or "validate"
+        # Always redirect — use sub-directories named after the step so multiple
+        # validate steps don't overwrite each other.
+        logic["validated_path"] = str(validate_dir / step_id)
+        logic["error_path"]     = str(error_dir    / step_id)
+        # Clear v2 schema fields so get_validate_paths() falls through to legacy
+        logic["dataset_name"] = ""
+        logic["error_dataset_name"] = ""
+        if logic.get("ctrl_file_create"):
+            logic["ctrl_output_path"] = str(ctrl_dir / step_id)
+        # Clear frequency so the engine does NOT apply DAILY/date-based partitioning
+        # to ctrl_output_path during test runs.  Without this, transformations.py calls
+        # _build_partitioned_path(ctrl_path, "", "DAILY", "") and writes the ctrl file
+        # to  ctrl/<step_id>/DAILY/<YYYYMMDD>/  instead of directly to ctrl/<step_id>/,
+        # making _read_ctrl_outputs unable to find it with a simple directory scan.
+        # Clearing frequency here is test-only isolation — it does NOT affect any data
+        # transformation logic (the validate step's data processing is unchanged).
+        logic["frequency"] = ""
+        # Clear any last-run-file paths that may reference production storage;
+        # redirect to temp dir so the test environment is fully isolated.
+        lr_temp = temp_dir / "last_run"
+        logic["last_run_file_path"] = str(lr_temp)
+        # Disable frequency/date partitioning for test runs so the validate step
+        # looks for the file at the flat lr_temp path (e.g. temp/last_run/<file>)
+        # instead of a date-partitioned subdirectory (temp/last_run/DAILY/<date>/<file>)
+        # that would never exist in the temp dir.
+        logic["last_run_frequency"] = ""
+        logic["partition_column"] = ""
+        # Also clear the previous_day_* keys so the production S3 path and
+        # frequency cannot leak back into the anticipated-path calculation and
+        # cause Spark to attempt a remote S3/HDFS read during a local test run.
+        # With previous_day_file_path cleared, the condition
+        #   `if last_run_check and _prev_day_path:` (transformations.py)
+        # is False and the entire previous-day header-date check is bypassed,
+        # which is correct behaviour for a local test run.
+        logic["previous_day_file_path"] = ""
+        logic["previous_day_file_name"] = ""
+        logic["previous_day_frequency"] = ""
+        # Auto-derive last_run_file_name from the source input's dataset_name
+        # when previous_day_check is enabled (same logic the engine uses at
+        # runtime, but we need it here for the test copy step).
+        lr_file_name = logic.get("last_run_file_name") or ""
+        if (logic.get("last_run_check") or logic.get("previous_day_check")) and not lr_file_name:
+            # Find the source input config to derive the file name
+            src_inputs = step.get("source_inputs") or []
+            inputs_cfg = cfg.get("Inputs") or cfg.get("inputs") or {}
+            for src_name in src_inputs:
+                src_cfg = inputs_cfg.get(src_name, {})
+                if not src_cfg:
+                    # Case-insensitive lookup
+                    for k, v in inputs_cfg.items():
+                        if k.upper() == src_name.upper():
+                            src_cfg = v
+                            break
+                if src_cfg:
+                    lr_file_name = src_cfg.get("dataset_name") or src_cfg.get("source_file_name") or ""
+                    break
+        if logic.get("last_run_check") or logic.get("previous_day_check"):
+            # Try to copy user-uploaded file; returns actual filename used
+            actual_name = _copy_last_run_file(base_path, config_name, step_id, lr_temp, lr_file_name)
+            # Use the actual copied filename if copy succeeded
+            if actual_name:
+                lr_file_name = actual_name
+            # If still no name, use a default
+            if not lr_file_name:
+                lr_file_name = "last_run_placeholder.dat"
+            logic["last_run_file_name"] = lr_file_name
+            # If no user-uploaded file was found, create a small placeholder so the
+            # last_run_check passes in test mode (the file simply needs to exist).
+            lr_dest = lr_temp / lr_file_name
+            if not lr_dest.exists():
+                lr_temp.mkdir(parents=True, exist_ok=True)
+                lr_dest.write_text("# placeholder for test run\n")
+    # ── End test-mode path isolation ───────────────────────────────────────────
 
     config_path = temp_dir / "config.json"
     with open(config_path, "w", encoding="utf-8") as f:
@@ -183,31 +458,270 @@ def _prepare_run(
     return temp_dir, config_path, temp_dir
 
 
+def _parse_fixed_output(text: str, fields: list, header_count: int, trailer_count: int) -> list[dict]:
+    """
+    Parse fixed-width output text into a list of row dicts, skipping header/trailer
+    lines and using only DATA fields (record_type != HEADER/TRAILER).
+
+    The dataflow-engine runner._write_fixed_width writes output by CONCATENATING
+    fields in declaration order, each padded to its ``length``.  The ``start``
+    positions in the config describe the source layout (not the output layout),
+    so we ignore them and instead compute positions as cumulative field lengths —
+    exactly matching the concatenation order the runner uses.
+    """
+    data_fields = [
+        f for f in fields
+        if (f.get("record_type") or "DATA").upper() not in ("HEADER", "TRAILER")
+    ]
+    lines = [ln.rstrip("\r") for ln in text.splitlines() if ln.rstrip("\r")]
+    if header_count:
+        lines = lines[header_count:]
+    if trailer_count and trailer_count <= len(lines):
+        lines = lines[:-trailer_count]
+    if not lines or not data_fields:
+        return []
+
+    # Pre-compute (pos, length) for each field using cumulative lengths
+    field_slices: list[tuple[str, int, int]] = []
+    pos = 0
+    for f in data_fields:
+        fname = f.get("name") or ""
+        length = int(f.get("length") or 1)
+        field_slices.append((fname, pos, length))
+        pos += length
+
+    rows = []
+    for line in lines:
+        row: dict = {}
+        for fname, start, length in field_slices:
+            row[fname] = line[start: start + length].strip()
+        rows.append(row)
+    return rows
+
+
 def _read_outputs(temp_dir: Path, config: dict) -> dict[str, list[dict]]:
-    """Read output parquet/csv from temp_dir/output into dict of name -> list of rows."""
+    """
+    Read actual output files from temp_dir/output/ in each output's configured format.
+
+    The test module uses the SAME file format as declared in the dataflow config
+    (FIXED → fixed-width text, CSV/DELIMITED → CSV, PARQUET → parquet parts).
+    Only the file path differs from a production run; all format/schema handling
+    is identical to what the dataflow-engine would do.
+    """
     output_dir = temp_dir / "output"
     outputs_cfg = config.get("Outputs") or config.get("outputs") or {}
     result: dict[str, list[dict]] = {}
-    for name in outputs_cfg:
-        # Spark writes parquet to a directory (e.g. output/SUMCOPY/)
-        parquet_dir = output_dir / name
-        csv_path = output_dir / f"{name}.csv"
-        if parquet_dir.exists() and parquet_dir.is_dir():
-            try:
-                import pandas as pd
-                df = pd.read_parquet(parquet_dir)
-                result[name] = df.to_dict(orient="records")
-            except Exception:
-                result[name] = []
-        elif csv_path.exists():
-            try:
-                with open(csv_path, newline="", encoding="utf-8") as f:
-                    reader = csv.DictReader(f)
-                    result[name] = list(reader)
-            except Exception:
-                result[name] = []
-        else:
+
+    for name, out_cfg in outputs_cfg.items():
+        if not isinstance(out_cfg, dict):
             result[name] = []
+            continue
+
+        fmt = (out_cfg.get("format") or "parquet").strip().upper()
+        out_dir = output_dir / name
+        hdr_skip = int(out_cfg.get("header_count") or 0)
+        trl_skip = int(out_cfg.get("trailer_count") or 0)
+        rows: list[dict] = []
+
+        if fmt == "FIXED":
+            # Find the output file: named file first, then spark text part files
+            target_name = (out_cfg.get("target_file_name") or "").strip()
+            text = ""
+            if target_name and out_dir.is_dir() and (out_dir / target_name).exists():
+                text = (out_dir / target_name).read_text(encoding="utf-8", errors="replace")
+            elif out_dir.is_dir():
+                # Fallback: spark part files (when target_file_name was not set)
+                part_files = sorted(
+                    f for f in out_dir.rglob("part-*")
+                    if f.is_file() and not f.name.endswith(".crc")
+                )
+                if part_files:
+                    text = "\n".join(
+                        f.read_text(encoding="utf-8", errors="replace") for f in part_files
+                    )
+            if text:
+                rows = _parse_fixed_output(
+                    text, out_cfg.get("fields") or [], hdr_skip, trl_skip
+                )
+
+        elif fmt in ("CSV", "DELIMITED"):
+            import glob as _glob
+            delimiter = (out_cfg.get("delimiter_char") or out_cfg.get("delimiter") or ",")
+            # Look for a single named file, then spark CSV part files
+            target_name = (out_cfg.get("target_file_name") or "").strip()
+            csv_text = ""
+            if target_name and out_dir.is_dir() and (out_dir / target_name).exists():
+                csv_text = (out_dir / target_name).read_text(encoding="utf-8", errors="replace")
+            elif out_dir.is_dir():
+                part_files = sorted(set(
+                    _glob.glob(str(out_dir / "part-*.csv"))
+                    + _glob.glob(str(out_dir / "**" / "part-*.csv"), recursive=True)
+                ))
+                if part_files:
+                    csv_text = "\n".join(
+                        Path(f).read_text(encoding="utf-8", errors="replace") for f in part_files
+                    )
+            if csv_text:
+                import io
+                reader = csv.DictReader(io.StringIO(csv_text), delimiter=delimiter)
+                rows = list(reader)
+                # Skip header/trailer text rows (delimiter-separated blank rows)
+                if hdr_skip:
+                    rows = rows[hdr_skip:]
+                if trl_skip and trl_skip <= len(rows):
+                    rows = rows[:-trl_skip]
+
+        else:  # PARQUET (default)
+            import glob as _glob
+            if out_dir.exists() and out_dir.is_dir():
+                try:
+                    import pandas as pd
+                    part_files = sorted(set(
+                        _glob.glob(str(out_dir / "part-*.parquet"))
+                        + _glob.glob(str(out_dir / "**" / "part-*.parquet"), recursive=True)
+                    ))
+                    if part_files:
+                        df = pd.concat(
+                            [pd.read_parquet(f) for f in part_files], ignore_index=True
+                        )
+                    else:
+                        df = pd.read_parquet(out_dir)
+                    rows = df.to_dict(orient="records")
+                except Exception:
+                    rows = []
+
+        result[name] = rows
+    return result
+
+
+def _parse_ctrl_output(text: str, ctrl_file_fields: list, ctrl_include_header: bool) -> list[dict]:
+    """
+    Parse a fixed-width control file into column-keyed row dicts.
+
+    _create_ctrl_file writes fields concatenated in declaration order, each padded
+    to its length (default 15 for numeric, 20 for string when length=0).  This
+    mirrors the exact logic in transformations._create_ctrl_file so the reader
+    always matches the writer.
+
+    When ctrl_include_header is True the first line is the field-name header row
+    written by _create_ctrl_file; it is skipped before parsing data rows.
+
+    If no ctrl_file_fields are provided the raw lines are returned as {"value": line}.
+    """
+    _DEFAULT_NUM_LEN = 15
+    _DEFAULT_STR_LEN = 20
+
+    lines = [ln.rstrip("\r") for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        return []
+
+    if not ctrl_file_fields:
+        # No schema — return raw lines for backward compatibility.
+        if ctrl_include_header and lines:
+            lines = lines[1:]
+        return [{"value": line} for line in lines]
+
+    # Build (name, pos, length, is_numeric) slices using same defaults as _create_ctrl_file
+    field_slices: list[tuple[str, int, int, bool]] = []
+    pos = 0
+    for f in ctrl_file_fields:
+        name = (f.get("name") or "").strip()
+        if not name:
+            continue
+        ftype = (f.get("type") or "STRING").upper()
+        is_numeric = ftype in ("LONG", "INT", "INTEGER", "BIGINT")
+        length = int(f.get("length") or 0)
+        if not length:
+            length = _DEFAULT_NUM_LEN if is_numeric else _DEFAULT_STR_LEN
+        field_slices.append((name, pos, length, is_numeric))
+        pos += length
+
+    # If ctrl_include_header=True, detect and remove the header line by content
+    # rather than blindly skipping line[0] (Spark union ordering is not guaranteed).
+    # The header line has the first field name left-justified at position 0.
+    if ctrl_include_header and field_slices:
+        first_fname, first_start, first_len, _ = field_slices[0]
+        header_sentinel = first_fname[:first_len].ljust(first_len)
+        lines = [
+            l for l in lines
+            if l[first_start: first_start + first_len] != header_sentinel
+        ]
+
+    if not lines:
+        return []
+
+    rows = []
+    for line in lines:
+        row: dict = {}
+        for fname, start, length, is_numeric in field_slices:
+            raw = line[start: start + length].strip()
+            # Normalize numeric: remove leading zeros so "000000000000005" == "5"
+            if is_numeric and raw.lstrip("0"):
+                raw = raw.lstrip("0")
+            elif is_numeric and raw == "0" * len(raw) and raw:
+                raw = "0"
+            row[fname] = raw
+        rows.append(row)
+    return rows
+
+
+def _read_ctrl_outputs(temp_dir: Path, config: dict) -> dict[str, list[dict]]:
+    """
+    Read control file outputs from temp_dir/ctrl/<step_id>/ for every validate
+    step that has ctrl_file_create enabled.  Returns dict keyed by step_id.
+
+    Each row is returned as a column-keyed dict matching the ctrl_file_fields
+    schema (same pattern as output dataset rows), so the reconciliation tab can
+    compare generated vs expected using matching column names.
+    """
+    ctrl_base = temp_dir / "ctrl"
+    if not ctrl_base.exists():
+        return {}
+
+    trans = config.get("Transformations") or config.get("transformations") or {}
+    result: dict[str, list[dict]] = {}
+    for step in trans.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        if step.get("type") != "validate":
+            continue
+        logic = step.get("logic") or {}
+        if not logic.get("ctrl_file_create"):
+            continue
+        ctrl_include_header = bool(logic.get("ctrl_include_header", False))
+        ctrl_file_fields = logic.get("ctrl_file_fields") or []
+        step_id = step.get("id") or "validate"
+        ctrl_dir = ctrl_base / step_id
+        if not ctrl_dir.exists():
+            result[step_id] = []
+            continue
+
+        content = ""
+        # _create_ctrl_file writes to ctrl/<step_id>/<frequency>/<date>/<name>.CTL
+        # Priority 1: named files (non-Spark)
+        named_files = sorted(
+            f for f in ctrl_dir.rglob("*")
+            if f.is_file()
+            and not f.name.startswith(".")
+            and f.suffix not in (".crc",)
+            and f.name != "_SUCCESS"
+            and not f.name.startswith("part-")
+        )
+        # Priority 2: Spark part files (fallback when ctrl_file_name was empty)
+        part_files = sorted(
+            f for f in ctrl_dir.rglob("part-*")
+            if f.is_file() and f.suffix not in (".crc",)
+        )
+        for ctrl_file in named_files + [f for f in part_files if f not in named_files]:
+            try:
+                with open(ctrl_file, newline="", encoding="utf-8") as fh:
+                    content = fh.read()
+            except Exception:
+                content = ""
+            if content.strip():
+                break
+
+        result[step_id] = _parse_ctrl_output(content, ctrl_file_fields, ctrl_include_header)
     return result
 
 
@@ -257,7 +771,8 @@ def run_dataflow_test(
 
     try:
         proc = subprocess.run(
-            [python_exe, str(run_script), str(config_path), "--base-path", str(run_base), "--no-cobrix"],
+            [python_exe, str(run_script), str(config_path), "--base-path", str(run_base), "--no-cobrix",
+             "--settings", str(base_path / "static" / "config" / "settings.json")],
             cwd=str(engine_dir),
             capture_output=True,
             text=True,
@@ -268,14 +783,19 @@ def run_dataflow_test(
         outputs = {}
         for k, rows in outputs_raw.items():
             outputs[k] = [{key: _to_native(v) for key, v in row.items()} for row in rows]
+        ctrl_raw = _read_ctrl_outputs(temp_dir, config)
+        ctrl_outputs = {}
+        for k, rows in ctrl_raw.items():
+            ctrl_outputs[k] = [{key: _to_native(v) for key, v in row.items()} for row in rows]
 
         if proc.returncode != 0:
             return {
                 "error": proc.stderr.strip() or f"Process exited with code {proc.returncode}",
                 "outputs": outputs,
+                "ctrl_outputs": ctrl_outputs,
                 "logs": logs,
             }
-        return {"error": None, "outputs": outputs, "logs": logs}
+        return {"error": None, "outputs": outputs, "ctrl_outputs": ctrl_outputs, "logs": logs}
     except subprocess.TimeoutExpired:
         return {"error": "Dataflow run timed out (300s).", "outputs": {}, "logs": ""}
     except Exception as e:
@@ -304,6 +824,7 @@ def run_dataflow_test_stream(
         yield "RESULT: " + json.dumps({
             "error": "Dataflow engine not found. Set DATAFLOW_ENGINE_DIR to the dataflow-engine project path.",
             "outputs": {},
+            "ctrl_outputs": {},
         }) + "\n"
         return
 
@@ -313,13 +834,13 @@ def run_dataflow_test_stream(
         )
     except Exception as e:
         yield "LOG: " + str(e) + "\n"
-        yield "RESULT: " + json.dumps({"error": str(e), "outputs": {}}) + "\n"
+        yield "RESULT: " + json.dumps({"error": str(e), "outputs": {}, "ctrl_outputs": {}}) + "\n"
         return
 
     run_script = engine_dir / "run_dataflow.py"
     if not run_script.exists():
         yield "LOG: run_dataflow.py not found\n"
-        yield "RESULT: " + json.dumps({"error": "run_dataflow.py not found", "outputs": {}}) + "\n"
+        yield "RESULT: " + json.dumps({"error": "run_dataflow.py not found", "outputs": {}, "ctrl_outputs": {}}) + "\n"
         return
 
     python_exe = _find_python_with_pyspark(engine_dir)
@@ -327,7 +848,8 @@ def run_dataflow_test_stream(
     proc = None
     try:
         proc = subprocess.Popen(
-            [python_exe, str(run_script), str(config_path), "--base-path", str(run_base), "--no-cobrix"],
+            [python_exe, str(run_script), str(config_path), "--base-path", str(run_base), "--no-cobrix",
+             "--settings", str(base_path / "static" / "config" / "settings.json")],
             cwd=str(engine_dir),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -336,22 +858,31 @@ def run_dataflow_test_stream(
         )
         if proc.stdout:
             for line in proc.stdout:
+                # Suppress noisy cloudpickle/PySpark serialisation diagnostics
+                # ("when serializing function/tuple/object") — internal pickle
+                # tracing messages that are not useful to the user.
+                if "when serializing" in line:
+                    continue
                 yield "LOG: " + line
         proc.wait(timeout=300)
         outputs_raw = _read_outputs(temp_dir, config)
         outputs = {}
         for k, rows in outputs_raw.items():
             outputs[k] = [{key: _to_native(v) for key, v in row.items()} for row in rows]
+        ctrl_raw = _read_ctrl_outputs(temp_dir, config)
+        ctrl_outputs = {}
+        for k, rows in ctrl_raw.items():
+            ctrl_outputs[k] = [{key: _to_native(v) for key, v in row.items()} for row in rows]
         err = None
         if proc.returncode != 0:
             err = f"Process exited with code {proc.returncode}"
-        yield "RESULT: " + json.dumps({"error": err, "outputs": outputs}) + "\n"
+        yield "RESULT: " + json.dumps({"error": err, "outputs": outputs, "ctrl_outputs": ctrl_outputs}) + "\n"
     except subprocess.TimeoutExpired:
         if proc:
             proc.kill()
-        yield "RESULT: " + json.dumps({"error": "Dataflow run timed out (300s).", "outputs": {}}) + "\n"
+        yield "RESULT: " + json.dumps({"error": "Dataflow run timed out (300s).", "outputs": {}, "ctrl_outputs": {}}) + "\n"
     except Exception as e:
-        yield "RESULT: " + json.dumps({"error": str(e), "outputs": {}}) + "\n"
+        yield "RESULT: " + json.dumps({"error": str(e), "outputs": {}, "ctrl_outputs": {}}) + "\n"
     finally:
         try:
             import shutil

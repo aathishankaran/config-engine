@@ -147,11 +147,11 @@ def _read_test_data_from_extracted_zip(
         for candidate in [name, dataset] if dataset else [name]:
             if not candidate:
                 continue
-            for ext in ("", ".csv", ".parquet"):
+            for ext in ("", ".csv", ".parquet", ".dat", ".txt", ".fixed"):
                 p = dir_path / f"{candidate}{ext}"
                 if p.exists() and p.is_file():
                     return p
-        for ext in (".csv", ".parquet", ""):
+        for ext in (".csv", ".parquet", ".dat", ".txt", ".fixed", ""):
             for f in dir_path.iterdir():
                 if not f.is_file():
                     continue
@@ -161,8 +161,31 @@ def _read_test_data_from_extracted_zip(
                     return f
         return None
 
-    def _read_dataset(path: Path) -> list[dict]:
+    def _read_dataset(path: Path, node_cfg: dict | None = None) -> list[dict]:
         try:
+            # Check if this is a FIXED format file based on config
+            fmt = ""
+            fields = []
+            if isinstance(node_cfg, dict):
+                fmt = (node_cfg.get("format") or "").strip().upper()
+                fields = node_cfg.get("fields") or []
+            if fmt == "FIXED" and fields:
+                text = path.read_text(encoding="utf-8", errors="replace")
+                rows = []
+                for line in text.splitlines():
+                    line = line.rstrip("\r")
+                    if not line:
+                        continue
+                    if len(rows) >= MAX_UPLOADED_ROWS:
+                        break
+                    row = {}
+                    for f in fields:
+                        fname = f.get("name") or ""
+                        start = int(f.get("start") or 1) - 1  # 1-based → 0-based
+                        length = int(f.get("length") or 1)
+                        row[fname] = line[start: start + length].strip()
+                    rows.append(row)
+                return rows
             if path.suffix.lower() == ".parquet":
                 try:
                     import pandas as pd
@@ -199,7 +222,8 @@ def _read_test_data_from_extracted_zip(
             dataset = _get_dataset(inputs_cfg, name)
             p = _find_file(inp_root, name, dataset)
             if p:
-                input_data[name] = _read_dataset(p)
+                ncfg = inputs_cfg.get(name) if isinstance(inputs_cfg.get(name), dict) else None
+                input_data[name] = _read_dataset(p, ncfg)
                 LOG.info("Loaded input %s: %d rows from %s", name, len(input_data[name]), p.name)
 
     expected_output: dict[str, list[dict]] = {}
@@ -208,7 +232,8 @@ def _read_test_data_from_extracted_zip(
             dataset = _get_dataset(outputs_cfg, name)
             p = _find_file(out_root, name, dataset)
             if p:
-                expected_output[name] = _read_dataset(p)
+                ncfg = outputs_cfg.get(name) if isinstance(outputs_cfg.get(name), dict) else None
+                expected_output[name] = _read_dataset(p, ncfg)
                 LOG.info("Loaded expected output %s: %d rows from %s", name, len(expected_output[name]), p.name)
 
     return input_data, expected_output
