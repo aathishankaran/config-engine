@@ -214,12 +214,206 @@
       "name": "BANG-BATCH-IMPORT-EFS-OUTPUT-02",
       "format": "FIXED",
       "write_mode": "OVERWRITE",
+      "source_path": "/tmp/efs-test/output/BANG-BATCH-IMPORT/",
       "target_storage": "efs",
       "source_inputs": [
         "BANG-BATCH-IMPORT-DATA-VALIDATION-OUT-01"
       ],
-      "header_count": 0,
-      "trailer_count": 0
+      "header_count": 1,
+      "trailer_count": 1,
+      "fields": [
+        {
+          "name": "OUT-DAT-REC-TYPE",
+          "type": "STRING",
+          "start": 141,
+          "length": 1,
+          "nullable": true
+        },
+        {
+          "name": "OUT-DAT-TXN-ID",
+          "type": "STRING",
+          "start": 142,
+          "length": 10,
+          "nullable": true
+        },
+        {
+          "name": "OUT-DAT-TXN-DATE",
+          "type": "STRING",
+          "start": 152,
+          "length": 8,
+          "nullable": true,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "OUT-DAT-VAL-DATE",
+          "type": "STRING",
+          "start": 160,
+          "length": 8,
+          "nullable": true,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "OUT-DAT-TXN-TYPE",
+          "type": "STRING",
+          "start": 168,
+          "length": 3,
+          "nullable": true
+        },
+        {
+          "name": "OUT-DAT-ACCT-NUM",
+          "type": "STRING",
+          "start": 171,
+          "length": 12,
+          "nullable": true
+        },
+        {
+          "name": "OUT-DAT-AMOUNT",
+          "type": "LONG",
+          "start": 183,
+          "length": 12,
+          "nullable": true
+        },
+        {
+          "name": "OUT-DAT-CURRENCY",
+          "type": "STRING",
+          "start": 195,
+          "length": 3,
+          "nullable": true
+        },
+        {
+          "name": "OUT-DAT-EXCH-RATE",
+          "type": "LONG",
+          "start": 198,
+          "length": 10,
+          "nullable": true
+        },
+        {
+          "name": "OUT-DAT-STATUS",
+          "type": "STRING",
+          "start": 208,
+          "length": 1,
+          "nullable": true
+        },
+        {
+          "name": "OUT-DAT-BRANCH-CD",
+          "type": "STRING",
+          "start": 209,
+          "length": 5,
+          "nullable": true
+        },
+        {
+          "name": "OUT-DAT-DESC",
+          "type": "STRING",
+          "start": 214,
+          "length": 30,
+          "nullable": true
+        },
+        {
+          "name": "OUT-DAT-MEMO",
+          "type": "STRING",
+          "start": 244,
+          "length": 15,
+          "nullable": true
+        },
+        {
+          "name": "OUT-DAT-FILLER-1",
+          "type": "STRING",
+          "start": 259,
+          "length": 2,
+          "nullable": true
+        }
+      ],
+      "output_columns": [
+        "OUT-DAT-REC-TYPE",
+        "OUT-DAT-TXN-ID",
+        "OUT-DAT-TXN-DATE",
+        "OUT-DAT-VAL-DATE",
+        "OUT-DAT-TXN-TYPE",
+        "OUT-DAT-ACCT-NUM",
+        "OUT-DAT-AMOUNT",
+        "OUT-DAT-CURRENCY",
+        "OUT-DAT-EXCH-RATE",
+        "OUT-DAT-STATUS",
+        "OUT-DAT-BRANCH-CD",
+        "OUT-DAT-DESC",
+        "OUT-DAT-MEMO",
+        "OUT-DAT-FILLER-1"
+      ],
+      "header_fields": [
+        {
+          "name": "OUT-HDR-REC-TYPE",
+          "type": "STRING",
+          "length": 1
+        },
+        {
+          "name": "OUT-HDR-FILE-DATE",
+          "type": "DATE",
+          "length": 8
+        },
+        {
+          "name": "OUT-HDR-SEQ-NUM",
+          "type": "LONG",
+          "length": 6
+        },
+        {
+          "name": "OUT-HDR-SRC-ID",
+          "type": "STRING",
+          "length": 10
+        },
+        {
+          "name": "OUT-HDR-FILE-NAME",
+          "type": "STRING",
+          "length": 20
+        },
+        {
+          "name": "OUT-HDR-FILLER",
+          "type": "STRING",
+          "length": 95
+        }
+      ],
+      "trailer_fields": [
+        {
+          "name": "OUT-TRL-REC-TYPE",
+          "type": "STRING",
+          "length": 1
+        },
+        {
+          "name": "OUT-TRL-REC-COUNT",
+          "type": "LONG",
+          "length": 8
+        },
+        {
+          "name": "OUT-TRL-TOTAL-AMT",
+          "type": "DECIMAL",
+          "length": 16
+        },
+        {
+          "name": "OUT-TRL-HASH-TOTAL",
+          "type": "LONG",
+          "length": 10
+        },
+        {
+          "name": "OUT-TRL-ERR-COUNT",
+          "type": "LONG",
+          "length": 8
+        },
+        {
+          "name": "OUT-TRL-VALID-CNT",
+          "type": "LONG",
+          "length": 8
+        },
+        {
+          "name": "OUT-TRL-INVALID-CNT",
+          "type": "LONG",
+          "length": 8
+        },
+        {
+          "name": "OUT-TRL-FILLER",
+          "type": "STRING",
+          "length": 81
+        }
+      ],
+      "_schema_file": "BANK-BATCH-OUTPUT.CPY"
     },
     "BANG-BATCH-IMPORT-OUTPUT-01": {
       "name": "BANG-BATCH-IMPORT-OUTPUT-01",

@@ -289,6 +289,11 @@
       "test_file": "BANK-BATCH-CTRL.DAT",
       "rows": 0,
       "type": "expected_output"
+    },
+    "BANG-BATCH-IMPORT-EFS-OUTPUT-02": {
+      "copybook_file": "BANK-BATCH-OUTPUT.CPY",
+      "fields": 28,
+      "type": "output"
     }
   },
   "last_run_files": {
