@@ -95,8 +95,8 @@ function updateLayoutToggle(mode) {
 function autoLayout() {
   var snap = DS.fn.snap;
   var inputNodes  = S.nodes.filter(function(n){ return n.type === 'input'; });
-  var outputNodes = S.nodes.filter(function(n){ return n.type === 'output'; });
-  var stepNodes   = S.nodes.filter(function(n){ return n.type !== 'input' && n.type !== 'output'; });
+  var outputNodes = S.nodes.filter(function(n){ return n.type === 'output' || n.type === 'efs_write'; });
+  var stepNodes   = S.nodes.filter(function(n){ return n.type !== 'input' && n.type !== 'output' && n.type !== 'efs_write'; });
 
   var rowGap   = C.NODE_H + 60;
   var startX   = 60;

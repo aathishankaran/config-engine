@@ -360,7 +360,7 @@ function silentApplyProps(node) {
     var gc = function(id) { var $el = $('#' + id); return $el.length ? $el[0].checked : false; };
     var formExists = false;
     if (node.type === 'input')       formExists = !!$('#pi-name').length;
-    else if (node.type === 'output') formExists = !!$('#po-name').length;
+    else if (node.type === 'output' || node.type === 'efs_write') formExists = !!$('#po-name').length;
     else if (node.type === 'select') formExists = !!$('#ps-id').length;
     else if (node.type === 'filter') formExists = !!$('#pf-id').length;
     else if (node.type === 'join')   formExists = !!$('#pj-id').length;
@@ -387,7 +387,7 @@ function silentApplyProps(node) {
         var $elOld = $('[data-node-id="' + oldName + '"]');
         if ($elOld.length) $elOld.attr('data-node-id', node.id);
       }
-    } else if (node.type === 'output') {
+    } else if (node.type === 'output' || node.type === 'efs_write') {
       var oldNameO = node.name;
       var newNameO = g('po-name');
       if (newNameO === null) return;
@@ -787,7 +787,7 @@ function loadConfig(config) {
         if (srcNode) S.connections.push({ id: 'conn_' + (S._connCounter++), from: srcNode.id, to: n.id });
       });
     } else {
-      var srcStep = S.nodes.find(function(nd) { return nd.output_alias === name && nd.type !== 'output'; });
+      var srcStep = S.nodes.find(function(nd) { return nd.output_alias === name && nd.type !== 'output' && nd.type !== 'efs_write'; });
       if (srcStep) {
         S.connections.push({ id: 'conn_' + (S._connCounter++), from: srcStep.id, to: n.id });
         n.source_inputs = [srcStep.output_alias || srcStep.step_id || srcStep.id];
