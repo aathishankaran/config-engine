@@ -1,0 +1,326 @@
+{
+  "Inputs": {
+    "HOGAN-TEST-FILE": {
+      "name": "HOGAN-TEST-FILE",
+      "format": "FIXED",
+      "source_path": "file:///opt/data/raw/hogan/",
+      "source_file_name": "USB.HOGON.TRAN.DAT",
+      "partition_col": "current_date()",
+      "frequency": "DAILY",
+      "header_count": 0,
+      "trailer_count": 0,
+      "fields": [
+        {
+          "name": "TXN-ID",
+          "type": "string",
+          "start": 1,
+          "length": 10,
+          "nullable": true
+        },
+        {
+          "name": "TXN-DATE",
+          "type": "long",
+          "start": 11,
+          "length": 8,
+          "nullable": true
+        },
+        {
+          "name": "TXN-TYPE",
+          "type": "string",
+          "start": 19,
+          "length": 3,
+          "nullable": true
+        },
+        {
+          "name": "TXN-ACCT-NBR",
+          "type": "string",
+          "start": 22,
+          "length": 12,
+          "nullable": true
+        },
+        {
+          "name": "TXN-AMOUNT",
+          "type": "double",
+          "start": 34,
+          "length": 12,
+          "nullable": true
+        },
+        {
+          "name": "TXN-CURRENCY",
+          "type": "string",
+          "start": 46,
+          "length": 3,
+          "nullable": true
+        },
+        {
+          "name": "TXN-DESC",
+          "type": "string",
+          "start": 49,
+          "length": 30,
+          "nullable": true
+        },
+        {
+          "name": "TXN-STATUS",
+          "type": "string",
+          "start": 79,
+          "length": 1,
+          "nullable": true
+        },
+        {
+          "name": "TXN-BRANCH-CODE",
+          "type": "string",
+          "start": 80,
+          "length": 5,
+          "nullable": true
+        }
+      ],
+      "_schema_file": "TXNREC.CPY",
+      "_test_file": "USB.HOGON.TRAN.DAT",
+      "_test_rows": 5
+    }
+  },
+  "Outputs": {
+    "Hogan_out": {
+      "name": "Hogan_out",
+      "format": "fixed",
+      "write_mode": "overwrite",
+      "source_path": "file:///opt/data/curated/hogan/",
+      "target_file_name": "USB.HOGON.TRAN.OUT.DAT",
+      "frequency": "DAILY",
+      "partition_col": "current_date()",
+      "source_inputs": [
+        "validate_out_1"
+      ],
+      "header_count": 0,
+      "trailer_count": 0,
+      "fields": [
+        {
+          "name": "TXN-ID",
+          "type": "string",
+          "start": 1,
+          "length": 10,
+          "nullable": true
+        },
+        {
+          "name": "TXN-DATE",
+          "type": "long",
+          "start": 11,
+          "length": 8,
+          "nullable": true
+        },
+        {
+          "name": "TXN-TYPE",
+          "type": "string",
+          "start": 19,
+          "length": 3,
+          "nullable": true
+        },
+        {
+          "name": "TXN-ACCT-NBR",
+          "type": "string",
+          "start": 22,
+          "length": 12,
+          "nullable": true
+        },
+        {
+          "name": "TXN-AMOUNT",
+          "type": "double",
+          "start": 34,
+          "length": 12,
+          "nullable": true
+        },
+        {
+          "name": "TXN-CURRENCY",
+          "type": "string",
+          "start": 46,
+          "length": 3,
+          "nullable": true
+        },
+        {
+          "name": "TXN-DESC",
+          "type": "string",
+          "start": 49,
+          "length": 30,
+          "nullable": true
+        },
+        {
+          "name": "TXN-STATUS",
+          "type": "string",
+          "start": 79,
+          "length": 1,
+          "nullable": true
+        },
+        {
+          "name": "TXN-BRANCH-CODE",
+          "type": "string",
+          "start": 80,
+          "length": 5,
+          "nullable": true
+        }
+      ],
+      "control_fields": [
+        {
+          "name": "COUNT-RECORDS",
+          "type": "long",
+          "nullable": true
+        },
+        {
+          "name": "EFFECTIVE-RECORD",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "AS-OF-DATE",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "SOURCE-CODE",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "SOURCE-ID",
+          "type": "string",
+          "nullable": true
+        }
+      ],
+      "output_columns": [
+        "TXN-ID",
+        "TXN-DATE",
+        "TXN-TYPE",
+        "TXN-ACCT-NBR",
+        "TXN-AMOUNT",
+        "TXN-CURRENCY",
+        "TXN-DESC",
+        "TXN-STATUS",
+        "TXN-BRANCH-CODE"
+      ],
+      "_schema_file": "TXNOUT.CPY",
+      "_test_file": "USB.HOGON.TRAN.OUT.DAT",
+      "_test_rows": 5
+    }
+  },
+  "Transformations": {
+    "description": "Built with Dataflow Studio",
+    "steps": [
+      {
+        "id": "validate_1",
+        "description": "",
+        "type": "validate",
+        "source_inputs": [
+          "HOGAN-TEST-FILE"
+        ],
+        "logic": {
+          "fail_mode": "ABORT",
+          "rules": [
+            {
+              "field": "TXN-ID",
+              "data_type": "TEXT",
+              "nullable": true,
+              "max_length": 10,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-DATE",
+              "data_type": "NUMBER",
+              "nullable": true,
+              "max_length": 8,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-TYPE",
+              "data_type": "TEXT",
+              "nullable": true,
+              "max_length": 3,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-ACCT-NBR",
+              "data_type": "TEXT",
+              "nullable": true,
+              "max_length": 12,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-AMOUNT",
+              "data_type": "NUMBER",
+              "nullable": true,
+              "max_length": 12,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-CURRENCY",
+              "data_type": "TEXT",
+              "nullable": true,
+              "max_length": 3,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-DESC",
+              "data_type": "TEXT",
+              "nullable": true,
+              "max_length": 30,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-STATUS",
+              "data_type": "TEXT",
+              "nullable": true,
+              "max_length": 1,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-BRANCH-CODE",
+              "data_type": "TEXT",
+              "nullable": true,
+              "max_length": 5,
+              "format": "ANY"
+            }
+          ],
+          "validated_path": "file:///opt/data/validated/hogan/",
+          "validated_file_name": "USB.HOGON.TRAN.VAL.DAT",
+          "error_path": "file:///opt/data/error/hogan/",
+          "error_file_name": "USB.HOGON.TRAN.ERR.DAT",
+          "frequency": "DAILY",
+          "path_partition_col": "current_date()",
+          "last_run_check": true,
+          "last_run_frequency": "DAILY",
+          "last_run_file_path": "file:///opt/data/curated/hogan/",
+          "last_run_file_name": "TXNPREV.DAT",
+          "partition_column": "date_sub(current_date(), 1)",
+          "ctrl_file_create": true,
+          "ctrl_file_name": "USB.HOGON.TRAN.CTL",
+          "ctrl_file_fields": [
+            {
+              "name": "COUNT-RECORDS",
+              "type": "LONG",
+              "expression": "count(*)"
+            },
+            {
+              "name": "EFFECTIVE-RECORD",
+              "type": "STRING",
+              "expression": "current_date()"
+            },
+            {
+              "name": "AS-OF-DATE",
+              "type": "STRING",
+              "expression": "current_date()"
+            },
+            {
+              "name": "SOURCE-CODE",
+              "type": "STRING",
+              "expression": "105"
+            },
+            {
+              "name": "SOURCE-ID",
+              "type": "STRING",
+              "expression": "105"
+            }
+          ]
+        },
+        "output_alias": "validate_out_1"
+      }
+    ]
+  }
+}

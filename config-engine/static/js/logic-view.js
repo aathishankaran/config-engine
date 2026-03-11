@@ -1,11 +1,10 @@
 /**
  * Logic view: buildLogicVisualHtml, buildIoSummaryHtml, showLogicPopup, renderSchemaTable.
- * Depends: utils.js
+ * Depends: utils.js, jQuery
  */
 (function (global) {
   global.CodeParser = global.CodeParser || {};
   var CP = global.CodeParser;
-  var $ = CP.$;
 
   function transformTagWithIcon(type) {
     if (type == null || type === '') return CP.tag('', 'view-tag-empty');
@@ -118,13 +117,13 @@
   var schemaColumnLabels = { name: 'Name', type: 'Type', start: 'Start', length: 'Length', precision: 'Precision', scale: 'Scale', nullable: 'Nullable', source: 'Source' };
 
   CP.renderSchemaTable = function (fields) {
-    var tableWrap = $('logic-view-io-schema-table');
-    var emptyEl = $('logic-view-io-schema-empty');
-    if (!tableWrap || !emptyEl) return;
+    var $tableWrap = $('#logic-view-io-schema-table');
+    var $emptyEl = $('#logic-view-io-schema-empty');
+    if (!$tableWrap.length || !$emptyEl.length) return;
     if (!fields || !Array.isArray(fields) || fields.length === 0) {
-      tableWrap.innerHTML = '';
-      tableWrap.classList.add('hidden');
-      emptyEl.classList.remove('hidden');
+      $tableWrap.html('');
+      $tableWrap.addClass('hidden');
+      $emptyEl.removeClass('hidden');
       return;
     }
     var keys = [];
@@ -149,79 +148,79 @@
       });
       return '<tr>' + cells.join('') + '</tr>';
     });
-    tableWrap.innerHTML = '<table><thead><tr>' + thead + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
-    tableWrap.classList.remove('hidden');
-    emptyEl.classList.add('hidden');
+    $tableWrap.html('<table><thead><tr>' + thead + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>');
+    $tableWrap.removeClass('hidden');
+    $emptyEl.addClass('hidden');
   };
 
   CP.setLogicViewMode = function (mode) {
-    var visualBtn = $('logic-toggle-visual');
-    var kvBtn = $('logic-toggle-kv');
-    var jsonBtn = $('logic-toggle-json');
-    var visualWrap = $('logic-view-logic-visual-wrap');
-    var kvWrap = $('logic-view-logic-wrap');
-    var jsonWrap = $('logic-view-logic-json-wrap');
-    [visualBtn, kvBtn, jsonBtn].forEach(function (btn) {
-      if (btn) { btn.classList.remove('active'); btn.setAttribute('aria-selected', 'false'); }
+    var $visualBtn = $('#logic-toggle-visual');
+    var $kvBtn = $('#logic-toggle-kv');
+    var $jsonBtn = $('#logic-toggle-json');
+    var $visualWrap = $('#logic-view-logic-visual-wrap');
+    var $kvWrap = $('#logic-view-logic-wrap');
+    var $jsonWrap = $('#logic-view-logic-json-wrap');
+    [$visualBtn, $kvBtn, $jsonBtn].forEach(function ($btn) {
+      if ($btn.length) { $btn.removeClass('active'); $btn.attr('aria-selected', 'false'); }
     });
-    [visualWrap, kvWrap, jsonWrap].forEach(function (el) { if (el) el.classList.add('hidden'); });
+    [$visualWrap, $kvWrap, $jsonWrap].forEach(function ($el) { if ($el.length) $el.addClass('hidden'); });
     if (mode === 'visual') {
-      if (visualBtn) { visualBtn.classList.add('active'); visualBtn.setAttribute('aria-selected', 'true'); }
-      if (visualWrap) visualWrap.classList.remove('hidden');
+      if ($visualBtn.length) { $visualBtn.addClass('active'); $visualBtn.attr('aria-selected', 'true'); }
+      if ($visualWrap.length) $visualWrap.removeClass('hidden');
     } else if (mode === 'json') {
-      if (jsonBtn) { jsonBtn.classList.add('active'); jsonBtn.setAttribute('aria-selected', 'true'); }
-      if (jsonWrap) jsonWrap.classList.remove('hidden');
+      if ($jsonBtn.length) { $jsonBtn.addClass('active'); $jsonBtn.attr('aria-selected', 'true'); }
+      if ($jsonWrap.length) $jsonWrap.removeClass('hidden');
     } else {
-      if (kvBtn) { kvBtn.classList.add('active'); kvBtn.setAttribute('aria-selected', 'true'); }
-      if (kvWrap) kvWrap.classList.remove('hidden');
+      if ($kvBtn.length) { $kvBtn.addClass('active'); $kvBtn.attr('aria-selected', 'true'); }
+      if ($kvWrap.length) $kvWrap.removeClass('hidden');
     }
   };
 
   CP.showLogicPopup = function (nodeId, info) {
-    var stepView = $('logic-view-step');
-    var ioView = $('logic-view-io');
-    var ioBody = $('logic-view-io-body');
-    var logicModalTitle = $('logic-modal-title');
-    var detailDrawer = $('detail-drawer');
+    var $stepView = $('#logic-view-step');
+    var $ioView = $('#logic-view-io');
+    var $ioBody = $('#logic-view-io-body');
+    var $logicModalTitle = $('#logic-modal-title');
+    var $detailDrawer = $('#detail-drawer');
     if (info.type === 'input') {
-      logicModalTitle.textContent = 'Input: ' + info.name;
-      stepView.style.display = 'none';
-      ioView.style.display = 'block';
+      $logicModalTitle.text('Input: ' + info.name);
+      $stepView.css('display', 'none');
+      $ioView.css('display', 'block');
       var d = info.data;
       var parts = [];
       if (d.name) parts.push(CP.tag(d.name, 'view-tag-name'));
       if (d.dataset) parts.push(CP.tag(d.dataset, 'view-tag-dataset'));
       if (d.format) parts.push(formatTagWithIcon(d.format));
       if (d.s3_path) parts.push(CP.tag(d.s3_path, 'view-tag-path'));
-      $('logic-view-io-tags').innerHTML = parts.length ? '<span class="view-tags">' + parts.join(' ') + '</span>' : CP.tag('', 'view-tag-empty');
+      $('#logic-view-io-tags').html(parts.length ? '<span class="view-tags">' + parts.join(' ') + '</span>' : CP.tag('', 'view-tag-empty'));
       CP.renderSchemaTable(d.fields);
-      ioBody.textContent = JSON.stringify(d, null, 2);
+      $ioBody.text(JSON.stringify(d, null, 2));
     } else if (info.type === 'output') {
-      logicModalTitle.textContent = 'Output: ' + info.name;
-      stepView.style.display = 'none';
-      ioView.style.display = 'block';
+      $logicModalTitle.text('Output: ' + info.name);
+      $stepView.css('display', 'none');
+      $ioView.css('display', 'block');
       var d = info.data;
       var parts = [];
       if (d.name) parts.push(CP.tag(d.name, 'view-tag-name'));
       if (d.dataset) parts.push(CP.tag(d.dataset, 'view-tag-dataset'));
       if (d.format) parts.push(formatTagWithIcon(d.format));
       if (d.write_mode) parts.push(CP.tag(d.write_mode, 'view-tag-mode'));
-      $('logic-view-io-tags').innerHTML = parts.length ? '<span class="view-tags">' + parts.join(' ') + '</span>' : CP.tag('', 'view-tag-empty');
+      $('#logic-view-io-tags').html(parts.length ? '<span class="view-tags">' + parts.join(' ') + '</span>' : CP.tag('', 'view-tag-empty'));
       CP.renderSchemaTable(d.fields);
-      ioBody.textContent = JSON.stringify(d, null, 2);
+      $ioBody.text(JSON.stringify(d, null, 2));
     } else {
       var s = info.data;
-      logicModalTitle.textContent = (s.id || 'Step') + ' (' + (s.type || '') + ')';
-      stepView.style.display = 'block';
-      ioView.style.display = 'none';
-      $('logic-view-id').innerHTML = '<span class="view-tags">' + CP.tag(s.id, 'view-tag-id') + '</span>';
-      $('logic-view-description').innerHTML = '<span class="view-tags">' + (s.description ? CP.tag(s.description, 'view-tag-desc') : CP.tag('—', 'view-tag-empty')) + '</span>';
-      $('logic-view-type').innerHTML = '<span class="view-tags">' + transformTagWithIcon(s.type) + '</span>';
+      $logicModalTitle.text((s.id || 'Step') + ' (' + (s.type || '') + ')');
+      $stepView.css('display', 'block');
+      $ioView.css('display', 'none');
+      $('#logic-view-id').html('<span class="view-tags">' + CP.tag(s.id, 'view-tag-id') + '</span>');
+      $('#logic-view-description').html('<span class="view-tags">' + (s.description ? CP.tag(s.description, 'view-tag-desc') : CP.tag('—', 'view-tag-empty')) + '</span>');
+      $('#logic-view-type').html('<span class="view-tags">' + transformTagWithIcon(s.type) + '</span>');
       var srcArr = Array.isArray(s.source_inputs) ? s.source_inputs : (s.source_inputs ? [s.source_inputs] : []);
-      $('logic-view-source-inputs').innerHTML = srcArr.length ? '<span class="view-tags">' + srcArr.map(function (x) { return CP.tag(x, 'view-tag-source'); }).join(' ') + '</span>' : CP.tag('', 'view-tag-empty');
-      $('logic-view-output-alias').innerHTML = '<span class="view-tags">' + CP.tag(s.output_alias, 'view-tag-output') + '</span>';
-      var logicEl = $('logic-view-logic');
-      var logicJsonEl = $('logic-view-logic-json');
+      $('#logic-view-source-inputs').html(srcArr.length ? '<span class="view-tags">' + srcArr.map(function (x) { return CP.tag(x, 'view-tag-source'); }).join(' ') + '</span>' : CP.tag('', 'view-tag-empty'));
+      $('#logic-view-output-alias').html('<span class="view-tags">' + CP.tag(s.output_alias, 'view-tag-output') + '</span>');
+      var $logicEl = $('#logic-view-logic');
+      var $logicJsonEl = $('#logic-view-logic-json');
       var logic = s.logic;
       if (logic && typeof logic === 'object' && !Array.isArray(logic)) {
         var html = '';
@@ -238,17 +237,17 @@
           else valHtml = '<span class="logic-kv-value">' + CP.escapeHtml(String(v)) + '</span>';
           html += '<div class="logic-kv-row">' + keyTag + valHtml + '</div>';
         });
-        logicEl.innerHTML = html || '<span class="logic-kv-empty">—</span>';
+        $logicEl.html(html || '<span class="logic-kv-empty">—</span>');
       } else if (logic && typeof logic === 'object' && Array.isArray(logic)) {
-        logicEl.innerHTML = '<pre class="logic-kv-value logic-kv-pre">' + CP.escapeHtml(JSON.stringify(logic, null, 2)) + '</pre>';
+        $logicEl.html('<pre class="logic-kv-value logic-kv-pre">' + CP.escapeHtml(JSON.stringify(logic, null, 2)) + '</pre>');
       } else {
-        logicEl.innerHTML = logic != null && logic !== '' ? '<span class="logic-kv-value">' + CP.escapeHtml(String(logic)) + '</span>' : '<span class="logic-kv-empty">—</span>';
+        $logicEl.html(logic != null && logic !== '' ? '<span class="logic-kv-value">' + CP.escapeHtml(String(logic)) + '</span>' : '<span class="logic-kv-empty">—</span>');
       }
-      if (logicJsonEl) logicJsonEl.textContent = logic != null && typeof logic === 'object' ? JSON.stringify(logic, null, 2) : (logic != null ? String(logic) : '');
+      if ($logicJsonEl.length) $logicJsonEl.text(logic != null && typeof logic === 'object' ? JSON.stringify(logic, null, 2) : (logic != null ? String(logic) : ''));
       CP.setLogicViewMode('visual');
-      var visualEl = $('logic-view-logic-visual');
-      if (visualEl) visualEl.innerHTML = CP.buildLogicVisualHtml(s.logic, s.type || '');
+      var $visualEl = $('#logic-view-logic-visual');
+      if ($visualEl.length) $visualEl.html(CP.buildLogicVisualHtml(s.logic, s.type || ''));
     }
-    if (detailDrawer) detailDrawer.classList.add('open');
+    if ($detailDrawer.length) $detailDrawer.addClass('open');
   };
 })(typeof window !== 'undefined' ? window : this);

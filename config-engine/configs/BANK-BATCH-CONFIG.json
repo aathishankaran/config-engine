@@ -1,0 +1,415 @@
+{
+  "Inputs": {
+    "BANK-BATCH-INPUT-01": {
+      "name": "BANK-BATCH-INPUT-01",
+      "format": "FIXED",
+      "dataset_name": "BANK-BATCH-INPUT.DAT",
+      "source_file_name": "BANK-BATCH-INPUT.DAT",
+      "frequency": "DAILY",
+      "source_path": "file:///opt/data/s3/raw/BANK-BATCH-CONFIG/",
+      "header_count": 1,
+      "trailer_count": 1,
+      "fields": [
+        {
+          "name": "REC-TYPE",
+          "type": "STRING",
+          "start": 1,
+          "length": 1,
+          "nullable": false
+        },
+        {
+          "name": "TXN-ID",
+          "type": "STRING",
+          "start": 2,
+          "length": 10,
+          "nullable": false
+        },
+        {
+          "name": "TXN-DATE",
+          "type": "LONG",
+          "start": 12,
+          "length": 8,
+          "nullable": false
+        },
+        {
+          "name": "VAL-DATE",
+          "type": "LONG",
+          "start": 20,
+          "length": 8,
+          "nullable": true
+        },
+        {
+          "name": "TXN-TYPE",
+          "type": "STRING",
+          "start": 28,
+          "length": 3,
+          "nullable": false
+        },
+        {
+          "name": "ACCT-NUM",
+          "type": "STRING",
+          "start": 31,
+          "length": 12,
+          "nullable": false
+        },
+        {
+          "name": "TXN-AMOUNT",
+          "type": "DOUBLE",
+          "start": 43,
+          "length": 12,
+          "nullable": false
+        },
+        {
+          "name": "CURRENCY",
+          "type": "STRING",
+          "start": 55,
+          "length": 3,
+          "nullable": false
+        },
+        {
+          "name": "EXCH-RATE",
+          "type": "DOUBLE",
+          "start": 58,
+          "length": 10,
+          "nullable": true
+        },
+        {
+          "name": "TXN-STATUS",
+          "type": "STRING",
+          "start": 68,
+          "length": 1,
+          "nullable": false
+        },
+        {
+          "name": "BRANCH-CD",
+          "type": "STRING",
+          "start": 69,
+          "length": 5,
+          "nullable": true
+        },
+        {
+          "name": "TXN-DESC",
+          "type": "STRING",
+          "start": 74,
+          "length": 30,
+          "nullable": true
+        },
+        {
+          "name": "TXN-MEMO",
+          "type": "STRING",
+          "start": 104,
+          "length": 15,
+          "nullable": true
+        }
+      ],
+      "_schema_file": "BANK-BATCH-INPUT.CPY",
+      "_test_file": "BANK-BATCH-INPUT.DAT",
+      "_test_rows": 5,
+      "prev_day_check": {
+        "enabled": true,
+        "header_date_field": ""
+      }
+    }
+  },
+  "Outputs": {
+    "BANK-BATCH-OUTPUT-01": {
+      "name": "BANK-BATCH-OUTPUT-01",
+      "format": "FIXED",
+      "write_mode": "OVERWRITE",
+      "dataset_name": "BANK-BATCH-OUTPUT.DAT",
+      "source_file_name": "BANK-BATCH-OUTPUT.DAT",
+      "frequency": "DAILY",
+      "source_path": "file:///opt/data/s3/curated/BANK-BATCH-CONFIG/",
+      "source_inputs": [
+        "BANK-BATCH-VALIDATION-OUT-01"
+      ],
+      "header_count": 1,
+      "trailer_count": 1,
+      "ctrl_file_gen": true,
+      "fields": [
+        {
+          "name": "REC-TYPE",
+          "type": "STRING",
+          "start": 1,
+          "length": 1,
+          "nullable": false
+        },
+        {
+          "name": "TXN-ID",
+          "type": "STRING",
+          "start": 2,
+          "length": 10,
+          "nullable": false
+        },
+        {
+          "name": "TXN-DATE",
+          "type": "LONG",
+          "start": 12,
+          "length": 8,
+          "nullable": false
+        },
+        {
+          "name": "VAL-DATE",
+          "type": "LONG",
+          "start": 20,
+          "length": 8,
+          "nullable": true
+        },
+        {
+          "name": "TXN-TYPE",
+          "type": "STRING",
+          "start": 28,
+          "length": 3,
+          "nullable": false
+        },
+        {
+          "name": "ACCT-NUM",
+          "type": "STRING",
+          "start": 31,
+          "length": 12,
+          "nullable": false
+        },
+        {
+          "name": "TXN-AMOUNT",
+          "type": "DOUBLE",
+          "start": 43,
+          "length": 12,
+          "nullable": false
+        },
+        {
+          "name": "CURRENCY",
+          "type": "STRING",
+          "start": 55,
+          "length": 3,
+          "nullable": false
+        },
+        {
+          "name": "EXCH-RATE",
+          "type": "DOUBLE",
+          "start": 58,
+          "length": 10,
+          "nullable": true
+        },
+        {
+          "name": "TXN-STATUS",
+          "type": "STRING",
+          "start": 68,
+          "length": 1,
+          "nullable": false
+        },
+        {
+          "name": "BRANCH-CD",
+          "type": "STRING",
+          "start": 69,
+          "length": 5,
+          "nullable": true
+        },
+        {
+          "name": "TXN-DESC",
+          "type": "STRING",
+          "start": 74,
+          "length": 30,
+          "nullable": true
+        },
+        {
+          "name": "TXN-MEMO",
+          "type": "STRING",
+          "start": 104,
+          "length": 15,
+          "nullable": true
+        },
+        {
+          "name": "VAL-FLAG",
+          "type": "STRING",
+          "start": 121,
+          "length": 1,
+          "nullable": false
+        },
+        {
+          "name": "PROC-TS",
+          "type": "LONG",
+          "start": 122,
+          "length": 14,
+          "nullable": false
+        },
+        {
+          "name": "ERR-CODE",
+          "type": "STRING",
+          "start": 136,
+          "length": 4,
+          "nullable": true
+        }
+      ],
+      "output_columns": [
+        "REC-TYPE",
+        "TXN-ID",
+        "TXN-DATE",
+        "VAL-DATE",
+        "TXN-TYPE",
+        "ACCT-NUM",
+        "TXN-AMOUNT",
+        "CURRENCY",
+        "EXCH-RATE",
+        "TXN-STATUS",
+        "BRANCH-CD",
+        "TXN-DESC",
+        "TXN-MEMO",
+        "VAL-FLAG",
+        "PROC-TS",
+        "ERR-CODE"
+      ],
+      "_schema_file": "BANK-BATCH-OUTPUT.CPY"
+    }
+  },
+  "Transformations": {
+    "description": "Built with Dataflow Studio",
+    "steps": [
+      {
+        "id": "BANK-BATCH-VALIDATION-01",
+        "description": "Validate input data records; TXN-STATUS must be A; generate control file",
+        "type": "validate",
+        "source_inputs": [
+          "BANK-BATCH-INPUT-01"
+        ],
+        "logic": {
+          "fail_mode": "ABORT",
+          "rules": [
+            {
+              "field": "TXN-ID",
+              "data_type": "TEXT",
+              "nullable": false,
+              "max_length": 10,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-DATE",
+              "data_type": "NUMBER",
+              "nullable": false,
+              "max_length": 8,
+              "format": "ANY"
+            },
+            {
+              "field": "VAL-DATE",
+              "data_type": "NUMBER",
+              "nullable": true,
+              "max_length": 8,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-TYPE",
+              "data_type": "TEXT",
+              "nullable": false,
+              "max_length": 3,
+              "format": "ANY"
+            },
+            {
+              "field": "ACCT-NUM",
+              "data_type": "TEXT",
+              "nullable": false,
+              "max_length": 12,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-AMOUNT",
+              "data_type": "NUMBER",
+              "nullable": false,
+              "max_length": 12,
+              "format": "ANY"
+            },
+            {
+              "field": "CURRENCY",
+              "data_type": "TEXT",
+              "nullable": false,
+              "max_length": 3,
+              "format": "ANY"
+            },
+            {
+              "field": "EXCH-RATE",
+              "data_type": "NUMBER",
+              "nullable": true,
+              "max_length": 10,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-STATUS",
+              "data_type": "TEXT",
+              "nullable": false,
+              "max_length": 1,
+              "format": "ANY"
+            },
+            {
+              "field": "BRANCH-CD",
+              "data_type": "TEXT",
+              "nullable": true,
+              "max_length": 5,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-DESC",
+              "data_type": "TEXT",
+              "nullable": true,
+              "max_length": 30,
+              "format": "ANY"
+            },
+            {
+              "field": "TXN-MEMO",
+              "data_type": "TEXT",
+              "nullable": true,
+              "max_length": 15,
+              "format": "ANY"
+            }
+          ],
+          "dataset_name": "BANK-BATCH-INPUTVAL.DAT",
+          "error_dataset_name": "BANK-BATCH-INPUTERR.DAT",
+          "frequency": "DAILY",
+          "validated_path": "file:///opt/data/s3/validated/BANK-BATCH-CONFIG/",
+          "error_path": "file:///opt/data/s3/error/BANK-BATCH-CONFIG/",
+          "previous_day_check": true,
+          "previous_day_file_path": "file:///opt/data/s3/raw/BANK-BATCH-CONFIG/",
+          "previous_day_frequency": "DAILY",
+          "previous_day_file_name": "BANK-BATCH-INPUT.DAT",
+          "record_count_check": true,
+          "record_count_file_path": "file:///opt/data/s3/raw/BANK-BATCH-CONFIG/",
+          "record_count_frequency": "DAILY",
+          "record_count_file_name": "BANK-BATCH-INPUT.DAT",
+          "ctrl_file_create": true,
+          "ctrl_file_name": "BANK-BATCH-CTRL.DAT",
+          "_ctrl_schema_file": "BANK-BATCH-CTRL.CPY",
+          "ctrl_file_fields": [
+            {
+              "name": "COUNT-RECORDS",
+              "type": "LONG",
+              "expression": "count(*)",
+              "length": 0
+            },
+            {
+              "name": "EFFECTIVE-RECORD",
+              "type": "STRING",
+              "expression": "current_date()",
+              "length": 0
+            },
+            {
+              "name": "AS-OF-DATE",
+              "type": "STRING",
+              "expression": "current_date()",
+              "length": 0
+            },
+            {
+              "name": "SOURCE-CODE",
+              "type": "STRING",
+              "expression": "'105'",
+              "length": 0
+            },
+            {
+              "name": "SOURCE-ID",
+              "type": "STRING",
+              "expression": "'BANK-BATCH-INPUT.DAT'",
+              "length": 0
+            }
+          ]
+        },
+        "output_alias": "BANK-BATCH-VALIDATION-OUT-01"
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "Inputs": {
+    "MY-INPUT": {
+      "format": "CSV",
+      "fields": []
+    }
+  },
+  "Outputs": {},
+  "Transformations": {
+    "steps": []
+  }
+}

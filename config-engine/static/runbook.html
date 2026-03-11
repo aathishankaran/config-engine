@@ -277,6 +277,30 @@
     }
     .rb-figure figcaption i { color: var(--usb-red); }
 
+    /* GIF Demo Figures */
+    .rb-gif-demo {
+      margin: 28px 0; border-radius: var(--radius); overflow: hidden;
+      box-shadow: var(--shadow-md); border: 2px solid var(--usb-navy-mid);
+      position: relative;
+    }
+    .rb-gif-demo img { width: 100%; border-radius: 0; display: block; }
+    .rb-gif-demo figcaption {
+      background: var(--usb-navy); color: rgba(255,255,255,.75);
+      font-size: 12px; padding: 9px 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .rb-gif-demo figcaption i { color: #22c55e; }
+    .rb-gif-demo::before {
+      content: '\f04b'; font-family: 'Font Awesome 6 Free'; font-weight: 900;
+      position: absolute; top: 12px; right: 12px;
+      background: rgba(10,34,64,.75); color: #22c55e;
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; z-index: 2; pointer-events: none;
+    }
+    .badge-validate { background: #e0f2f1; color: #0d9488; }
+    .badge-oracle   { background: #fff7ed; color: #c2410c; }
+
     /* ═══════════════════════════════════════════════
        INFO / WARNING / TIP CALLOUTS
     ═══════════════════════════════════════════════ */
@@ -426,7 +450,7 @@
       <span class="sb-num">4</span> Interface Overview
     </a>
     <a class="sb-link" href="#load-config">
-      <span class="sb-num">5</span> Load a Configuration
+      <span class="sb-num">5</span> Load an Interface
     </a>
     <a class="sb-link" href="#canvas">
       <span class="sb-num">6</span> Studio Canvas
@@ -443,7 +467,7 @@
       <span class="sb-num">9</span> Import &amp; Export JSON
     </a>
     <a class="sb-link" href="#new-config">
-      <span class="sb-num">10</span> Create New Configuration
+      <span class="sb-num">10</span> Create New Interface
     </a>
     <a class="sb-link" href="#components">
       <span class="sb-num">11</span> Component Reference
@@ -469,15 +493,15 @@
       <div class="hero-eyebrow">U.S. Bank · Internal Developer Tools</div>
       <h1>Config Engine — User Runbook</h1>
       <p>
-        A visual dataflow configuration builder for mainframe transformation pipelines.
-        Design, edit, and validate COBOL/JCL dataflow configurations using the drag-and-drop canvas
+        A visual dataflow interface builder for mainframe transformation pipelines.
+        Design, edit, and validate COBOL/JCL dataflow interfaces using the drag-and-drop canvas
         or the built-in JSON editor.
       </p>
       <div class="hero-meta">
         <span class="hero-chip"><i class="fa-solid fa-circle-check"></i> Current Version</span>
         <span class="hero-chip"><i class="fa-solid fa-flask"></i> Flask · Python</span>
         <span class="hero-chip"><i class="fa-solid fa-code-branch"></i> Internal Use Only</span>
-        <span class="hero-chip"><i class="fa-solid fa-clock"></i> Updated Feb 2026</span>
+        <span class="hero-chip"><i class="fa-solid fa-clock"></i> Updated Mar 2026</span>
       </div>
     </div>
 
@@ -491,20 +515,20 @@
       </div>
 
       <p>
-        <strong>Config Engine</strong> is a browser-based tool for creating and managing <em>dataflow configurations</em>
+        <strong>Config Engine</strong> is a browser-based tool for creating and managing <em>dataflow interfaces</em>
         — structured JSON files that describe how mainframe batch data moves through transformation steps
         (Inputs → Transformations → Outputs).
       </p>
 
       <p style="margin-top:14px;">
-        Configurations are used by the <strong>Dataflow Engine</strong> to execute real data pipelines
+        Interfaces are used by the <strong>Dataflow Engine</strong> to execute real data pipelines
         against COBOL/fixed-width/Parquet source files. Config Engine lets engineers design
         these pipelines visually without hand-editing complex JSON.
       </p>
 
       <div class="callout info" style="margin-top:18px;">
         <i class="fa-solid fa-circle-info"></i>
-        <p><strong>Dual Interface:</strong> Every configuration can be edited both as a visual node graph
+        <p><strong>Dual Interface:</strong> Every interface can be edited both as a visual node graph
         (<em>Studio Canvas</em>) and as raw JSON (<em>JSON Editor</em>). Changes in either view are kept in sync.</p>
       </div>
 
@@ -643,7 +667,7 @@ source .venv/bin/activate
           <tr>
             <td><strong>Config List</strong></td>
             <td>Left sidebar</td>
-            <td>Lists all saved <code>.json</code> configurations; click to load</td>
+            <td>Lists all saved <code>.json</code> interfaces; click to load</td>
           </tr>
           <tr>
             <td><strong>Studio Canvas</strong></td>
@@ -653,7 +677,7 @@ source .venv/bin/activate
           <tr>
             <td><strong>Components Palette</strong></td>
             <td>Right sidebar</td>
-            <td>Draggable node types: Input, Output, Select, Filter, Join, Aggregate, Union, Custom</td>
+            <td>Draggable node types: Input, Output, Oracle Write, Validate, Mapping, Select, Filter, Join, Aggregate, Union, Custom</td>
           </tr>
           <tr>
             <td><strong>Properties Panel</strong></td>
@@ -673,12 +697,12 @@ source .venv/bin/activate
     </section>
 
     <!-- ─────────────────────────────────────────────
-         5. LOAD A CONFIGURATION
+         5. LOAD AN INTERFACE
     ───────────────────────────────────────────────── -->
     <section class="rb-section" id="load-config">
       <div class="section-header">
         <span class="section-number">5</span>
-        <h2>Load a Configuration</h2>
+        <h2>Load an Interface</h2>
       </div>
 
       <ol class="step-list">
@@ -715,7 +739,7 @@ source .venv/bin/activate
       <div class="callout tip">
         <i class="fa-solid fa-lightbulb"></i>
         <p><strong>Tip:</strong> After loading, the toolbar shows <strong>Test</strong>, <strong>Download</strong>,
-        <strong>Rename</strong>, and <strong>Delete</strong> action buttons for the active configuration.</p>
+        <strong>Rename</strong>, and <strong>Delete</strong> action buttons for the active interface.</p>
       </div>
 
       <figure class="rb-figure">
@@ -723,6 +747,14 @@ source .venv/bin/activate
         <figcaption>
           <i class="fa-solid fa-camera"></i>
           Fig 5.1 — BANK_BATCH_SYSTEM.json loaded and fit to view — 11 nodes, 10 connections
+        </figcaption>
+      </figure>
+
+      <figure class="rb-gif-demo">
+        <img src="/static/images/runbook/gif05-save-config.gif" alt="Saving an interface" />
+        <figcaption>
+          <i class="fa-solid fa-play"></i>
+          Demo 5.2 — Click Save to persist the current pipeline to the server
         </figcaption>
       </figure>
     </section>
@@ -756,6 +788,14 @@ source .venv/bin/activate
         </li>
       </ol>
 
+      <figure class="rb-gif-demo">
+        <img src="/static/images/runbook/gif01-drag-node.gif" alt="Dragging a node onto the canvas" />
+        <figcaption>
+          <i class="fa-solid fa-play"></i>
+          Demo 6.1 — Drag components from the palette onto the canvas to build a pipeline
+        </figcaption>
+      </figure>
+
       <h3 style="margin:24px 0 12px; font-size:16px; color:var(--usb-navy);">Connecting Nodes</h3>
       <ol class="step-list">
         <li class="step-item">
@@ -781,6 +821,14 @@ source .venv/bin/activate
         </li>
       </ol>
 
+      <figure class="rb-gif-demo">
+        <img src="/static/images/runbook/gif02-connect-nodes.gif" alt="Connecting nodes on the canvas" />
+        <figcaption>
+          <i class="fa-solid fa-play"></i>
+          Demo 6.2 — Switch to Connect mode and click source → target to draw connections
+        </figcaption>
+      </figure>
+
       <h3 style="margin:24px 0 12px; font-size:16px; color:var(--usb-navy);">Canvas Controls</h3>
       <table class="rb-table">
         <thead><tr><th>Action</th><th>How</th></tr></thead>
@@ -793,6 +841,14 @@ source .venv/bin/activate
           <tr><td>Deselect</td><td><kbd>Esc</kbd></td></tr>
         </tbody>
       </table>
+
+      <figure class="rb-gif-demo">
+        <img src="/static/images/runbook/gif04-auto-layout.gif" alt="Auto-layout vertical and horizontal" />
+        <figcaption>
+          <i class="fa-solid fa-play"></i>
+          Demo 6.3 — Toggle between vertical and horizontal auto-layout to organize your pipeline
+        </figcaption>
+      </figure>
     </section>
 
     <!-- ─────────────────────────────────────────────
@@ -846,6 +902,14 @@ source .venv/bin/activate
         <figcaption>
           <i class="fa-solid fa-camera"></i>
           Fig 7.1 — Properties panel open for a selected node. Edit fields and click Apply to save.
+        </figcaption>
+      </figure>
+
+      <figure class="rb-gif-demo">
+        <img src="/static/images/runbook/gif03-edit-props.gif" alt="Editing node properties" />
+        <figcaption>
+          <i class="fa-solid fa-play"></i>
+          Demo 7.2 — Click a node, edit its fields, and press Apply to save changes
         </figcaption>
       </figure>
 
@@ -965,7 +1029,7 @@ source .venv/bin/activate
         <img src="/static/images/runbook/sc05-import.png" alt="Import JSON modal" />
         <figcaption>
           <i class="fa-solid fa-camera"></i>
-          Fig 9.1 — Import JSON modal: paste or upload a configuration file
+          Fig 9.1 — Import JSON modal: paste or upload an interface file
         </figcaption>
       </figure>
 
@@ -975,7 +1039,7 @@ source .venv/bin/activate
           <div class="step-bullet"></div>
           <div class="step-body">
             <h4>Click "Export JSON" in the toolbar</h4>
-            <p>The current canvas configuration is downloaded as a <code>.json</code> file.</p>
+            <p>The current canvas interface is downloaded as a <code>.json</code> file.</p>
           </div>
         </li>
       </ol>
@@ -983,17 +1047,17 @@ source .venv/bin/activate
       <div class="callout tip">
         <i class="fa-solid fa-lightbulb"></i>
         <p><strong>Download button:</strong> After loading a config, the <strong>Download</strong> button (red, in toolbar)
-        also exports the current configuration file directly.</p>
+        also exports the current interface file directly.</p>
       </div>
     </section>
 
     <!-- ─────────────────────────────────────────────
-         10. CREATE NEW CONFIGURATION
+         10. CREATE NEW INTERFACE
     ───────────────────────────────────────────────── -->
     <section class="rb-section" id="new-config">
       <div class="section-header">
         <span class="section-number">10</span>
-        <h2>Create New Configuration</h2>
+        <h2>Create New Interface</h2>
       </div>
 
       <ol class="step-list">
@@ -1033,6 +1097,14 @@ source .venv/bin/activate
           </div>
         </li>
       </ol>
+
+      <figure class="rb-gif-demo">
+        <img src="/static/images/runbook/gif06-create-config.gif" alt="Creating a new interface from scratch" />
+        <figcaption>
+          <i class="fa-solid fa-play"></i>
+          Demo 10.1 — Create a new config: name it, drag nodes, connect them, and save
+        </figcaption>
+      </figure>
     </section>
 
     <!-- ─────────────────────────────────────────────
@@ -1060,6 +1132,24 @@ source .venv/bin/activate
             <td><span class="type-badge badge-output">Sink</span></td>
             <td>Write results to Parquet, CSV, or COBOL files</td>
             <td><code>format</code>, <code>path</code>, <code>partition</code></td>
+          </tr>
+          <tr>
+            <td><strong>Oracle Write</strong></td>
+            <td><span class="type-badge badge-oracle">Sink</span></td>
+            <td>Load data into Oracle via SQL*Loader with Vault-based credentials</td>
+            <td><code>host</code>, <code>table</code>, <code>load_mode</code>, <code>vault_path</code></td>
+          </tr>
+          <tr>
+            <td><strong>Validate</strong></td>
+            <td><span class="type-badge badge-validate">Quality</span></td>
+            <td>Data quality checks — route valid rows to output, invalid rows to error path</td>
+            <td><code>fail_mode</code>, <code>validate_rules[]</code>, <code>validated_path</code>, <code>error_path</code></td>
+          </tr>
+          <tr>
+            <td><strong>Mapping</strong></td>
+            <td><span class="type-badge badge-transform">Transform</span></td>
+            <td>Field-level mapping and renaming between source and target schemas</td>
+            <td><code>mappings[]</code> with <code>source</code>, <code>target</code>, <code>transform</code></td>
           </tr>
           <tr>
             <td><strong>Select</strong></td>
@@ -1135,6 +1225,22 @@ source .venv/bin/activate
             <td><strong>Model Name</strong></td>
             <td>The LLM model identifier to use (e.g., <code>gpt-4</code>, <code>llama3</code>)</td>
           </tr>
+          <tr>
+            <td><strong>Raw Bucket Prefix</strong></td>
+            <td>S3/GCS path prefix for raw input data (e.g., <code>s3://data-lake/raw/</code>)</td>
+          </tr>
+          <tr>
+            <td><strong>Validation Bucket Prefix</strong></td>
+            <td>Path prefix for validated / intermediate data after quality checks</td>
+          </tr>
+          <tr>
+            <td><strong>Error Bucket Prefix</strong></td>
+            <td>Path prefix where rows that fail validation rules are written</td>
+          </tr>
+          <tr>
+            <td><strong>Curated Bucket Prefix</strong></td>
+            <td>Path prefix for final curated / production-ready output data</td>
+          </tr>
         </tbody>
       </table>
     </section>
@@ -1154,11 +1260,14 @@ source .venv/bin/activate
           <tr><td><kbd>V</kbd></td><td>Switch to Select mode</td><td>Canvas</td></tr>
           <tr><td><kbd>C</kbd></td><td>Switch to Connect mode (draw connections)</td><td>Canvas</td></tr>
           <tr><td><kbd>F</kbd></td><td>Fit all nodes to viewport</td><td>Canvas</td></tr>
-          <tr><td><kbd>A</kbd></td><td>Auto-arrange layout</td><td>Canvas</td></tr>
+          <tr><td><kbd>A</kbd></td><td>Auto-arrange layout (vertical)</td><td>Canvas</td></tr>
+          <tr><td><kbd>H</kbd></td><td>Auto-arrange layout (horizontal)</td><td>Canvas</td></tr>
           <tr><td><kbd>Del</kbd></td><td>Delete selected node or connection</td><td>Canvas</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Deselect / close overlays</td><td>Global</td></tr>
           <tr><td><kbd>+</kbd></td><td>Zoom in</td><td>Canvas</td></tr>
           <tr><td><kbd>-</kbd></td><td>Zoom out</td><td>Canvas</td></tr>
+          <tr><td><kbd>Ctrl</kbd> <kbd>S</kbd></td><td>Save current interface</td><td>Global</td></tr>
+          <tr><td><kbd>Ctrl</kbd> <kbd>E</kbd></td><td>Export interface as JSON</td><td>Global</td></tr>
           <tr><td><kbd>Ctrl</kbd> <kbd>Z</kbd></td><td>Undo (JSON Editor)</td><td>JSON Editor</td></tr>
           <tr><td><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Z</kbd></td><td>Redo (JSON Editor)</td><td>JSON Editor</td></tr>
         </tbody>
@@ -1195,7 +1304,7 @@ source .venv/bin/activate
           <tr>
             <td>JSON Editor not opening</td>
             <td>No config loaded</td>
-            <td>Load or create a configuration first; the mode bar appears only when a config is active</td>
+            <td>Load or create an interface first; the mode bar appears only when an interface is active</td>
           </tr>
           <tr>
             <td>Nodes disappeared after Apply</td>
@@ -1213,7 +1322,7 @@ source .venv/bin/activate
       <div class="callout info" style="margin-top:24px;">
         <i class="fa-solid fa-circle-info"></i>
         <p>For additional help, check the <code>README.md</code> in the project root or the
-        <code>DATAFLOW_ENGINE_SCHEMA.md</code> for the full configuration schema reference.</p>
+        <code>DATAFLOW_ENGINE_SCHEMA.md</code> for the full interface schema reference.</p>
       </div>
     </section>
 

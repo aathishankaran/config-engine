@@ -18,7 +18,10 @@ class FieldDefinition(BaseModel):
     length: int | None = None
     precision: int | None = None
     nullable: bool = True
+    format: str | None = None  # Format pattern e.g. YYYYMMDD, YYYYMM, HHMMSS
     source: str | None = None  # Source copybook field reference
+    record_type: str = "DATA"  # "DATA" | "HEADER" | "TRAILER" — set by copybook parser from 01-level group name
+    just_right: bool = False   # True when COBOL JUSTIFIED RIGHT clause present; right-aligns string output
 
 
 class CobrixOptions(BaseModel):
@@ -59,6 +62,14 @@ class OutputConfig(BaseModel):
     )
     copybook: str | None = Field(None, description="Copybook for Cobrix EBCDIC output")
     fields: list[FieldDefinition] = Field(default_factory=list)
+    header_fields: list[FieldDefinition] = Field(
+        default_factory=list,
+        description="Fields written into the header record row(s) with computed expressions",
+    )
+    trailer_fields: list[FieldDefinition] = Field(
+        default_factory=list,
+        description="Fields written into the trailer record row(s) with computed expressions",
+    )
     output_columns: list[str] | None = Field(
         None,
         description="Explicit list of column names to write (from copybook). Runner selects only these.",

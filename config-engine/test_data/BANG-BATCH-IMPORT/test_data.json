@@ -1,0 +1,306 @@
+{
+  "input_data": {
+    "BANG-BATCH-IMPORT-INPUT-01": [
+      {
+        "INP-DAT-REC-TYPE": "",
+        "INP-DAT-TXN-ID": "",
+        "INP-DAT-TXN-DATE": "",
+        "INP-DAT-VAL-DATE": "",
+        "INP-DAT-TXN-TYPE": "",
+        "INP-DAT-ACCT-NUM": "",
+        "INP-DAT-AMOUNT": "",
+        "INP-DAT-CURRENCY": "",
+        "INP-DAT-EXCH-RATE": "",
+        "INP-DAT-STATUS": "",
+        "INP-DAT-BRANCH-CD": "",
+        "INP-DAT-DESC": "",
+        "INP-DAT-MEMO": "",
+        "INP-DAT-FILLER": ""
+      },
+      {
+        "INP-DAT-REC-TYPE": "",
+        "INP-DAT-TXN-ID": "",
+        "INP-DAT-TXN-DATE": "",
+        "INP-DAT-VAL-DATE": "",
+        "INP-DAT-TXN-TYPE": "",
+        "INP-DAT-ACCT-NUM": "",
+        "INP-DAT-AMOUNT": "",
+        "INP-DAT-CURRENCY": "",
+        "INP-DAT-EXCH-RATE": "",
+        "INP-DAT-STATUS": "",
+        "INP-DAT-BRANCH-CD": "",
+        "INP-DAT-DESC": "",
+        "INP-DAT-MEMO": "",
+        "INP-DAT-FILLER": ""
+      },
+      {
+        "INP-DAT-REC-TYPE": "",
+        "INP-DAT-TXN-ID": "",
+        "INP-DAT-TXN-DATE": "",
+        "INP-DAT-VAL-DATE": "",
+        "INP-DAT-TXN-TYPE": "",
+        "INP-DAT-ACCT-NUM": "",
+        "INP-DAT-AMOUNT": "",
+        "INP-DAT-CURRENCY": "",
+        "INP-DAT-EXCH-RATE": "",
+        "INP-DAT-STATUS": "",
+        "INP-DAT-BRANCH-CD": "",
+        "INP-DAT-DESC": "",
+        "INP-DAT-MEMO": "",
+        "INP-DAT-FILLER": ""
+      },
+      {
+        "INP-DAT-REC-TYPE": "",
+        "INP-DAT-TXN-ID": "",
+        "INP-DAT-TXN-DATE": "",
+        "INP-DAT-VAL-DATE": "",
+        "INP-DAT-TXN-TYPE": "",
+        "INP-DAT-ACCT-NUM": "",
+        "INP-DAT-AMOUNT": "",
+        "INP-DAT-CURRENCY": "",
+        "INP-DAT-EXCH-RATE": "",
+        "INP-DAT-STATUS": "",
+        "INP-DAT-BRANCH-CD": "",
+        "INP-DAT-DESC": "",
+        "INP-DAT-MEMO": "",
+        "INP-DAT-FILLER": ""
+      },
+      {
+        "INP-DAT-REC-TYPE": "",
+        "INP-DAT-TXN-ID": "",
+        "INP-DAT-TXN-DATE": "",
+        "INP-DAT-VAL-DATE": "",
+        "INP-DAT-TXN-TYPE": "",
+        "INP-DAT-ACCT-NUM": "",
+        "INP-DAT-AMOUNT": "",
+        "INP-DAT-CURRENCY": "",
+        "INP-DAT-EXCH-RATE": "",
+        "INP-DAT-STATUS": "",
+        "INP-DAT-BRANCH-CD": "",
+        "INP-DAT-DESC": "",
+        "INP-DAT-MEMO": "",
+        "INP-DAT-FILLER": ""
+      },
+      {
+        "INP-DAT-REC-TYPE": "",
+        "INP-DAT-TXN-ID": "",
+        "INP-DAT-TXN-DATE": "",
+        "INP-DAT-VAL-DATE": "",
+        "INP-DAT-TXN-TYPE": "",
+        "INP-DAT-ACCT-NUM": "",
+        "INP-DAT-AMOUNT": "",
+        "INP-DAT-CURRENCY": "",
+        "INP-DAT-EXCH-RATE": "",
+        "INP-DAT-STATUS": "",
+        "INP-DAT-BRANCH-CD": "",
+        "INP-DAT-DESC": "",
+        "INP-DAT-MEMO": "",
+        "INP-DAT-FILLER": ""
+      },
+      {
+        "INP-DAT-REC-TYPE": "",
+        "INP-DAT-TXN-ID": "",
+        "INP-DAT-TXN-DATE": "",
+        "INP-DAT-VAL-DATE": "",
+        "INP-DAT-TXN-TYPE": "",
+        "INP-DAT-ACCT-NUM": "",
+        "INP-DAT-AMOUNT": "",
+        "INP-DAT-CURRENCY": "",
+        "INP-DAT-EXCH-RATE": "",
+        "INP-DAT-STATUS": "",
+        "INP-DAT-BRANCH-CD": "",
+        "INP-DAT-DESC": "",
+        "INP-DAT-MEMO": "",
+        "INP-DAT-FILLER": ""
+      }
+    ],
+    "__ctrl__BANG-BATCH-IMPORT-DATA-VALIDATION-01": []
+  },
+  "expected_output": {
+    "BANG-BATCH-IMPORT-OUTPUT-01": [
+      {
+        "OUT-DAT-REC-TYPE": "",
+        "OUT-DAT-TXN-ID": "",
+        "OUT-DAT-TXN-DATE": "",
+        "OUT-DAT-VAL-DATE": "",
+        "OUT-DAT-TXN-TYPE": "",
+        "OUT-DAT-ACCT-NUM": "",
+        "OUT-DAT-AMOUNT": "",
+        "OUT-DAT-CURRENCY": "",
+        "OUT-DAT-EXCH-RATE": "",
+        "OUT-DAT-STATUS": "",
+        "OUT-DAT-BRANCH-CD": "",
+        "OUT-DAT-DESC": "",
+        "OUT-DAT-MEMO": "",
+        "OUT-DAT-FILLER-1": "",
+        "OUT-DAT-VAL-FLAG": "",
+        "OUT-DAT-PROC-TS": "",
+        "OUT-DAT-ERR-CODE": "",
+        "OUT-DAT-FILLER-2": ""
+      },
+      {
+        "OUT-DAT-REC-TYPE": "",
+        "OUT-DAT-TXN-ID": "",
+        "OUT-DAT-TXN-DATE": "",
+        "OUT-DAT-VAL-DATE": "",
+        "OUT-DAT-TXN-TYPE": "",
+        "OUT-DAT-ACCT-NUM": "",
+        "OUT-DAT-AMOUNT": "",
+        "OUT-DAT-CURRENCY": "",
+        "OUT-DAT-EXCH-RATE": "",
+        "OUT-DAT-STATUS": "",
+        "OUT-DAT-BRANCH-CD": "",
+        "OUT-DAT-DESC": "",
+        "OUT-DAT-MEMO": "",
+        "OUT-DAT-FILLER-1": "",
+        "OUT-DAT-VAL-FLAG": "",
+        "OUT-DAT-PROC-TS": "",
+        "OUT-DAT-ERR-CODE": "",
+        "OUT-DAT-FILLER-2": ""
+      },
+      {
+        "OUT-DAT-REC-TYPE": "",
+        "OUT-DAT-TXN-ID": "",
+        "OUT-DAT-TXN-DATE": "",
+        "OUT-DAT-VAL-DATE": "",
+        "OUT-DAT-TXN-TYPE": "",
+        "OUT-DAT-ACCT-NUM": "",
+        "OUT-DAT-AMOUNT": "",
+        "OUT-DAT-CURRENCY": "",
+        "OUT-DAT-EXCH-RATE": "",
+        "OUT-DAT-STATUS": "",
+        "OUT-DAT-BRANCH-CD": "",
+        "OUT-DAT-DESC": "",
+        "OUT-DAT-MEMO": "",
+        "OUT-DAT-FILLER-1": "",
+        "OUT-DAT-VAL-FLAG": "",
+        "OUT-DAT-PROC-TS": "",
+        "OUT-DAT-ERR-CODE": "",
+        "OUT-DAT-FILLER-2": ""
+      },
+      {
+        "OUT-DAT-REC-TYPE": "",
+        "OUT-DAT-TXN-ID": "",
+        "OUT-DAT-TXN-DATE": "",
+        "OUT-DAT-VAL-DATE": "",
+        "OUT-DAT-TXN-TYPE": "",
+        "OUT-DAT-ACCT-NUM": "",
+        "OUT-DAT-AMOUNT": "",
+        "OUT-DAT-CURRENCY": "",
+        "OUT-DAT-EXCH-RATE": "",
+        "OUT-DAT-STATUS": "",
+        "OUT-DAT-BRANCH-CD": "",
+        "OUT-DAT-DESC": "",
+        "OUT-DAT-MEMO": "",
+        "OUT-DAT-FILLER-1": "",
+        "OUT-DAT-VAL-FLAG": "",
+        "OUT-DAT-PROC-TS": "",
+        "OUT-DAT-ERR-CODE": "",
+        "OUT-DAT-FILLER-2": ""
+      },
+      {
+        "OUT-DAT-REC-TYPE": "",
+        "OUT-DAT-TXN-ID": "",
+        "OUT-DAT-TXN-DATE": "",
+        "OUT-DAT-VAL-DATE": "",
+        "OUT-DAT-TXN-TYPE": "",
+        "OUT-DAT-ACCT-NUM": "",
+        "OUT-DAT-AMOUNT": "",
+        "OUT-DAT-CURRENCY": "",
+        "OUT-DAT-EXCH-RATE": "",
+        "OUT-DAT-STATUS": "",
+        "OUT-DAT-BRANCH-CD": "",
+        "OUT-DAT-DESC": "",
+        "OUT-DAT-MEMO": "",
+        "OUT-DAT-FILLER-1": "",
+        "OUT-DAT-VAL-FLAG": "",
+        "OUT-DAT-PROC-TS": "",
+        "OUT-DAT-ERR-CODE": "",
+        "OUT-DAT-FILLER-2": ""
+      },
+      {
+        "OUT-DAT-REC-TYPE": "",
+        "OUT-DAT-TXN-ID": "",
+        "OUT-DAT-TXN-DATE": "",
+        "OUT-DAT-VAL-DATE": "",
+        "OUT-DAT-TXN-TYPE": "",
+        "OUT-DAT-ACCT-NUM": "",
+        "OUT-DAT-AMOUNT": "",
+        "OUT-DAT-CURRENCY": "",
+        "OUT-DAT-EXCH-RATE": "",
+        "OUT-DAT-STATUS": "",
+        "OUT-DAT-BRANCH-CD": "",
+        "OUT-DAT-DESC": "",
+        "OUT-DAT-MEMO": "",
+        "OUT-DAT-FILLER-1": "",
+        "OUT-DAT-VAL-FLAG": "",
+        "OUT-DAT-PROC-TS": "",
+        "OUT-DAT-ERR-CODE": "",
+        "OUT-DAT-FILLER-2": ""
+      },
+      {
+        "OUT-DAT-REC-TYPE": "",
+        "OUT-DAT-TXN-ID": "",
+        "OUT-DAT-TXN-DATE": "",
+        "OUT-DAT-VAL-DATE": "",
+        "OUT-DAT-TXN-TYPE": "",
+        "OUT-DAT-ACCT-NUM": "",
+        "OUT-DAT-AMOUNT": "",
+        "OUT-DAT-CURRENCY": "",
+        "OUT-DAT-EXCH-RATE": "",
+        "OUT-DAT-STATUS": "",
+        "OUT-DAT-BRANCH-CD": "",
+        "OUT-DAT-DESC": "",
+        "OUT-DAT-MEMO": "",
+        "OUT-DAT-FILLER-1": "",
+        "OUT-DAT-VAL-FLAG": "",
+        "OUT-DAT-PROC-TS": "",
+        "OUT-DAT-ERR-CODE": "",
+        "OUT-DAT-FILLER-2": ""
+      }
+    ],
+    "__ctrl__BANG-BATCH-IMPORT-DATA-VALIDATION-01": [
+      {
+        "value": "00000000000052026030520260305105     BANK-BATCH-INPUT.DAT                       "
+      }
+    ]
+  },
+  "file_meta": {
+    "BANG-BATCH-IMPORT-INPUT-01": {
+      "test_file": "BANK-BATCH-INPUT.DAT",
+      "rows": 7,
+      "type": "input",
+      "copybook_file": "BANK-BATCH-INPUT.CPY",
+      "fields": 26
+    },
+    "VAL_3": {
+      "copybook_file": "BANK-BATCH-CTRL.CPY",
+      "fields": 5,
+      "type": "validate_ctrl"
+    },
+    "BANG-BATCH-IMPORT-OUTPUT-01": {
+      "test_file": "BANK-BATCH-OUTPUT.DAT",
+      "rows": 7,
+      "type": "output",
+      "copybook_file": "BANK-BATCH-OUTPUT.CPY",
+      "fields": 28
+    },
+    "__ctrl__BANG-BATCH-IMPORT-DATA-VALIDATION-01": {
+      "test_file": "BANK-BATCH-CTRL.DAT",
+      "rows": 0,
+      "type": "expected_output"
+    }
+  },
+  "last_run_files": {
+    "BANG-BATCH-IMPORT-DATA-VALIDATION-01": {
+      "file": "BANK-BATCH-INPUT-PREV.DAT",
+      "path": "/Users/Alagushankar/WorkSpace/Claude/cloude-engine/config-engine/test_data/BANG-BATCH-IMPORT/last_run/BANG-BATCH-IMPORT-DATA-VALIDATION-01/BANK-BATCH-INPUT-PREV.DAT"
+    }
+  },
+  "test_ctrl_files": {
+    "BANG-BATCH-IMPORT-DATA-VALIDATION-01": {
+      "file": "BANK-BATCH-CNT.CTL.DAT",
+      "path": "/Users/Alagushankar/WorkSpace/Claude/cloude-engine/config-engine/test_data/BANG-BATCH-IMPORT/test_ctrl/BANG-BATCH-IMPORT-DATA-VALIDATION-01/BANK-BATCH-CNT.CTL.DAT"
+    }
+  }
+}

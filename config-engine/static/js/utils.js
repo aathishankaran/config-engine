@@ -1,11 +1,10 @@
 /**
- * Utilities: DOM helpers, escapeHtml, format/transform icons, modal popups.
+ * Utilities: escapeHtml, format/transform icons, modal popups.
+ * jQuery is loaded globally — uses $() for DOM access.
  */
 (function (global) {
   global.CodeParser = global.CodeParser || {};
   var CP = global.CodeParser;
-
-  CP.$ = function (id) { return document.getElementById(id); };
 
   CP.escapeHtml = function (str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -65,46 +64,48 @@
   };
 
   CP.showMessagePopup = function (title, message, type, useHtml) {
-    var $ = CP.$;
-    var msgModal = $('message-modal');
-    var msgTitle = $('message-modal-title');
-    var msgBody = $('message-modal-body');
-    var msgHeader = $('message-modal-header');
+    var $msgModal = $('#message-modal');
+    var $msgTitle = $('#message-modal-title');
+    var $msgBody = $('#message-modal-body');
+    var $msgHeader = $('#message-modal-header');
     type = type || 'success';
-    if (msgTitle) msgTitle.textContent = title || (type === 'error' ? 'Error' : 'Success');
-    if (msgBody) {
-      if (useHtml && message != null && message !== '') msgBody.innerHTML = message;
-      else msgBody.textContent = message != null ? String(message) : '';
+    var isError = (type === 'error');
+    if ($msgTitle.length) {
+      var icon = isError ? 'fa-circle-xmark' : 'fa-circle-check';
+      $msgTitle.html('<i class="fa-solid ' + icon + '" style="margin-right:8px"></i>' +
+                     (title || (isError ? 'Error' : 'Success')));
     }
-    if (msgHeader) {
-      msgHeader.classList.remove('success', 'error');
-      msgHeader.classList.add(type === 'error' ? 'error' : 'success');
+    if ($msgBody.length) {
+      if (useHtml && message != null && message !== '') $msgBody.html(message);
+      else $msgBody.text(message != null ? String(message) : '');
     }
-    if (msgModal) msgModal.classList.add('visible');
+    if ($msgHeader.length) {
+      $msgHeader.removeClass('modal-head-success modal-head-danger')
+                .addClass(isError ? 'modal-head-danger' : 'modal-head-success');
+    }
+    $msgModal.removeClass('hidden');
   };
 
   CP.closeMessageModal = function () {
-    var msgModal = CP.$('message-modal');
-    if (msgModal) msgModal.classList.remove('visible');
+    $('#message-modal').addClass('hidden');
   };
 
   CP.showErrorPopup = function (title, message, details) {
-    var $ = CP.$;
-    var errModal = $('error-modal');
-    var errTitle = $('error-modal-title');
-    var errMsg = $('error-modal-message');
-    var errDetails = $('error-modal-details');
-    if (errTitle) errTitle.textContent = title || 'Error';
-    if (errMsg) errMsg.textContent = message || '';
-    if (errDetails) {
-      errDetails.textContent = details != null && details !== '' ? String(details) : '';
-      errDetails.style.display = details != null && details !== '' ? 'block' : 'none';
+    var $errModal = $('#error-modal');
+    var $errTitle = $('#error-modal-title');
+    var $errMsg = $('#error-modal-message');
+    var $errDetails = $('#error-modal-details');
+    $errTitle.html('<i class="fa-solid fa-circle-xmark" style="margin-right:8px"></i>' + (title || 'Error'));
+    $errMsg.text(message || '');
+    if (details != null && details !== '') {
+      $errDetails.text(String(details)).show();
+    } else {
+      $errDetails.text('').hide();
     }
-    if (errModal) errModal.classList.add('visible');
+    $errModal.removeClass('hidden');
   };
 
   CP.closeErrorModal = function () {
-    var errModal = CP.$('error-modal');
-    if (errModal) errModal.classList.remove('visible');
+    $('#error-modal').addClass('hidden');
   };
 })(typeof window !== 'undefined' ? window : this);
