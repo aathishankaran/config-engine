@@ -26,7 +26,7 @@ function buildNodeEl(node) {
   var meta = C.TYPE_META[node.type] || C.TYPE_META.custom;
   var icon = C.TYPE_ICONS[node.type] || C.TYPE_ICONS.custom;
   var isInput  = node.type === 'input';
-  var isOutput = node.type === 'output';
+  var isOutput = node.type === 'output' || node.type === 'efs_write';
 
   var title = isInput || isOutput ? node.name || node.id
              : node.output_alias || node.step_id || node.id;

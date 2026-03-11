@@ -219,7 +219,7 @@
           };
         }
         cfg.Inputs[inp.name] = inp;
-      } else if (n.type === 'output') {
+      } else if (n.type === 'output' || n.type === 'efs_write') {
         var out = {
           name: n.name || n.id,
           format: (n.format || 'PARQUET').toUpperCase(),
@@ -228,11 +228,16 @@
         if (n.dataset_name)     out.dataset_name     = n.dataset_name;
         if (n.dataset_name)     out.source_file_name = n.dataset_name;
         if (n.frequency)        out.frequency        = n.frequency;
-        var _curBucket = (S._appSettings.curated_bucket_prefix || '').replace(/\/$/, '');
+        var _isEfsOut  = n.type === 'efs_write';
+        var _curBucket = (_isEfsOut
+          ? (S._appSettings.efs_output_prefix || '')
+          : (S._appSettings.curated_bucket_prefix || '')
+        ).replace(/\/$/, '');
         var _ifaceOut  = DS.fn._getInterfaceName();
         if (_curBucket && _ifaceOut) {
           out.source_path = _curBucket + '/' + _ifaceOut + '/';
         }
+        if (_isEfsOut) out.target_storage = 'efs';
         if (n.source_inputs && n.source_inputs.length > 0) out.source_inputs = n.source_inputs;
         var outFmt = (n.format || '').toUpperCase();
         if (outFmt === 'FIXED') {

@@ -45,6 +45,7 @@ DEFAULT_SETTINGS = {
     "validation_bucket_prefix": "",
     "error_bucket_prefix": "",
     "curated_bucket_prefix": "",
+    "efs_output_prefix": "",
     "usa_holidays": [
         {"active": True,  "name": "New Year's Day",          "date": "2026-01-01"},
         {"active": True,  "name": "Martin Luther King Jr. Day","date": "2026-01-19"},
@@ -1114,7 +1115,10 @@ def api_save_node_test_file(filename):
                 file_format = "FIXED"
                 fields_json = json.dumps(node_cfg["fields"])
         try:
-            text = raw_bytes.decode("utf-8", errors="replace")
+            # Decode and strip UTF-8 BOM that Excel / mainframe export tools often prepend.
+            # Without this, the first column header becomes "\uFEFFCOL_NAME" instead of
+            # "COL_NAME", which breaks column mapping in reconciliation.
+            text = raw_bytes.decode("utf-8-sig", errors="replace")
             # Control-file expected uploads: parse the raw fixed-width CTL file using
             # ctrl_file_fields from the matching validate step so that column names and
             # positions exactly match the generated ctrl output (also parsed the same way
@@ -1261,7 +1265,7 @@ def api_save_last_run_file(filename):
         # validate step so column names match the generated ctrl output exactly.
         if file_type == "test_ctrl":
             try:
-                text = raw_bytes.decode("utf-8", errors="replace")
+                text = raw_bytes.decode("utf-8-sig", errors="replace")
                 _lr_ctrl_fields: list = []
                 _lr_ctrl_incl_hdr: bool = False
                 try:
