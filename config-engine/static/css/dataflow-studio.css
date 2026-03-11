@@ -50,6 +50,8 @@
   --node-validate-header:  #0d9488;
   --node-oracle-write-border: #c2410c;
   --node-oracle-write-header: #c2410c;
+  --node-efs-write-border:    #7c3aed;
+  --node-efs-write-header:    #7c3aed;
 }
 
 html, body {
@@ -364,6 +366,7 @@ html, body {
 .pi-custom    .palette-item-icon { background: #f1f5f9; color: #64748b; }
 .pi-validate      .palette-item-icon { background: #ccfbf1; color: #0d9488; }
 .pi-oracle-write  .palette-item-icon { background: #ffedd5; color: #c2410c; }
+.pi-efs-write     .palette-item-icon { background: #ede9fe; color: #7c3aed; }
 
 /* ===================================================================
    CANVAS
@@ -504,6 +507,7 @@ html, body {
 .node-custom   .node-header { background: rgba(100,116,139,0.10); }
 .node-validate      .node-header { background: rgba(13,148,136,0.10); }
 .node-oracle-write  .node-header { background: rgba(194,65,12,0.10); }
+.node-efs_write     .node-header { background: rgba(124,58,237,0.10); }
 
 /* Elevated icon badge — larger box with shadow, floats above the card */
 .node-header-icon {
@@ -533,6 +537,7 @@ html, body {
 .node-custom   .node-header-icon { background: var(--node-custom-border); }
 .node-validate      .node-header-icon { background: var(--node-validate-border); }
 .node-oracle-write  .node-header-icon { background: var(--node-oracle-write-border); }
+.node-efs_write     .node-header-icon { background: var(--node-efs-write-border); }
 /* Larger, crisper SVG icons inside the elevated badge */
 .node-header-icon svg { width: 16px; height: 16px; stroke: #fff; color: #fff; stroke-width: 2; }
 
@@ -554,6 +559,7 @@ html, body {
 .node-custom   .node-type-label { color: #475569; }
 .node-validate      .node-type-label { color: #0f766e; }
 .node-oracle-write  .node-type-label { color: #9a3412; }
+.node-efs_write     .node-type-label { color: #6d28d9; }
 
 /* Node body */
 .node-body {
@@ -587,6 +593,7 @@ html, body {
 .df-node.node-custom    { border-left: 3px solid var(--node-custom-border); }
 .df-node.node-validate      { border-left: 3px solid var(--node-validate-border); }
 .df-node.node-oracle-write  { border-left: 3px solid var(--node-oracle-write-border); }
+.df-node.node-efs_write     { border-left: 3px solid var(--node-efs-write-border); }
 
 /* Connection Ports — small, clearly separated from the card icon */
 .node-port {
