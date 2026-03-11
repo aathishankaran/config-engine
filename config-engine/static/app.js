@@ -932,6 +932,7 @@
         var $errorBucketPrefix = $('#settings-error-bucket-prefix');
         var $rawBucketPrefix = $('#settings-raw-bucket-prefix');
         var $curatedBucketPrefix = $('#settings-curated-bucket-prefix');
+        var $efsOutputPrefix = $('#settings-efs-output-prefix');
         if ($useLlm.length) $useLlm[0].checked = !!data.use_llm;
         if ($pathPrefix.length) $pathPrefix.val(data.input_output_path_prefix || '');
         if ($inputPrefix.length) $inputPrefix.val(data.input_dataset_prefix || '');
@@ -944,6 +945,7 @@
         if ($validationBucketPrefix.length) $validationBucketPrefix.val(data.validation_bucket_prefix || '');
         if ($errorBucketPrefix.length) $errorBucketPrefix.val(data.error_bucket_prefix || '');
         if ($curatedBucketPrefix.length) $curatedBucketPrefix.val(data.curated_bucket_prefix || '');
+        if ($efsOutputPrefix.length) $efsOutputPrefix.val(data.efs_output_prefix || '');
         /* Holidays table */
         _renderHolidaysTable(data.usa_holidays || []);
         updateLlmPanelVisibility();
@@ -963,6 +965,7 @@
       var $errorBucketPrefix = $('#settings-error-bucket-prefix');
       var $rawBucketPrefix = $('#settings-raw-bucket-prefix');
       var $curatedBucketPrefix = $('#settings-curated-bucket-prefix');
+      var $efsOutputPrefix = $('#settings-efs-output-prefix');
       var $msg = $('#settings-message');
       var api = window.CodeParser && window.CodeParser.API;
       if (!api || !api.saveSettings) return;
@@ -982,6 +985,7 @@
         validation_bucket_prefix: ($validationBucketPrefix.length && $validationBucketPrefix.val()) ? $validationBucketPrefix.val().trim() : '',
         error_bucket_prefix: ($errorBucketPrefix.length && $errorBucketPrefix.val()) ? $errorBucketPrefix.val().trim() : '',
         curated_bucket_prefix: ($curatedBucketPrefix.length && $curatedBucketPrefix.val()) ? $curatedBucketPrefix.val().trim() : '',
+        efs_output_prefix: ($efsOutputPrefix.length && $efsOutputPrefix.val()) ? $efsOutputPrefix.val().trim() : '',
         usa_holidays: _readHolidaysTable()
       };
       if ($msg.length) { $msg.text('Saving\u2026'); $msg[0].className = 'import-message'; }
@@ -2114,22 +2118,16 @@
     });
   }
 
-  /* Renders per-output-node upload buttons for expected output files AND
-     per-validate-step ctrl file upload buttons in the Reconciliation tab.
-     Users can upload fixed-width / CSV expected outputs directly from here
-     without needing to go back to the Input Datasets tab.                    */
+  /* Renders per-output-node upload buttons for expected output files in the
+     Reconciliation tab.  Control file expected uploads are handled in the
+     Input Datasets tab (Expected Control Files section).                     */
   function _renderReconExpectedUpload(container) {
     if (!container) return;
     var $container = $(container);
     var outputs = (currentConfig && currentConfig.Outputs) || {};
     var outputKeys = Object.keys(outputs);
-    // Ctrl file steps (validate steps with ctrl_file_create)
-    var allSteps = (currentConfig && currentConfig.Transformations && currentConfig.Transformations.steps) || [];
-    var ctrlSteps = allSteps.filter(function (s) {
-      return s.type === 'validate' && s.logic && s.logic.ctrl_file_create;
-    });
 
-    if (!outputKeys.length && !ctrlSteps.length) {
+    if (!outputKeys.length) {
       $container.html('<p style="font-size:12px;color:#94a3b8;padding:8px 0">No output nodes defined in this interface.</p>');
       return;
     }
@@ -2217,87 +2215,6 @@
       $item.append($label).append($btn).append($badge);
       $container.append($item);
     });
-
-    // ── Control file upload buttons (one per validate step with ctrl_file_create) ──
-    if (ctrlSteps.length) {
-      var $ctrlDivider = $('<div>').css({
-        fontSize: '11px', fontWeight: '600', color: '#0d9488',
-        textTransform: 'uppercase', letterSpacing: '0.05em',
-        margin: '8px 0 4px', padding: '4px 0 2px',
-        borderTop: '1px solid #e2e8f0'
-      }).text('Expected Control Files');
-      $container.append($ctrlDivider);
-
-      ctrlSteps.forEach(function (step) {
-        var stepId     = step.id || step.output_alias || 'validate';
-        var storageKey = '__ctrl__' + stepId;
-
-        var $item  = $('<div>').addClass('test-import-node-item');
-        var $label = $('<div>').addClass('test-import-node-name');
-        $label.html('<i class="fa-solid fa-file-lines" style="margin-right:5px;color:#0d9488"></i>' +
-                    (window.CodeParser.escapeHtml || escapeHtml)(stepId) +
-                    '<span style="font-size:10px;margin-left:8px;color:#64748b;text-transform:uppercase;font-weight:600">CTL</span>');
-
-        var $btn   = $('<button>').attr('type', 'button').addClass('test-import-node-btn');
-        var $badge = $('<div>').addClass('test-import-file-badge');
-
-        var existingCtrlData  = uploadedTestData[currentPath] && uploadedTestData[currentPath].expected_output;
-        var existingCtrlRows  = existingCtrlData && existingCtrlData[storageKey];
-        if (existingCtrlRows && existingCtrlRows.length > 0) {
-          $btn[0].className = 'test-import-node-btn has-file';
-          $btn.html('<i class="fa-solid fa-check"></i> Control file (' + existingCtrlRows.length + ' row' + (existingCtrlRows.length !== 1 ? 's' : '') + ') — Re-upload');
-        } else {
-          $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Upload Expected Control File');
-        }
-
-        $btn.on('click', function () {
-          var $fileInput = $('<input>').attr('type', 'file').attr('accept', '*').hide();
-          $(document.body).append($fileInput);
-          $fileInput.on('change', function () {
-            var file = $fileInput[0].files && $fileInput[0].files[0];
-            $fileInput.remove();
-            if (!file) return;
-            var fd = new FormData();
-            fd.append('file', file);
-            fd.append('node_name', storageKey);
-            fd.append('node_type', 'expected_output');
-            fd.append('format', 'FIXED');
-            fd.append('fields', JSON.stringify([]));
-            $btn.prop('disabled', true);
-            $btn.html('<i class="fa-solid fa-spinner fa-spin"></i> Uploading…');
-            fetch('/api/config/' + encodeURIComponent(currentPath) + '/node-test-file', { method: 'POST', body: fd })
-              .then(function (r) { return r.json(); })
-              .then(function (res) {
-                $btn.prop('disabled', false);
-                if (res.error) {
-                  $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Upload Expected Control File');
-                  (window.CodeParser.showMessagePopup || showMessagePopup)('Upload failed', res.error, 'error');
-                  return;
-                }
-                $btn[0].className = 'test-import-node-btn has-file';
-                $btn.html('<i class="fa-solid fa-check"></i> ' + file.name + ' (' + (res.rows || 0) + ' row' + (res.rows !== 1 ? 's' : '') + ')');
-                $badge.text('✓ Saved'); $badge.addClass('visible');
-                API.getConfigTestData(currentPath).then(function (data) {
-                  uploadedTestData[currentPath] = {
-                    input_data:      data.input_data      || {},
-                    expected_output: data.expected_output || {}
-                  };
-                  renderReconciliation();
-                }).catch(function () { renderReconciliation(); });
-              })
-              .catch(function (e) {
-                $btn.prop('disabled', false);
-                $btn.html('<i class="fa-solid fa-file-arrow-up"></i> Upload Expected Control File');
-                (window.CodeParser.showMessagePopup || showMessagePopup)('Upload failed', e.message || String(e), 'error');
-              });
-          });
-          $fileInput[0].click();
-        });
-
-        $item.append($label).append($btn).append($badge);
-        $container.append($item);
-      });
-    }
   }
 
   // --- Reconciliation helpers ---
@@ -2306,7 +2223,18 @@
     if (v === null || v === undefined) return '';
     var s = String(v).trim();
     if (s === '') return '';
-    // Numeric normalization: "100.0" == "100" == "100.00"
+    // For pure integers, strip leading zeros but avoid IEEE 754 precision loss for
+    // large numbers (bank account/transaction IDs can be 16–19 digits; Number() loses
+    // precision beyond 15 significant digits).
+    if (/^-?\d+$/.test(s)) {
+      var neg = s.charAt(0) === '-';
+      var digits = s.replace(/^-?0+/, '') || '0';
+      // If > 15 digits the value cannot be safely held in a JS double — compare as string.
+      if (digits.length > 15) return (neg ? '-' : '') + digits;
+      // Smaller integers: convert to strip leading zeros via Number.
+      return String(Number(s));
+    }
+    // Numeric normalization for decimals/floats: "100.0" == "100" == "100.00"
     var n = Number(s);
     if (!isNaN(n) && isFinite(n)) return String(n);
     return s;
@@ -2544,12 +2472,19 @@
 
       // Check whether this output name exists in the current config's Outputs
       var configOutputs = (currentConfig && currentConfig.Outputs) || {};
-      var isStaleKey = !configOutputs[name] && Object.keys(expected).indexOf(name) >= 0 && !genRows.length;
+      // __ctrl__ keys are validate-step control files — never flag them as stale
+      // (they are intentionally absent from configOutputs)
+      var isCtrlKey   = name.indexOf('__ctrl__') === 0;
+      var isStaleKey  = !isCtrlKey && !configOutputs[name] && Object.keys(expected).indexOf(name) >= 0 && !genRows.length;
+      // Display title: "Control File: <stepId>" for ctrl keys, raw name for outputs
+      var displayTitle = isCtrlKey
+        ? 'Control File: ' + escape(name.slice('__ctrl__'.length))
+        : escape(name);
 
       html += '<div class="test-recon-dataset">';
       // Header row: title + hide-matching toggle
       html += '<div class="recon-dataset-header">';
-      html += '<h4 class="test-recon-dataset-title">' + escape(name) + ' <span class="' + statusClass + '">' + statusText + '</span>';
+      html += '<h4 class="test-recon-dataset-title">' + displayTitle + ' <span class="' + statusClass + '">' + statusText + '</span>';
       if (isStaleKey) {
         // Suggest which config output this stale key might correspond to
         var configOutKeys = Object.keys(configOutputs);
@@ -2628,7 +2563,9 @@
           html += '<td class="recon-source-label recon-source-gen">Gen only</td>';
           allCols.forEach(function (ec) {
             var gc = colMap[ec];  // null when no matching generated column
-            var v = (gc != null) ? pair.gen[gc] : undefined;
+            // For extra gen cols added to allCols by their own name, gc is undefined so
+            // fall back to direct key lookup on pair.gen (ec IS the gen column name).
+            var v = (gc != null) ? pair.gen[gc] : pair.gen[ec];
             html += '<td>' + escape(v != null ? String(v) : '') + '</td>';
           });
           html += '</tr>';
@@ -2671,7 +2608,9 @@
             html += '<td class="recon-source-label recon-source-gen">Gen</td>';
             allCols.forEach(function (ec) {
               var gc = colMap[ec];  // null when no matching generated column
-              var v = (gc != null) ? pair.gen[gc] : undefined;
+              // For extra gen cols added to allCols by their own name, gc is undefined so
+              // fall back to direct key lookup on pair.gen (ec IS the gen column name).
+              var v = (gc != null) ? pair.gen[gc] : pair.gen[ec];
               var cls = diffCols[ec] ? ' class="recon-cell-diff recon-cell-gen-val"' : '';
               html += '<td' + cls + '>' + escape(v != null ? String(v) : '') + '</td>';
             });
@@ -2807,15 +2746,20 @@
               var ctrlOuts = res.ctrl_outputs || {};
               Object.keys(ctrlOuts).forEach(function (stepId) {
                 var rows = ctrlOuts[stepId] || [];
-                if (!rows.length) return;
                 var cols = rows[0] ? Object.keys(rows[0]).filter(function (k) { return !k.startsWith('_'); }) : [];
-                if (!cols.length) cols = rows[0] ? Object.keys(rows[0]) : ['value'];
-                var html = '<div class="test-table-wrap"><h3>Control File: ' + esc2(stepId) + '</h3><table class="test-table"><thead><tr>' +
-                  cols.map(function (c) { return '<th>' + esc2(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
-                rows.forEach(function (r) {
-                  html += '<tr>' + cols.map(function (c) { return '<td>' + esc2(String(r[c] != null ? r[c] : '')) + '</td>'; }).join('') + '</tr>';
-                });
-                html += '</tbody></table></div>';
+                if (!cols.length && rows[0]) cols = Object.keys(rows[0]);
+                var html = '<div class="test-table-wrap"><h3>Control File: ' + esc2(stepId) + '</h3>';
+                if (!rows.length) {
+                  html += '<p class="test-output-empty" style="margin:4px 0 8px">Control file generated (0 data rows).</p>';
+                } else {
+                  html += '<table class="test-table"><thead><tr>' +
+                    cols.map(function (c) { return '<th>' + esc2(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+                  rows.forEach(function (r) {
+                    html += '<tr>' + cols.map(function (c) { return '<td>' + esc2(String(r[c] != null ? r[c] : '')) + '</td>'; }).join('') + '</tr>';
+                  });
+                  html += '</tbody></table>';
+                }
+                html += '</div>';
                 $outputTables.append(html);
               });
               if (outputNames.length === 0 && Object.keys(ctrlOuts).length === 0 && res.error) {

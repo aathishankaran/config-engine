@@ -189,6 +189,7 @@ function renderInputProps(body, node) {
  */
 
 function renderOutputProps(body, node) {
+  var _isEfsWriteNode = node.type === 'efs_write';
   var meta = DS.fn.getNodeMeta(node);
   var schemaFileO = meta.copybook_file || node._schema_file || '';
   var schemaFieldCountO = meta.fields || (node.fields ? node.fields.length : 0);
@@ -259,7 +260,9 @@ function renderOutputProps(body, node) {
       formRow('Dataset Name', textInput('po-dataset-name', curDatasetO, 'e.g. OUTPUT.SUMCOPY.DAT'),
         'Output file name with extension') +
       formRow('Write Mode', selectInput('po-wmode', C.WRITE_MODES, (node.write_mode || '').toUpperCase() || C.WRITE_MODES[0])) +
-      DS.fn._pathInfoBannerHtml('po-path-preview', S._appSettings.curated_bucket_prefix || '', curFreqO, curDatasetO, '') +
+      DS.fn._pathInfoBannerHtml('po-path-preview',
+        _isEfsWriteNode ? (S._appSettings.efs_output_prefix || '') : (S._appSettings.curated_bucket_prefix || ''),
+        curFreqO, curDatasetO, '') +
     '</div>' +
 
     /* ── FORMAT PROPERTIES (conditional) ── */
@@ -355,8 +358,9 @@ function renderOutputProps(body, node) {
     if (!$_poPreview.length) return;
     var f = $_poFreq.val() || '';
     var d = $_poDs.val()   || '';
+    var prefix = _isEfsWriteNode ? (S._appSettings.efs_output_prefix || '') : (S._appSettings.curated_bucket_prefix || '');
     $_poPreview.html('<i class="fa-solid fa-circle-info"></i> Files will be processed as: <code>' +
-      DS.fn.esc(DS.fn._buildPathPreview(S._appSettings.curated_bucket_prefix || '', DS.fn._getInterfaceName(), f, d)) + '</code>');
+      DS.fn.esc(DS.fn._buildPathPreview(prefix, DS.fn._getInterfaceName(), f, d)) + '</code>');
   }
   $_poFreq.on('change', _updateOutputPreview);
   $_poDs.on('input',    _updateOutputPreview);
@@ -1811,6 +1815,7 @@ function showPropsPanel(node) {
   else if (node.type === 'union')     renderUnionProps(body, node);
   else if (node.type === 'validate')      renderValidateProps(body, node);
   else if (node.type === 'oracle_write')  renderOracleWriteProps(body, node);
+  else if (node.type === 'efs_write')     renderOutputProps(body, node);
   else renderCustomProps(body, node);
 
   DS.fn.initSrcDropdowns(body);
@@ -2237,6 +2242,42 @@ function applyPropsToNode(node) {
         if (S._nodeFileMeta[_cfgPO] && S._nodeFileMeta[_cfgPO][oldNameO]) {
           S._nodeFileMeta[_cfgPO][node.name] = S._nodeFileMeta[_cfgPO][oldNameO];
           delete S._nodeFileMeta[_cfgPO][oldNameO];
+        }
+      }
+    }
+  } else if (node.type === 'efs_write') {
+    var oldNameE = node.name;
+    node.name             = g('po-name') || node.id;
+    node.id               = node.name;
+    node.format           = g('po-format');
+    node.dataset_name     = g('po-dataset-name') || '';
+    delete node.source_path; delete node.target_file_name; delete node.partition_col;
+    node.write_mode       = g('po-wmode');
+    node.frequency        = g('po-frequency') || undefined;
+    node.source_inputs    = DS.fn.getMultiSelectValues('po-src');
+    node.target_storage   = 'efs';
+    delete node.s3_path;
+    delete node.path;
+    var _rlE = parseInt(g('po-record-length'), 10);
+    var _hcE = parseInt(g('po-header-count'), 10);
+    var _tcE = parseInt(g('po-trailer-count'), 10);
+    node.record_length    = isNaN(_rlE) ? undefined : _rlE;
+    node.header_count     = isNaN(_hcE) ? 0 : _hcE;
+    node.trailer_count    = isNaN(_tcE) ? 0 : _tcE;
+    node.delimiter_char   = g('po-delimiter-char') || '';
+    node.ctrl_file_gen    = gc('po-ctrl-file-gen');
+    if (oldNameE && oldNameE !== node.name) {
+      var $elE = $('[data-node-id="' + oldNameE + '"]');
+      if ($elE.length) $elE.attr('data-node-id', node.id);
+      var _cfgPE = ($('#current-file').text() || '').trim();
+      if (_cfgPE && _cfgPE !== 'Select an interface') {
+        fetch('/api/config/' + encodeURIComponent(_cfgPE) + '/rename-node-test-data', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ old_name: oldNameE, new_name: node.name, node_type: 'efs_write' })
+        }).catch(function(e) { console.warn('rename test data:', e); });
+        if (S._nodeFileMeta[_cfgPE] && S._nodeFileMeta[_cfgPE][oldNameE]) {
+          S._nodeFileMeta[_cfgPE][node.name] = S._nodeFileMeta[_cfgPE][oldNameE];
+          delete S._nodeFileMeta[_cfgPE][oldNameE];
         }
       }
     }
