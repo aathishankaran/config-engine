@@ -292,6 +292,16 @@ html, body {
   flex: 1;
 }
 
+/* palette-section must be a flex column that fills .studio-props
+   so that palette-body's flex:1 + overflow-y:auto can actually scroll */
+#palette-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .palette-section-title {
   font-size: 11px;
   font-weight: 700;
@@ -2626,7 +2636,6 @@ html, body { overflow: hidden; height: 100%; margin: 0; }
   align-items: center;
   gap: 8px;
   padding: 0 12px;
-  border-right: 1px solid var(--border);
   flex-shrink: 0;
   transition: width .2s ease, min-width .2s ease;
 }
@@ -2680,7 +2689,6 @@ html, body { overflow: hidden; height: 100%; margin: 0; }
   justify-content: flex-end;
   gap: 6px;
   padding: 0 12px;
-  border-left: 1px solid var(--border);
   flex-shrink: 0;
   transition: width .2s ease, min-width .2s ease;
   box-sizing: border-box;
@@ -2906,6 +2914,7 @@ html, body { overflow: hidden; height: 100%; margin: 0; }
 #left-panel {
   width: var(--lp-width);
   min-width: var(--lp-width);
+  min-height: 0;
   background: var(--bg-sidebar);
   display: flex;
   flex-direction: column;

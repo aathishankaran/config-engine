@@ -1166,12 +1166,15 @@ function renderValidateProps(body, node) {
         '<div id="pv-prev-day-section"' + (hasPrevDay ? '' : ' style="display:none;"') + '>' +
           '<div class="pv-feature-card-body">' +
             '<p style="font-size:11px;color:#64748b;margin:0 0 6px">' +
-              'Previous business day is <strong>auto-calculated at runtime</strong> (skips weekends and holidays).' +
+              'Previous business day is <strong>auto-calculated at runtime</strong> (skips holidays). Header date is always validated as a real calendar date.' +
             '</p>' +
             formRow('Header Date Field',
               '<select id="pv-prev-day-header-field" class="form-select">' + _hdrFieldOpts + '</select>',
               'Header field from the input file that contains the run date') +
             prevDayBanner +
+            '<div class="path-info-banner">' +
+              '<i class="fa-solid fa-calendar-check"></i> Calendar date check: header date is always validated as a real calendar date — invalid dates (e.g. Feb\u00a030) will fail the job.' +
+            '</div>' +
           '</div>' +
         '</div>' +
       '</div>' +

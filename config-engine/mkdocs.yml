@@ -1,0 +1,92 @@
+site_name: Config Engine Documentation
+site_description: Flask web application for managing dataflow configurations, parsing mainframe artifacts, and testing data pipelines.
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - toc.integrate
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths:
+            - .
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_category_heading: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            docstring_style: google
+            docstring_section_style: spacy
+            merge_init_into_class: true
+            show_signature_annotations: true
+            separate_signature: true
+            heading_level: 2
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets
+  - tables
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Developer Guide: developer-guide.md
+  - REST API Routes: api-routes.md
+  - Config JSON Schema: config-json-schema.md
+  - Design Decisions: design-decisions.md
+  - Test Report: test-report.md
+  - API Reference:
+    - app: api/app.md
+    - schema: api/schema.md
+    - engine: api/engine.md
+    - keywords: api/keywords.md
+    - file_discovery: api/file_discovery.md
+    - jcl_parser: api/jcl_parser.md
+    - cobol_parser: api/cobol_parser.md
+    - copybook_parser: api/copybook_parser.md
+    - transformation_extractor: api/cobol_transformation_extractor.md
+    - test_dataflow: api/test_dataflow.md
+    - zip_import: api/zip_import.md
