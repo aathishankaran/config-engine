@@ -46,6 +46,9 @@ logs/
 # ─── Test / Sample data (optional: comment out if needed) ─
 configs/test_data/
 
+# ─── MkDocs Build Output ────────────────────────────────
+site/
+
 # ─── OS / Misc ───────────────────────────────────────────
 Thumbs.db
 Desktop.ini

@@ -4,24 +4,33 @@ COBOL parser for extracting file references and basic structure.
 
 import re
 from pathlib import Path
-from dataclasses import dataclass
+from typing import List, Optional, Tuple
 
 
-@dataclass
 class FileDescriptor:
     """Represents a COBOL FD (File Descriptor)."""
 
-    fd_name: str
-    copybook: str | None = None
-    record_name: str | None = None
+    def __init__(
+        self,
+        fd_name,        # type: str
+        copybook=None,  # type: Optional[str]
+        record_name=None,  # type: Optional[str]
+    ):
+        self.fd_name = fd_name
+        self.copybook = copybook
+        self.record_name = record_name
 
 
-@dataclass
 class SelectAssignment:
     """Represents SELECT...ASSIGN."""
 
-    file_name: str
-    dd_name: str | None = None
+    def __init__(
+        self,
+        file_name,    # type: str
+        dd_name=None, # type: Optional[str]
+    ):
+        self.file_name = file_name
+        self.dd_name = dd_name
 
 
 class COBOLParser:
@@ -57,7 +66,7 @@ class COBOLParser:
     _WS_SECTION_RE = re.compile(r"\bWORKING-STORAGE\s+SECTION\b", re.IGNORECASE)
     _PROC_DIV_RE = re.compile(r"\bPROCEDURE\s+DIVISION\b", re.IGNORECASE)
 
-    def _parse_fds_with_copybook(self, content: str) -> list[FileDescriptor]:
+    def _parse_fds_with_copybook(self, content: str) -> List[FileDescriptor]:
         """
         Parse FD statements and find the associated COPY copybook by scanning ahead
         into the 01-record definition that follows each FD block.
@@ -69,14 +78,14 @@ class COBOLParser:
             01  SRC-REC.
                 COPY GENIN01.
         """
-        fds: list[FileDescriptor] = []
+        fds: List[FileDescriptor] = []
         lines = content.splitlines()
         for i, line in enumerate(lines):
             fd_m = self._FD_LINE.match(line)
             if not fd_m:
                 continue
             fd_name = fd_m.group(1).replace("-", "_")
-            copybook: str | None = None
+            copybook: Optional[str] = None
             # Look ahead up to 25 lines within the FILE SECTION only — stop at
             # the next FD, WORKING-STORAGE, LINKAGE SECTION, or PROCEDURE DIVISION.
             for j in range(i + 1, min(i + 26, len(lines))):
@@ -92,18 +101,18 @@ class COBOLParser:
             fds.append(FileDescriptor(fd_name=fd_name, copybook=copybook))
         return fds
 
-    def parse_file(self, path: Path) -> tuple[list[FileDescriptor], list[SelectAssignment]]:
+    def parse_file(self, path: Path) -> Tuple[List[FileDescriptor], List[SelectAssignment]]:
         """Parse COBOL file and return FD and SELECT info."""
         content = path.read_text(encoding="utf-8", errors="ignore")
         return self.parse_content(content)
 
     def parse_content(
         self, content: str
-    ) -> tuple[list[FileDescriptor], list[SelectAssignment]]:
+    ) -> Tuple[List[FileDescriptor], List[SelectAssignment]]:
         """Parse COBOL content and extract file structure."""
         # Use lookahead-based FD parsing to capture COPY inside the 01-record
         fds = self._parse_fds_with_copybook(content)
-        selects: list[SelectAssignment] = []
+        selects: List[SelectAssignment] = []
 
         for match in self.SELECT_PATTERN.finditer(content):
             file_name = match.group(1).replace("-", "_")

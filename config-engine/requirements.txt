@@ -1,19 +1,19 @@
 # Config Engine (Flask web UI)
-# Python 3.12+  |  Linux / macOS / Windows
+# Python 3.6.8+  |  Linux / macOS / Windows
 
 # ── Web framework ──────────────────────────────────────────────────────────────
-flask>=3.0.0
+flask>=1.1.2,<2.1        # Flask 2.1+ requires Python 3.7+
 
 # ── Data validation & serialisation ───────────────────────────────────────────
-pydantic>=2.0.0
+pydantic>=1.8,<2.0       # Pydantic 2.x requires Python 3.7+
 
 # ── Data processing (schema parsing, test data preview) ───────────────────────
-pandas>=2.2.0            # 2.2+ has Python 3.12 wheels on all platforms
-pyarrow>=14.0.0          # required by pandas for Parquet / Arrow support
+pandas>=1.1.5,<1.2       # pandas 1.1.5 is the last release supporting Python 3.6
+pyarrow>=3.0.0,<6.0      # pyarrow 6.0+ requires Python 3.7+
 
 # ── COBOL copybook parsing (server-side schema import) ────────────────────────
 # ebcdic>=1.1.1           # optional: EBCDIC encoding/decoding for COBOL files
 
 # ── Dev extras ────────────────────────────────────────────────────────────────
-# pytest>=8.0.0
+pytest>=3.0,<5.0         # pytest 5.0+ requires Python 3.5+ but 4.6 is last for 3.6
 # httpx>=0.27.0           # async HTTP client for testing

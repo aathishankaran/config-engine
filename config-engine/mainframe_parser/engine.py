@@ -11,6 +11,7 @@ Copybooks are used only for schema (field definitions), not for naming inputs/ou
 
 import logging
 from pathlib import Path
+from typing import Dict, List, Optional
 
 from .schema import (
     DataFlowConfig,
@@ -36,9 +37,9 @@ def _normalize_copybook_stem(stem: str) -> str:
 
 
 def _filter_procs_for_cobol(
-    proc_paths: list[Path],
-    cobol_paths: list[Path],
-) -> list[Path]:
+    proc_paths: List[Path],
+    cobol_paths: List[Path],
+) -> List[Path]:
     """
     Return only the PROC files that explicitly run one of our COBOL programs
     via an ``EXEC PGM=<program-name>`` statement.
@@ -50,7 +51,7 @@ def _filter_procs_for_cobol(
     if not cobol_paths or not proc_paths:
         return proc_paths
     cobol_stems = {p.stem.upper() for p in cobol_paths}
-    relevant: list[Path] = []
+    relevant: List[Path] = []
     for pp in proc_paths:
         try:
             content = pp.read_text(encoding="utf-8", errors="ignore").upper()
@@ -76,15 +77,15 @@ class MainframeConfigEngine:
 
     def generate_config(
         self,
-        jcl_paths: list[Path] | None = None,
-        proc_paths: list[Path] | None = None,
-        cobol_paths: list[Path] | None = None,
-        copybook_paths: list[Path] | None = None,
-        copybook_mapping: dict[str, Path] | None = None,
-        dd_copybook_mapping: dict[str, str] | None = None,
+        jcl_paths: Optional[List[Path]] = None,
+        proc_paths: Optional[List[Path]] = None,
+        cobol_paths: Optional[List[Path]] = None,
+        copybook_paths: Optional[List[Path]] = None,
+        copybook_mapping: Optional[Dict[str, Path]] = None,
+        dd_copybook_mapping: Optional[Dict[str, str]] = None,
         base_s3_path: str = "s3://migration-bucket/data",
-        input_path_prefix: str | None = None,
-        output_path_prefix: str | None = None,
+        input_path_prefix: Optional[str] = None,
+        output_path_prefix: Optional[str] = None,
     ) -> DataFlowConfig:
         """
         Generate configuration from mainframe artifact paths.
@@ -112,8 +113,8 @@ class MainframeConfigEngine:
 
         # 1. Parse JCL/PROC for inputs and outputs
         LOG.info("Parsing JCL and PROC files...")
-        all_inputs: dict[str, InputConfig] = {}
-        all_outputs: dict[str, OutputConfig] = {}
+        all_inputs: Dict[str, InputConfig] = {}
+        all_outputs: Dict[str, OutputConfig] = {}
 
         # Filter PROC files to only those that execute one of our COBOL programs.
         # This excludes utility/backup PROCs (e.g. GENBKUP02, GENDATCHK) whose DD
@@ -138,14 +139,14 @@ class MainframeConfigEngine:
         LOG.info("  -> Found %d input(s), %d output(s)", len(all_inputs), len(all_outputs))
 
         # 1b. Build DD -> copybook name from COBOL FD + SELECT (DD names from JCL/COBOL; copybooks for schema only)
-        dd_copybook_from_cobol: dict[str, str] = {}
+        dd_copybook_from_cobol: Dict[str, str] = {}
         for path in cobol_paths or []:
             try:
                 fds, selects = self.cobol_parser.parse_file(path)
             except Exception as e:
                 LOG.warning("Skipping COBOL file %s: %s", path, e)
                 continue
-            fd_by_name: dict[str, str | None] = {}
+            fd_by_name: Dict[str, Optional[str]] = {}
             for fd in fds:
                 key = fd.fd_name.upper()
                 fd_by_name[key] = fd.copybook
@@ -162,8 +163,8 @@ class MainframeConfigEngine:
         # When JCL has no inputs/outputs: infer from COBOL (DD names), not from copybook file names.
         # Dataset names and config keys come from JCL/PROC/COBOL; copybooks are for schema only.
         if not all_inputs and not all_outputs and dd_copybook_from_cobol:
-            in_dd_names: list[str] = []
-            out_dd_names: list[str] = []
+            in_dd_names: List[str] = []
+            out_dd_names: List[str] = []
             out_marks = ("SUM", "OUT", "SUMMARY", "RPT", "REPORT", "WRITE", "TARGET")
             in_marks = ("TXN", "IN", "INPUT", "DAILY", "FILE", "READ", "SOURCE", "COPY", "CNTL")
             for dd_name, copybook in dd_copybook_from_cobol.items():
@@ -214,7 +215,7 @@ class MainframeConfigEngine:
 
         # 2. Parse copybooks and enrich schema
         LOG.info("Parsing copybooks...")
-        copybook_cache: dict[str, list] = {}
+        copybook_cache: Dict[str, list] = {}
         for path in copybook_paths or []:
             fields = self.copybook_parser.parse_file(path)
             key = _normalize_copybook_stem(path.stem).upper()
@@ -227,7 +228,7 @@ class MainframeConfigEngine:
                 fields = self.copybook_parser.parse_file(path)
                 copybook_cache[name.upper()] = fields
 
-        copybook_path_map: dict[str, Path] = {}
+        copybook_path_map: Dict[str, Path] = {}
         for path in copybook_paths or []:
             key = _normalize_copybook_stem(path.stem).upper()
             if key not in copybook_path_map or not path.stem.startswith("._"):
@@ -300,8 +301,8 @@ class MainframeConfigEngine:
     def _ensure_all_outputs_covered(
         self,
         extracted: TransformationConfig,
-        output_names: list[str],
-        input_names: list[str],
+        output_names: List[str],
+        input_names: List[str],
     ) -> TransformationConfig:
         """Add pass-through steps for any output that no extracted step produces."""
         steps = list(extracted.steps or [])
@@ -355,7 +356,7 @@ class MainframeConfigEngine:
         if not output_names:
             output_names = ["(no JCL outputs)"]
 
-        steps: list[TransformationStep] = []
+        steps: List[TransformationStep] = []
 
         if len(output_names) == 1 and output_names[0] != "(no JCL outputs)":
             steps.append(
