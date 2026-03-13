@@ -7,7 +7,7 @@ sort, move, compute logic for PySpark configuration (no AI required).
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from ..keywords import COBOL_VERB_TO_PYSPARK
 from ..schema import TransformationStep, TransformationConfig
@@ -96,14 +96,14 @@ class COBOLTransformationExtractor:
     def extract_from_content(
         self,
         cobol_content: str,
-        input_names: List[str],
-        output_names: List[str],
-    ) -> Optional[TransformationConfig]:
+        input_names: list[str],
+        output_names: list[str],
+    ) -> TransformationConfig | None:
         """Extract transformation steps from COBOL content."""
-        steps: List[TransformationStep] = []
+        steps: list[TransformationStep] = []
         content_upper = cobol_content.upper()
 
-        dd_map: Dict[str, str] = {}
+        dd_map: dict[str, str] = {}
         for m in self.SELECT_PATTERN.finditer(cobol_content):
             prog_name = m.group(1).replace("-", "_").upper()
             dd_name = m.group(2).replace("-", "_").upper()
@@ -352,7 +352,7 @@ class COBOLTransformationExtractor:
         if agg_match:
             group_field = agg_match.group(1)
             agg_part = agg_match.group(2)
-            aggs: List[Dict[str, Any]] = []
+            aggs: list[dict[str, Any]] = []
             if "SUM(" in agg_part.upper():
                 sum_m = re.search(r"SUM\(([\w\-]+)\)", agg_part, re.IGNORECASE)
                 if sum_m:
@@ -458,14 +458,14 @@ class COBOLTransformationExtractor:
     def _extract_move_compute(
         self,
         content: str,
-        input_names: List[str],
-        output_names: List[str],
-    ) -> List[TransformationStep]:
+        input_names: list[str],
+        output_names: list[str],
+    ) -> list[TransformationStep]:
         """Extract MOVE, ADD, COMPUTE as column expressions.
         Splits so that MOVE to SUM_* (summary output) is a separate step placed last."""
-        steps: List[TransformationStep] = []
-        expressions: List[dict] = []
-        seen: Set[str] = set()
+        steps: list[TransformationStep] = []
+        expressions: list[dict] = []
+        seen: set[str] = set()
 
         for m in self.COMPUTE_PATTERN.finditer(content):
             tgt = m.group(1)
@@ -589,9 +589,9 @@ class COBOLTransformationExtractor:
     def _extract_sort_merge(
         self,
         content: str,
-        input_names: List[str],
-        output_names: List[str],
-    ) -> Optional[TransformationStep]:
+        input_names: list[str],
+        output_names: list[str],
+    ) -> TransformationStep | None:
         """Extract SORT or MERGE as sort/union transformation."""
         sort_m = self.SORT_PATTERN.search(content)
         if sort_m:
@@ -624,12 +624,12 @@ class COBOLTransformationExtractor:
 
     def extract_from_files(
         self,
-        cobol_paths: List[Path],
-        input_names: List[str],
-        output_names: List[str],
-    ) -> Optional[TransformationConfig]:
+        cobol_paths: list[Path],
+        input_names: list[str],
+        output_names: list[str],
+    ) -> TransformationConfig | None:
         """Extract transformations from COBOL file paths."""
-        content = ""  # type: str
+        content = ""
         for path in cobol_paths or []:
             content += path.read_text(encoding="utf-8", errors="ignore") + "\n\n"
         if not content.strip():

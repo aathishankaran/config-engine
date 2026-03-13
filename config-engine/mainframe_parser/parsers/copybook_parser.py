@@ -6,7 +6,6 @@ Handles all common COBOL PIC clause formats and usage clauses.
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
 
 from ..schema import FieldDefinition
 
@@ -74,7 +73,7 @@ _DATE_FMT_NAMES = {"YYYYMMDD", "MMDDYYYY", "YYYY-MM-DD", "MMDDYY", "YYMMDD", "YY
 _TIME_FMT_NAMES = {"HHMMSS", "HH:MM:SS", "HHMM"}
 
 
-def _extract_format_hint(line: str, name: str, pic_length: Optional[int]) -> Optional[str]:
+def _extract_format_hint(line: str, name: str, pic_length: int | None) -> str | None:
     """
     Detect a date/time format hint for a copybook field.
 
@@ -165,7 +164,7 @@ def _cobol_type_to_spark(pic: str, usage: str = "") -> str:
     return "string"
 
 
-def _parse_pic_length(pic: str) -> Tuple[Optional[int], Optional[int]]:
+def _parse_pic_length(pic: str) -> tuple[int | None, int | None]:
     """
     Extract (length, precision) from a COBOL PIC clause.
 
@@ -259,12 +258,12 @@ class CopybookParser:
     # COBOL allows abbreviated form JUST RIGHT as well as full JUSTIFIED RIGHT.
     JUSTIFIED_PATTERN = re.compile(r"\bJUST(?:IFIED)?\s+RIGHT\b", re.IGNORECASE)
 
-    def parse_file(self, path: Path) -> List[FieldDefinition]:
+    def parse_file(self, path: Path) -> list[FieldDefinition]:
         """Parse a copybook file and return field definitions."""
         content = path.read_text(encoding="utf-8", errors="ignore")
         return self.parse_content(content)
 
-    def parse_content(self, content: str) -> List[FieldDefinition]:
+    def parse_content(self, content: str) -> list[FieldDefinition]:
         """Parse copybook content and extract field definitions."""
         try:
             fields = self._parse_with_copybook_lib(content)
@@ -280,7 +279,7 @@ class CopybookParser:
         re.IGNORECASE | re.MULTILINE,
     )
 
-    def _build_group_record_type_map(self, content: str) -> List[Tuple[str, str]]:
+    def _build_group_record_type_map(self, content: str) -> list[tuple[str, str]]:
         """
         Pre-scan content for 01-level group names and return an ordered list of
         (group_name, record_type) so we can tag fields by their position range.
@@ -291,7 +290,7 @@ class CopybookParser:
             groups.append((m.start(), group_name, self._group_record_type(group_name)))
         return groups  # [(char_offset, name, record_type), ...]
 
-    def _parse_with_copybook_lib(self, content: str) -> List[FieldDefinition]:
+    def _parse_with_copybook_lib(self, content: str) -> list[FieldDefinition]:
         """Use the `copybook` library if available (elementary items only)."""
         try:
             from copybook import parse_string
@@ -310,7 +309,7 @@ class CopybookParser:
                 return rtype
 
             parsed = parse_string(content)
-            fields: List[FieldDefinition] = []
+            fields: list[FieldDefinition] = []
             position = 1
             for item in parsed.flatten():
                 pic = getattr(item, "pic", None)
@@ -387,7 +386,7 @@ class CopybookParser:
             return "TRAILER"
         return "DATA"
 
-    def _parse_with_regex(self, content: str) -> List[FieldDefinition]:
+    def _parse_with_regex(self, content: str) -> list[FieldDefinition]:
         """
         Robust regex-based copybook parser.
 
@@ -402,16 +401,16 @@ class CopybookParser:
           - Column-6 comment lines (* in position 7) and blank lines
           - Multiple 01-level groups tagged as HEADER / TRAILER / DATA based on group name
         """
-        fields: List[FieldDefinition] = []
-        seen: Set[str] = set()
+        fields: list[FieldDefinition] = []
+        seen: set[str] = set()
         position = 1
         _current_record_type = "DATA"   # tracks current 01-level group type
 
         # Name → start position (for REDEFINES lookup)
-        name_to_start: Dict[str, int] = {}
+        name_to_start: dict[str, int] = {}
         # Redefines map built in one pass: redefining → redefined.
         # Prefixes are stripped so lookups work regardless of placeholder tokens.
-        redefines_map: Dict[str, str] = {
+        redefines_map: dict[str, str] = {
             _strip_cobol_prefix(m.group(2)): _strip_cobol_prefix(m.group(3))
             for m in self._REDEFINES_PATTERN.finditer(content)
         }
