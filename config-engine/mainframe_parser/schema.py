@@ -5,7 +5,7 @@ This schema defines the intermediate layer between mainframe data processing
 and PySpark execution on AWS cloud.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 from pydantic import BaseModel, Field
 
 
@@ -14,12 +14,12 @@ class FieldDefinition(BaseModel):
 
     name: str
     type: str = "string"  # string, int, long, double, decimal, date, timestamp
-    start: Optional[int] = None  # Starting position (1-based or 0-based byte offset) for fixed-width/delimited
-    length: Optional[int] = None
-    precision: Optional[int] = None
+    start: int | None = None  # Starting position (1-based or 0-based byte offset) for fixed-width/delimited
+    length: int | None = None
+    precision: int | None = None
     nullable: bool = True
-    format: Optional[str] = None  # Format pattern e.g. YYYYMMDD, YYYYMM, HHMMSS
-    source: Optional[str] = None  # Source copybook field reference
+    format: str | None = None  # Format pattern e.g. YYYYMMDD, YYYYMM, HHMMSS
+    source: str | None = None  # Source copybook field reference
     record_type: str = "DATA"  # "DATA" | "HEADER" | "TRAILER" — set by copybook parser from 01-level group name
     just_right: bool = False   # True when COBOL JUSTIFIED RIGHT clause present; right-aligns string output
 
@@ -27,7 +27,7 @@ class FieldDefinition(BaseModel):
 class CobrixOptions(BaseModel):
     """Cobrix-specific options for reading mainframe EBCDIC files in PySpark."""
 
-    copybook_path: Optional[str] = Field(None, description="Path to copybook file (S3 or local)")
+    copybook_path: str | None = Field(None, description="Path to copybook file (S3 or local)")
     encoding: str = Field("cp037", description="EBCDIC encoding (cp037=US, cp273=German, etc.)")
     record_format: str = Field("F", description="F=Fixed, V=Variable, D=Variable with RDW")
     file_start_offset: int = Field(0, description="Byte offset to start reading")
@@ -39,44 +39,44 @@ class InputConfig(BaseModel):
     """Configuration for a single input source."""
 
     name: str = Field(..., description="DD name or logical input identifier")
-    dataset: Optional[str] = Field(None, description="Mainframe dataset name (DSN)")
+    dataset: str | None = Field(None, description="Mainframe dataset name (DSN)")
     format: str = Field(
         "cobol",
         description="cobol (Cobrix/EBCDIC), parquet, csv, fixed",
     )
-    copybook: Optional[str] = Field(None, description="Copybook file path for Cobrix")
-    cobrix: Optional[CobrixOptions] = Field(None, description="Cobrix options for mainframe files")
-    fields: List[FieldDefinition] = Field(default_factory=list)
-    s3_path: Optional[str] = Field(None, description="Target S3 path in AWS")
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    copybook: str | None = Field(None, description="Copybook file path for Cobrix")
+    cobrix: CobrixOptions | None = Field(None, description="Cobrix options for mainframe files")
+    fields: list[FieldDefinition] = Field(default_factory=list)
+    s3_path: str | None = Field(None, description="Target S3 path in AWS")
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class OutputConfig(BaseModel):
     """Configuration for a single output destination."""
 
     name: str = Field(..., description="DD name or logical output identifier")
-    dataset: Optional[str] = Field(None, description="Mainframe dataset name")
+    dataset: str | None = Field(None, description="Mainframe dataset name")
     format: str = Field(
         "parquet",
         description="parquet, csv, cobol (Cobrix for EBCDIC output)",
     )
-    copybook: Optional[str] = Field(None, description="Copybook for Cobrix EBCDIC output")
-    fields: List[FieldDefinition] = Field(default_factory=list)
-    header_fields: List[FieldDefinition] = Field(
+    copybook: str | None = Field(None, description="Copybook for Cobrix EBCDIC output")
+    fields: list[FieldDefinition] = Field(default_factory=list)
+    header_fields: list[FieldDefinition] = Field(
         default_factory=list,
         description="Fields written into the header record row(s) with computed expressions",
     )
-    trailer_fields: List[FieldDefinition] = Field(
+    trailer_fields: list[FieldDefinition] = Field(
         default_factory=list,
         description="Fields written into the trailer record row(s) with computed expressions",
     )
-    output_columns: Optional[List[str]] = Field(
+    output_columns: list[str] | None = Field(
         None,
         description="Explicit list of column names to write (from copybook). Runner selects only these.",
     )
-    s3_path: Optional[str] = Field(None, description="Target S3 path in AWS")
+    s3_path: str | None = Field(None, description="Target S3 path in AWS")
     write_mode: str = "overwrite"  # overwrite, append
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class TransformationStep(BaseModel):
@@ -85,20 +85,20 @@ class TransformationStep(BaseModel):
     id: str
     description: str = ""
     type: str = "select"  # select, filter, join, aggregate, union, custom
-    source_inputs: List[str] = Field(default_factory=list)
-    logic: Dict[str, Any] = Field(
+    source_inputs: list[str] = Field(default_factory=list)
+    logic: dict[str, Any] = Field(
         default_factory=dict,
         description="Transformation logic (columns, conditions, expressions). "
         "Optional 'working_storage': list of names (e.g. WS_DEBIT_TOTAL) for mainframe in-memory temp variables; "
         "ADD/SUBTRACT/MULTIPLY to a missing target are treated as 0/0/1 + expression.",
     )
-    output_alias: Optional[str] = None
+    output_alias: str | None = None
 
 
 class TransformationConfig(BaseModel):
     """Configuration for data transformations."""
 
-    steps: List[TransformationStep] = Field(default_factory=list)
+    steps: list[TransformationStep] = Field(default_factory=list)
     description: str = ""
 
 
@@ -111,15 +111,15 @@ class DataFlowConfig(BaseModel):
 
     name: str = "mainframe_migration"
     description: str = ""
-    inputs: Dict[str, InputConfig] = Field(default_factory=dict)
-    outputs: Dict[str, OutputConfig] = Field(default_factory=dict)
+    inputs: dict[str, InputConfig] = Field(default_factory=dict)
+    outputs: dict[str, OutputConfig] = Field(default_factory=dict)
     transformations: TransformationConfig = Field(default_factory=TransformationConfig)
-    metadata: Dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Additional metadata (source program, JCL reference, etc.)",
     )
 
-    def to_json_config(self) -> Dict:
+    def to_json_config(self) -> dict:
         """Export as the canonical JSON format for PySpark framework. Cobrix block is excluded from Inputs (runtime-only)."""
         def _convert_sets(obj):
             """Recursively convert sets to lists for JSON serialization."""
@@ -133,14 +133,14 @@ class DataFlowConfig(BaseModel):
                 return obj
         
         inputs_dict = {
-            k: _convert_sets(v.dict(exclude_none=True, exclude={"cobrix"}))
+            k: _convert_sets(v.model_dump(exclude_none=True, exclude={"cobrix"}))
             for k, v in self.inputs.items()
         }
         outputs_dict = {
-            k: _convert_sets(v.dict(exclude_none=True))
+            k: _convert_sets(v.model_dump(exclude_none=True))
             for k, v in self.outputs.items()
         }
-        transformations_dict = _convert_sets(self.transformations.dict(exclude_none=True))
+        transformations_dict = _convert_sets(self.transformations.model_dump(exclude_none=True))
         
         return {
             "Inputs": inputs_dict,

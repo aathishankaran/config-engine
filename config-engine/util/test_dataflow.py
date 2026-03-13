@@ -12,10 +12,10 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
-def _dataflow_engine_dir() -> Optional[Path]:
+def _dataflow_engine_dir() -> Path | None:
     """Return path to dataflow-engine project, or None if not found."""
     env_path = os.environ.get("DATAFLOW_ENGINE_DIR")
     if env_path:
@@ -45,7 +45,7 @@ def _has_pyspark(python_exe: str) -> bool:
         return False
 
 
-def _find_python_with_pyspark(engine_dir: Optional[Path] = None) -> str:
+def _find_python_with_pyspark(engine_dir: Path | None = None) -> str:
     """
     Return a Python executable that has PySpark installed.
 
@@ -88,13 +88,13 @@ def _find_python_with_pyspark(engine_dir: Optional[Path] = None) -> str:
     return sys.executable
 
 
-def generate_sample_data(config: dict, num_rows: int = 5) -> Dict[str, List[dict]]:
+def generate_sample_data(config: dict, num_rows: int = 5) -> dict[str, list[dict]]:
     """
     Generate minimal sample input data from config schema (Inputs.fields).
     Returns dict mapping input name -> list of row dicts.
     """
     inputs = config.get("Inputs") or config.get("inputs") or {}
-    out: Dict[str, List[dict]] = {}
+    out: dict[str, list[dict]] = {}
     for name, cfg in inputs.items():
         if not isinstance(cfg, dict):
             continue
@@ -161,8 +161,8 @@ def _copy_last_run_file(
 
 
 def _write_fixed_input(
-    rows: List[dict], path: Path, cfg: dict,
-    trailer_data: Optional[dict] = None,
+    rows: list[dict], path: Path, cfg: dict,
+    trailer_data: dict | None = None,
 ) -> None:
     """
     Write sample rows as a fixed-width text file matching the input field schema.
@@ -211,7 +211,7 @@ def _write_fixed_input(
             line[start:end] = list(val[:end - start])
         return "".join(line)
 
-    lines: List[str] = []
+    lines: list[str] = []
     for _ in range(header_count):
         lines.append(_make_line({}, header_fields) if header_fields else " " * line_width)
     for row in rows:
@@ -226,8 +226,8 @@ def _write_fixed_input(
 
 
 def _write_input_file(
-    name: str, rows: List[dict], inp_cfg: dict, input_dir: Path,
-    trailer_data: Optional[dict] = None,
+    name: str, rows: list[dict], inp_cfg: dict, input_dir: Path,
+    trailer_data: dict | None = None,
 ) -> str:
     """
     Write test input rows in the format specified by inp_cfg["format"].
@@ -266,9 +266,9 @@ def _prepare_run(
     config: dict,
     config_name: str,
     base_path: Path,
-    sample_data: Optional[dict],
+    sample_data: dict | None,
     num_sample_rows: int,
-) -> Tuple[Path, Path, Path]:
+) -> tuple[Path, Path, Path]:
     """
     Write config and sample data to a temp dir. Returns (temp_dir, config_path, base_path).
 
@@ -297,7 +297,7 @@ def _prepare_run(
     # engine subtracts header_count/trailer_count from before comparing.
     # Build a mapping of input_name -> {field_name: inclusive_count} so the
     # correct value is written into the trailer line of every FIXED test file.
-    _trailer_inject: Dict[str, dict] = {}
+    _trailer_inject: dict[str, dict] = {}
     trans_steps = (cfg.get("Transformations") or cfg.get("transformations") or {}).get("steps") or []
     _all_inputs_cfg = cfg.get("Inputs") or cfg.get("inputs") or {}
     for _vstep in trans_steps:
@@ -458,7 +458,7 @@ def _prepare_run(
     return temp_dir, config_path, temp_dir
 
 
-def _parse_fixed_output(text: str, fields: list, header_count: int, trailer_count: int) -> List[dict]:
+def _parse_fixed_output(text: str, fields: list, header_count: int, trailer_count: int) -> list[dict]:
     """
     Parse fixed-width output text into a list of row dicts, skipping header/trailer
     lines and using only DATA fields (record_type != HEADER/TRAILER).
@@ -482,7 +482,7 @@ def _parse_fixed_output(text: str, fields: list, header_count: int, trailer_coun
         return []
 
     # Pre-compute (pos, length) for each field using cumulative lengths
-    field_slices: List[Tuple[str, int, int]] = []
+    field_slices: list[tuple[str, int, int]] = []
     pos = 0
     for f in data_fields:
         fname = f.get("name") or ""
@@ -499,7 +499,7 @@ def _parse_fixed_output(text: str, fields: list, header_count: int, trailer_coun
     return rows
 
 
-def _read_outputs(temp_dir: Path, config: dict) -> Dict[str, List[dict]]:
+def _read_outputs(temp_dir: Path, config: dict) -> dict[str, list[dict]]:
     """
     Read actual output files from temp_dir/output/ in each output's configured format.
 
@@ -510,7 +510,7 @@ def _read_outputs(temp_dir: Path, config: dict) -> Dict[str, List[dict]]:
     """
     output_dir = temp_dir / "output"
     outputs_cfg = config.get("Outputs") or config.get("outputs") or {}
-    result: Dict[str, List[dict]] = {}
+    result: dict[str, list[dict]] = {}
 
     for name, out_cfg in outputs_cfg.items():
         if not isinstance(out_cfg, dict):
@@ -521,7 +521,7 @@ def _read_outputs(temp_dir: Path, config: dict) -> Dict[str, List[dict]]:
         out_dir = output_dir / name
         hdr_skip = int(out_cfg.get("header_count") or 0)
         trl_skip = int(out_cfg.get("trailer_count") or 0)
-        rows: List[dict] = []
+        rows: list[dict] = []
 
         if fmt == "FIXED":
             # Find the output file: named file first, then spark text part files
@@ -594,7 +594,7 @@ def _read_outputs(temp_dir: Path, config: dict) -> Dict[str, List[dict]]:
     return result
 
 
-def _parse_ctrl_output(text: str, ctrl_file_fields: list, ctrl_include_header: bool) -> List[dict]:
+def _parse_ctrl_output(text: str, ctrl_file_fields: list, ctrl_include_header: bool) -> list[dict]:
     """
     Parse a fixed-width control file into column-keyed row dicts.
 
@@ -622,7 +622,7 @@ def _parse_ctrl_output(text: str, ctrl_file_fields: list, ctrl_include_header: b
         return [{"value": line} for line in lines]
 
     # Build (name, pos, length, is_numeric) slices using same defaults as _create_ctrl_file
-    field_slices: List[Tuple[str, int, int, bool]] = []
+    field_slices: list[tuple[str, int, int, bool]] = []
     pos = 0
     for f in ctrl_file_fields:
         name = (f.get("name") or "").strip()
@@ -665,7 +665,7 @@ def _parse_ctrl_output(text: str, ctrl_file_fields: list, ctrl_include_header: b
     return rows
 
 
-def _read_ctrl_outputs(temp_dir: Path, config: dict) -> Dict[str, List[dict]]:
+def _read_ctrl_outputs(temp_dir: Path, config: dict) -> dict[str, list[dict]]:
     """
     Read control file outputs from temp_dir/ctrl/<step_id>/ for every validate
     step that has ctrl_file_create enabled.  Returns dict keyed by step_id.
@@ -679,7 +679,7 @@ def _read_ctrl_outputs(temp_dir: Path, config: dict) -> Dict[str, List[dict]]:
         return {}
 
     trans = config.get("Transformations") or config.get("transformations") or {}
-    result: Dict[str, List[dict]] = {}
+    result: dict[str, list[dict]] = {}
     for step in trans.get("steps") or []:
         if not isinstance(step, dict):
             continue
@@ -743,7 +743,7 @@ def run_dataflow_test(
     config: dict,
     config_name: str,
     base_path: Path,
-    sample_data: Optional[dict] = None,
+    sample_data: dict | None = None,
     num_sample_rows: int = 5,
 ) -> dict:
     """
@@ -812,7 +812,7 @@ def run_dataflow_test_stream(
     config: dict,
     config_name: str,
     base_path: Path,
-    sample_data: Optional[dict] = None,
+    sample_data: dict | None = None,
     num_sample_rows: int = 5,
 ):
     """

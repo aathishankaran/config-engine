@@ -8,7 +8,6 @@ import os
 import re
 import shutil
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 from flask import Flask, Response, jsonify, request, send_from_directory, send_file
 
@@ -168,7 +167,7 @@ def _safe_json_dump(obj, f, indent=2):
     json.dump(_convert_sets(obj), f, indent=indent)
 
 
-def _find_json_files(dir_path: Path, base: str = "") -> List[dict]:
+def _find_json_files(dir_path: Path, base: str = "") -> list[dict]:
     """Recursively find .json files; return list of {path, name, relative}. Skips test_data dir."""
     out = []
     if not dir_path.exists():
@@ -267,7 +266,7 @@ def get_config_test_data(filename):
             cfg = {}
         # Collect all field definitions that look like fixed-width (have start+length).
         # Used later to re-parse stale expected_output keys not in the config's Outputs.
-        _all_fw_field_sets: List[list] = []
+        _all_fw_field_sets: list[list] = []
         for _sec in ("Inputs", "inputs", "Outputs", "outputs"):
             for _ncfg in (cfg.get(_sec) or {}).values():
                 if not isinstance(_ncfg, dict):
@@ -615,7 +614,7 @@ def _parse_ctrl_file_text(text: str, ctrl_file_fields: list, ctrl_include_header
         return [{"value": line} for line in lines]
 
     # Build (name, pos, length, is_numeric) slices — cumulative positions
-    field_slices: List[Tuple[str, int, int, bool]] = []
+    field_slices: list[tuple[str, int, int, bool]] = []
     pos = 0
     for f in ctrl_file_fields:
         name = (f.get("name") or "").strip()
@@ -1099,7 +1098,7 @@ def api_save_node_test_file(filename):
         rows = []
         file_format = (request.form.get("format") or "").strip().upper()
         fields_json  = (request.form.get("fields") or "").strip()
-        node_cfg: Optional[dict] = None
+        node_cfg: dict | None = None
         # Always load node_cfg from the saved config so header_count / trailer_count
         # are available for skipping, even when format+fields are sent by the client.
         try:
@@ -1162,7 +1161,7 @@ def api_save_node_test_file(filename):
                         f for f in fields_def
                         if (f.get("record_type") or "DATA").upper() not in ("HEADER", "TRAILER")
                     ]
-                    slices: List[Tuple[str, int, int]] = []
+                    slices: list[tuple[str, int, int]] = []
                     pos = 0
                     for f in data_fields:
                         fname = f.get("name") or ""

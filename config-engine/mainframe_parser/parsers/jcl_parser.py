@@ -7,7 +7,7 @@ Only data inputs/outputs are included; libraries and intermediate (passed) DDs a
 
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
 
 from ..keywords import JCL_DD_KEYWORDS, JCL_DISP_INPUT, JCL_DISP_OUTPUT
 from ..schema import InputConfig, OutputConfig
@@ -25,28 +25,18 @@ JCL_SKIP_INPUT_INTERMEDIATE = frozenset({
 })
 
 
+@dataclass
 class DDStatement:
     """Represents a JCL DD statement."""
 
-    def __init__(
-        self,
-        ddname,          # type: str
-        dsn=None,        # type: Optional[str]
-        disp=None,       # type: Optional[str]
-        unit=None,       # type: Optional[str]
-        space=None,      # type: Optional[str]
-        dcb=None,        # type: Optional[str]
-        is_input=False,  # type: bool
-        is_output=False, # type: bool
-    ):
-        self.ddname = ddname
-        self.dsn = dsn
-        self.disp = disp
-        self.unit = unit
-        self.space = space
-        self.dcb = dcb
-        self.is_input = is_input
-        self.is_output = is_output
+    ddname: str
+    dsn: str | None = None
+    disp: str | None = None
+    unit: str | None = None
+    space: str | None = None
+    dcb: str | None = None
+    is_input: bool = False
+    is_output: bool = False
 
 
 class JCLParser:
@@ -89,7 +79,7 @@ class JCLParser:
         re.IGNORECASE,
     )
 
-    def parse_exec_steps(self, content: str) -> List[dict]:
+    def parse_exec_steps(self, content: str) -> list[dict]:
         """
         Parse all EXEC statements from a JCL file.
 
@@ -104,7 +94,7 @@ class JCLParser:
         Handles multi-line EXEC parameter continuations (lines that begin with
         ``//`` followed only by spaces and ``PARAM='VALUE'``).
         """
-        steps: List[dict] = []
+        steps: list[dict] = []
         lines = content.splitlines()
         i = 0
         # Track IF/ENDIF blocks for conditional step detection
@@ -148,7 +138,7 @@ class JCLParser:
             rest_of_line = exec_m.group(3)
 
             # Extract COND from the same line
-            condition: Optional[str] = None
+            condition: str | None = None
             cond_m = self._COND_RE.search(rest_of_line)
             if cond_m:
                 condition = cond_m.group(1)
@@ -156,7 +146,7 @@ class JCLParser:
                 condition = "conditional"
 
             # Collect EXEC parameter overrides from continuation lines
-            params: Dict[str, str] = {}
+            params: dict[str, str] = {}
             j = i + 1
             while j < len(lines):
                 cont = lines[j].strip()
@@ -183,20 +173,20 @@ class JCLParser:
 
         return steps
 
-    def parse_file(self, path: Path) -> Tuple[List[InputConfig], List[OutputConfig]]:
+    def parse_file(self, path: Path) -> tuple[list[InputConfig], list[OutputConfig]]:
         """Parse a JCL or PROC file and return inputs/outputs."""
         content = path.read_text(encoding="utf-8", errors="ignore")
         return self.parse_content(content)
 
     def parse_content(
         self, content: str
-    ) -> Tuple[List[InputConfig], List[OutputConfig]]:
+    ) -> tuple[list[InputConfig], list[OutputConfig]]:
         """Parse JCL/PROC content and extract DD statements."""
-        inputs: List[InputConfig] = []
-        outputs: List[OutputConfig] = []
+        inputs: list[InputConfig] = []
+        outputs: list[OutputConfig] = []
 
         lines = content.splitlines()
-        current_dd: Optional[dict] = None
+        current_dd: dict | None = None
 
         for line in lines:
             if line.strip().startswith("//") and " DD " in line.upper():
@@ -225,7 +215,7 @@ class JCLParser:
 
         return inputs, outputs
 
-    def _infer_io_from_ddname(self, ddname: str) -> Optional[str]:
+    def _infer_io_from_ddname(self, ddname: str) -> str | None:
         """Infer input vs output from DD name when DISP is missing or symbolic. Returns 'input', 'output', or None."""
         name = ddname.upper()
         out_marks = ("OUT", "OUTPUT", "SUMMARY", "RPT", "REPORT", "REPORT1", "REPORT2", "WRITE", "DEST", "TARGET")
@@ -239,8 +229,8 @@ class JCLParser:
     def _process_dd(
         self,
         dd: dict,
-        inputs: List[InputConfig],
-        outputs: List[OutputConfig],
+        inputs: list[InputConfig],
+        outputs: list[OutputConfig],
     ) -> None:
         """Process a DD statement into InputConfig or OutputConfig."""
         ddname = dd["ddname"]

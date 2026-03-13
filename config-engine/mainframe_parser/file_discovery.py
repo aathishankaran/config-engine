@@ -8,7 +8,6 @@ Counts are deduplicated by resolved path so the same file is never counted twice
 """
 
 from pathlib import Path
-from typing import List, Set, Tuple
 
 # File extensions by artifact type (case-insensitive). Only these extensions are counted.
 JCL_EXTENSIONS = {".jcl"}
@@ -17,22 +16,22 @@ COBOL_EXTENSIONS = {".cbl", ".cob", ".cobol"}
 COPYBOOK_EXTENSIONS = {".cpy", ".cpybook", ".copybook", ".copy"}
 
 
-def _dedupe_paths(paths: List[Path], by_name: bool = False) -> List[Path]:
+def _dedupe_paths(paths: list[Path], by_name: bool = False) -> list[Path]:
     """Return paths deduplicated so each file is counted once.
     If by_name=True, dedupe by lowercase filename (same name in different folders counts as one).
     Otherwise dedupe by resolved path.
     """
     if by_name:
-        seen: Set[str] = set()
-        out: List[Path] = []
+        seen: set[str] = set()
+        out: list[Path] = []
         for p in paths:
             key = p.name.lower()
             if key not in seen:
                 seen.add(key)
                 out.append(p)
         return out
-    seen_abs: Set[Path] = set()
-    out_abs: List[Path] = []
+    seen_abs: set[Path] = set()
+    out_abs: list[Path] = []
     for p in paths:
         try:
             r = p.resolve()
@@ -47,7 +46,7 @@ def _dedupe_paths(paths: List[Path], by_name: bool = False) -> List[Path]:
 def discover_mainframe_files(
     folder: Path,
     recursive: bool = True,
-) -> Tuple[List[Path], List[Path], List[Path], List[Path]]:
+) -> tuple[list[Path], list[Path], list[Path], list[Path]]:
     """
     Discover mainframe files in a folder (and all subfolders when recursive=True).
     Each file is counted at most once (deduplicated by resolved path).
@@ -63,10 +62,10 @@ def discover_mainframe_files(
     if not folder.is_dir():
         raise NotADirectoryError(f"Not a directory: {folder}")
 
-    jcl_paths: List[Path] = []
-    proc_paths: List[Path] = []
-    cobol_paths: List[Path] = []
-    copybook_paths: List[Path] = []
+    jcl_paths: list[Path] = []
+    proc_paths: list[Path] = []
+    cobol_paths: list[Path] = []
+    copybook_paths: list[Path] = []
 
     pattern = "**/*" if recursive else "*"
     for path in folder.glob(pattern):
