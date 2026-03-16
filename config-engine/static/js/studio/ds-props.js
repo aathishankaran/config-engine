@@ -1222,6 +1222,8 @@ function renderValidateProps(body, node) {
                 '<input type="checkbox" id="pv-ctrl-include-header"' + (node.ctrl_include_header ? ' checked' : '') + ' />' +
                 '<span style="font-size:12px;color:#64748b">Include header row in control file</span>' +
               '</label>') +
+
+
             DS.fn.buildControlFileFieldsEditor('pv-ctrl-fields', node.ctrl_file_fields || [],
               '<button type="button" class="tbl-hdr-icon-btn' + ctrlSchemaBtnClass + '" id="pv-ctrl-import-schema-btn" title="' +
                 (ctrlSchemaFile ? 'Re-import schema \u2014 ' + DS.fn.esc(ctrlSchemaFile) + ' (' + ctrlFieldCount + ' fields)' : 'Import control file schema from a file') + '">' +
@@ -2100,6 +2102,13 @@ function readListEditorIntoNode(node) {
         arr[rowIdx].expression = lit ? "'" + lit + "'" : '';
       } else if (selVal === '__custom__') {
         arr[rowIdx].expression = ($item.find('.cf-expr-custom').val() || '').trim();
+      } else if (selVal === '__effective_date__') {
+        var effField = ($item.find('.cf-expr-eff-field').val() || '').trim();
+        arr[rowIdx].expression = effField ? 'first(' + effField + ')' : '';
+      } else if (selVal === '__as_of_date__') {
+        var asofField = ($item.find('.cf-expr-asof-field').val() || '').trim();
+        var asofFmt   = ($item.find('.cf-expr-asof-fmt').val()   || 'yyyyMMdd').trim();
+        arr[rowIdx].expression = asofField ? "last_day(to_date(first(" + asofField + "),'" + asofFmt + "'))" : '';
       }
     });
   }

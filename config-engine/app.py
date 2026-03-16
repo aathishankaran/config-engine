@@ -458,6 +458,31 @@ def get_config_test_data(filename):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/config/<path:filename>/test-data/save", methods=["PUT"])
+def api_save_test_data(filename):
+    """Persist updated expected_output / input_data to test_data.json."""
+    try:
+        payload = request.get_json(force=True) or {}
+        td_dir = _test_data_dir(filename)
+        td_dir.mkdir(parents=True, exist_ok=True)
+        td_file = td_dir / "test_data.json"
+        existing: dict = {}
+        if td_file.exists():
+            try:
+                existing = json.loads(td_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        if "expected_output" in payload:
+            existing["expected_output"] = payload["expected_output"]
+        if "input_data" in payload:
+            existing["input_data"] = payload["input_data"]
+        with open(td_file, "w", encoding="utf-8") as f:
+            _safe_json_dump(existing, f, indent=2)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/config/<path:filename>", methods=["PUT"])
 def save_config(filename):
     """Save config JSON."""

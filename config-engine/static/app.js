@@ -2715,6 +2715,48 @@
                 appendTestLogsContent($logsEl[0], '\nDataflow completed successfully.\n');
               }
             }
+            // ── Auto-fill missing expected output from generated results ──────
+            // After a successful run, populate expected output for nodes that
+            // have no expected data yet (e.g. EFS-OUTPUT-02), and replace ctrl
+            // entries stored as raw {"value":"..."} with parsed column data.
+            // This creates a baseline for future reconciliation runs.
+            if (!res.error && !_jobAborted && currentPath) {
+              if (!uploadedTestData[currentPath]) uploadedTestData[currentPath] = {};
+              if (!uploadedTestData[currentPath].expected_output) uploadedTestData[currentPath].expected_output = {};
+              var _eo = uploadedTestData[currentPath].expected_output;
+              var _genAll = lastGeneratedOutput || {};
+              var _eoChanged = false;
+              Object.keys(_genAll).forEach(function (gk) {
+                var genRows = _genAll[gk];
+                if (!genRows || !genRows.length) return;
+                var existingExp = _eo[gk];
+                // Fill if no expected data exists
+                if (!existingExp || !existingExp.length) {
+                  _eo[gk] = genRows;
+                  _eoChanged = true;
+                  return;
+                }
+                // For ctrl entries: replace raw {"value":"..."} with parsed columns
+                if (gk.indexOf('__ctrl__') === 0) {
+                  var expCols = Object.keys(existingExp[0] || {});
+                  if (expCols.length === 1 && expCols[0] === 'value') {
+                    _eo[gk] = genRows;
+                    _eoChanged = true;
+                  }
+                }
+              });
+              // Persist back to server if changed
+              if (_eoChanged) {
+                var _inputData = uploadedTestData[currentPath].input_data || {};
+                $.ajax({
+                  url: '/api/config/' + encodeURIComponent(currentPath) + '/test-data/save',
+                  method: 'PUT',
+                  contentType: 'application/json',
+                  data: JSON.stringify({ expected_output: _eo, input_data: _inputData }),
+                  dataType: 'json'
+                });
+              }
+            }
             var hasExpected = currentPath && uploadedTestData[currentPath] && uploadedTestData[currentPath].expected_output && Object.keys(uploadedTestData[currentPath].expected_output).length > 0;
             var $reconCtaOutput2 = $('#test-output-recon-cta');
             if (hasExpected && !res.error && Object.keys(res.outputs || {}).length > 0) {

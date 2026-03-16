@@ -45,6 +45,57 @@ def _has_pyspark(python_exe: str) -> bool:
         return False
 
 
+def _get_spark_env() -> dict:
+    """
+    Build an environment dict for PySpark subprocesses.
+
+    PySpark 3.5.x requires Java 8/11/17.  If the system default is newer
+    (e.g. Java 25) Spark crashes with ``getSubject is not supported``.
+    This helper detects a compatible JDK and sets JAVA_HOME accordingly.
+
+    Resolution order:
+      1. SPARK_JAVA_HOME env var (explicit override)
+      2. Existing JAVA_HOME if version <= 17
+      3. Well-known macOS JDK 17 path
+      4. Well-known macOS JDK 11 path
+      5. Fall through with current env (let the error surface naturally)
+    """
+    env = os.environ.copy()
+
+    # 1. Explicit override
+    spark_java = os.environ.get("SPARK_JAVA_HOME", "").strip()
+    if spark_java and Path(spark_java).is_dir():
+        env["JAVA_HOME"] = spark_java
+        return env
+
+    # 2. Check current JAVA_HOME version
+    current_java = os.environ.get("JAVA_HOME", "").strip()
+    if current_java:
+        try:
+            ver_out = subprocess.run(
+                [str(Path(current_java) / "bin" / "java"), "-version"],
+                capture_output=True, text=True, timeout=5,
+            ).stderr
+            # Parse version like "17.0.9" or "11.0.27"
+            import re
+            m = re.search(r'"(\d+)', ver_out)
+            if m and int(m.group(1)) <= 17:
+                return env  # current JAVA_HOME is fine
+        except Exception:
+            pass
+
+    # 3-4. Well-known macOS paths for JDK 17 / 11
+    for jdk in (
+        "/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home",
+        "/Library/Java/JavaVirtualMachines/jdk-11.jdk/Contents/Home",
+    ):
+        if Path(jdk).is_dir():
+            env["JAVA_HOME"] = jdk
+            return env
+
+    return env
+
+
 def _find_python_with_pyspark(engine_dir: Path | None = None) -> str:
     """
     Return a Python executable that has PySpark installed.
@@ -88,10 +139,62 @@ def _find_python_with_pyspark(engine_dir: Path | None = None) -> str:
     return sys.executable
 
 
+def _sample_value(field: dict, row_idx: int) -> str:
+    """Generate a plausible sample value for a single field definition."""
+    from datetime import date, timedelta
+
+    ftype = (field.get("type") or "TEXT").upper()
+    length = int(field.get("length") or 10)
+    fmt = (field.get("format") or "").upper()
+    fname = (field.get("name") or "").upper()
+
+    # DATE fields — produce yyyyMMdd strings
+    if ftype == "DATE" or fmt in ("DATE", "YYYYMMDD"):
+        d = date.today() - timedelta(days=row_idx)
+        return d.strftime("%Y%m%d")
+
+    # TIMESTAMP fields
+    if ftype == "TIMESTAMP":
+        d = date.today() - timedelta(days=row_idx)
+        return d.strftime("%Y%m%d%H%M%S")
+
+    # Numeric / amount / count / rate fields
+    if ftype in ("NUMBER", "NUMERIC", "DECIMAL", "INT", "INTEGER", "LONG", "BIGINT"):
+        val = str((row_idx + 1) * 100)
+        return val.zfill(length)
+
+    # Heuristic: field name contains AMOUNT, COUNT, RATE, NUM, etc.
+    if any(kw in fname for kw in ("AMOUNT", "COUNT", "RATE", "TOTAL", "HASH", "SEQ")):
+        val = str((row_idx + 1) * 100)
+        return val.zfill(length)
+
+    # Heuristic: field name contains DATE
+    if "DATE" in fname:
+        d = date.today() - timedelta(days=row_idx)
+        return d.strftime("%Y%m%d")
+
+    # Record type indicator (single char)
+    if "REC-TYPE" in fname or "REC_TYPE" in fname:
+        return "D"
+
+    # Status / flag fields (short)
+    if length <= 2 and ("STATUS" in fname or "FLAG" in fname):
+        return "A"
+
+    # Default text value — pad to length
+    val = f"SAMPLE{row_idx + 1:03d}"
+    if length > 0:
+        val = val[:length].ljust(length)
+    return val
+
+
 def generate_sample_data(config: dict, num_rows: int = 5) -> dict[str, list[dict]]:
     """
     Generate minimal sample input data from config schema (Inputs.fields).
     Returns dict mapping input name -> list of row dicts.
+
+    Produces type-aware values (valid dates, padded numbers, etc.) so that
+    validation steps don't abort on malformed sample data.
     """
     inputs = config.get("Inputs") or config.get("inputs") or {}
     out: dict[str, list[dict]] = {}
@@ -103,19 +206,25 @@ def generate_sample_data(config: dict, num_rows: int = 5) -> dict[str, list[dict
             cols = ["id"]
             rows = [{"id": i} for i in range(max(1, num_rows))]
         else:
-            # Keep schema column names as-is (including hyphen and *)
-            cols = [f.get("name") or f"col_{i}" for i, f in enumerate(fields) if isinstance(f, dict)]
+            data_fields = [
+                f for f in fields
+                if isinstance(f, dict)
+                and (f.get("record_type") or "DATA").upper() not in ("HEADER", "TRAILER")
+            ]
+            if not data_fields:
+                data_fields = [f for f in fields if isinstance(f, dict)]
+            cols = [f.get("name") or f"col_{i}" for i, f in enumerate(data_fields)]
             if not cols:
                 cols = ["id"]
-            rows = []
-            for i in range(max(1, num_rows)):
-                row = {}
-                for j, c in enumerate(cols):
-                    if c.lower() in ("id", "key"):
-                        row[c] = i
-                    else:
-                        row[c] = f"val_{i}" if j == 0 else i
-                rows.append(row)
+                rows = [{"id": i} for i in range(max(1, num_rows))]
+            else:
+                rows = []
+                for i in range(max(1, num_rows)):
+                    row = {}
+                    for f in data_fields:
+                        fname = f.get("name") or ""
+                        row[fname] = _sample_value(f, i)
+                    rows.append(row)
         out[name] = rows
     return out
 
@@ -163,6 +272,7 @@ def _copy_last_run_file(
 def _write_fixed_input(
     rows: list[dict], path: Path, cfg: dict,
     trailer_data: dict | None = None,
+    header_data: dict | None = None,
 ) -> None:
     """
     Write sample rows as a fixed-width text file matching the input field schema.
@@ -212,8 +322,17 @@ def _write_fixed_input(
         return "".join(line)
 
     lines: list[str] = []
+    # Build header row values: prefer real values from uploaded .DAT file,
+    # fall back to generated sample values so the runner extracts meaningful metadata
+    # (e.g. INP-HDR-FILE-DATE → "20260305") for ctrl file expression resolution.
+    _hdr_row: dict = dict(header_data) if header_data else {}
+    if header_fields:
+        for _hf in header_fields:
+            _hf_name = _hf.get("name") or ""
+            if _hf_name and _hf_name not in _hdr_row:
+                _hdr_row[_hf_name] = _sample_value(_hf, 0)
     for _ in range(header_count):
-        lines.append(_make_line({}, header_fields) if header_fields else " " * line_width)
+        lines.append(_make_line(_hdr_row, header_fields) if header_fields else " " * line_width)
     for row in rows:
         lines.append(_make_line(row, fields))
     # Trailer: merge injected data (e.g. record count) with empty defaults
@@ -228,6 +347,7 @@ def _write_fixed_input(
 def _write_input_file(
     name: str, rows: list[dict], inp_cfg: dict, input_dir: Path,
     trailer_data: dict | None = None,
+    header_data: dict | None = None,
 ) -> str:
     """
     Write test input rows in the format specified by inp_cfg["format"].
@@ -237,7 +357,7 @@ def _write_input_file(
     fmt = (inp_cfg.get("format") or "csv").strip().upper()
     if fmt == "FIXED":
         file_name = f"{name}.dat"
-        _write_fixed_input(rows, input_dir / file_name, inp_cfg, trailer_data=trailer_data)
+        _write_fixed_input(rows, input_dir / file_name, inp_cfg, trailer_data=trailer_data, header_data=header_data)
         return f"input/{file_name}"
     elif fmt == "PARQUET":
         try:
@@ -334,12 +454,44 @@ def _prepare_run(
             _trailer_inject[_src][_rc_field.replace("_", "-")] = str(_total_count)
     # ── End pre-scan ─────────────────────────────────────────────────────────
 
+    # ── Extract header field values from original raw .DAT files on disk ──────
+    # When ctrl file expressions reference header fields (e.g. first(INP-HDR-FILE-DATE)),
+    # the runner needs real header values. Read them from the raw upload files.
+    _header_inject: dict[str, dict] = {}
+    _test_data_dir = base_path.parent / "test_data" / config_name.replace(".json", "")
+    for name, inp_cfg_td in (cfg.get("Inputs") or cfg.get("inputs") or {}).items():
+        if not isinstance(inp_cfg_td, dict):
+            continue
+        hdr_fields = inp_cfg_td.get("header_fields") or []
+        hdr_count  = int(inp_cfg_td.get("header_count") or 0)
+        if not hdr_fields or hdr_count <= 0:
+            continue
+        # Try to read header from the original raw file on disk
+        safe_name = name.replace("/", "_").replace("..", "_").replace(" ", "_")
+        for ext in (".DAT", ".dat", ".txt", ""):
+            raw_file = _test_data_dir / f"node_{safe_name}{ext}"
+            if raw_file.exists():
+                try:
+                    raw_lines = raw_file.read_text(encoding="utf-8", errors="replace").splitlines()
+                    if raw_lines:
+                        hdr_row: dict = {}
+                        for hf in hdr_fields:
+                            hf_name = hf.get("name") or ""
+                            start = max(0, int(hf.get("start") or 1) - 1)
+                            length = int(hf.get("length") or 1)
+                            hdr_row[hf_name] = raw_lines[0][start:start + length].strip() if len(raw_lines[0]) >= start + length else ""
+                        _header_inject[name] = hdr_row
+                except Exception:
+                    pass
+                break
+
     for name, rows in data_by_name.items():
         inp_cfg = inputs.get(name)
         if not isinstance(inp_cfg, dict):
             continue
         rel_path = _write_input_file(name, rows, inp_cfg, input_dir,
-                                     trailer_data=_trailer_inject.get(name))
+                                     trailer_data=_trailer_inject.get(name),
+                                     header_data=_header_inject.get(name))
         # Use the legacy "path" key — get_input_path() falls through to this when
         # source_path / source_file_name / dataset_name are all empty.
         inp_cfg["path"] = rel_path
@@ -777,6 +929,7 @@ def run_dataflow_test(
             capture_output=True,
             text=True,
             timeout=300,
+            env=_get_spark_env(),
         )
         logs = (proc.stdout or "") + (proc.stderr or "")
         outputs_raw = _read_outputs(temp_dir, config)
@@ -855,6 +1008,7 @@ def run_dataflow_test_stream(
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
+            env=_get_spark_env(),
         )
         if proc.stdout:
             for line in proc.stdout:

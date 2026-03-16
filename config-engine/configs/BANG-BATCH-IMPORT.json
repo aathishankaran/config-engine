@@ -769,7 +769,7 @@
             {
               "name": "EFFECTIVE-RECORD",
               "type": "DATE",
-              "expression": "current_date()",
+              "expression": "first(INP-HDR-FILE-DATE)",
               "length": 0,
               "begin": 0,
               "format": ""

@@ -236,6 +236,12 @@ var _CF_EXPR_POPUP_HTML =
     '</div>' +
 
     '<div class="cf-expr-section">' +
+      '<div class="cf-expr-section-label">Header Date Fields (requires Header Post Date Field config)</div>' +
+      '<div class="cf-expr-row"><span class="cf-expr-code">effective_date</span><span class="cf-expr-desc">Header post-date value (raw)</span></div>' +
+      '<div class="cf-expr-row"><span class="cf-expr-code">as_of_date</span><span class="cf-expr-desc">Last calendar day of the month derived from header post-date</span></div>' +
+    '</div>' +
+
+    '<div class="cf-expr-section">' +
       '<div class="cf-expr-section-label">Literals &amp; Casts</div>' +
       '<div class="cf-expr-row"><span class="cf-expr-code">\'USB.HOGAN.FILE.DAT\'</span><span class="cf-expr-desc">Hard-coded string</span></div>' +
       '<div class="cf-expr-row"><span class="cf-expr-code">42</span><span class="cf-expr-desc">Hard-coded integer</span></div>' +
@@ -253,28 +259,48 @@ var _CF_EXPR_POPUP_HTML =
 
 /* Preset expressions for control file / header / trailer fields */
 var _CF_EXPR_PRESETS = [
-  { value: '',                                          label: '-- Select expression --' },
-  { value: 'count(*)',                                  label: 'count(*) \u2014 row count' },
-  { value: 'sum(amount)',                               label: 'sum(col) \u2014 sum of column' },
-  { value: 'max(load_date)',                            label: 'max(col) \u2014 max value' },
-  { value: 'min(load_date)',                            label: 'min(col) \u2014 min value' },
-  { value: 'current_date()',                            label: 'current_date() \u2014 today\'s date' },
-  { value: 'current_timestamp()',                       label: 'current_timestamp() \u2014 now' },
-  { value: "date_format(current_date(),'yyyyMMdd')",    label: 'date_format \u2014 formatted date' },
-  { value: "last_day(current_date())",                  label: 'last_day(current_date()) \u2014 last day of month' },
-  { value: 'lpad(cast(count(*) as string),10,\'0\')',   label: 'lpad count \u2014 zero-padded count' },
-  { value: '__literal__',                               label: '\u270f\ufe0f Hardcoded value...' },
-  { value: '__custom__',                                label: '\u2699\ufe0f Custom expression...' }
+  { value: '',                                          label: '-- Expression --' },
+  { value: 'count(*)',                                  label: 'count(*)' },
+  { value: 'sum(amount)',                               label: 'sum(col)' },
+  { value: 'max(load_date)',                            label: 'max(col)' },
+  { value: 'min(load_date)',                            label: 'min(col)' },
+  { value: 'current_date()',                            label: 'current_date()' },
+  { value: 'current_timestamp()',                       label: 'current_timestamp()' },
+  { value: "date_format(current_date(),'yyyyMMdd')",    label: 'date_format(...)' },
+  { value: "last_day(current_date())",                  label: 'last_day(today)' },
+  { value: 'lpad(cast(count(*) as string),10,\'0\')',   label: 'lpad count' },
+  { value: '__effective_date__',                        label: '\ud83d\udcc5 effective_date' },
+  { value: '__as_of_date__',                            label: '\ud83d\udcc5 as_of_date' },
+  { value: '__literal__',                               label: '\u270f\ufe0f Hardcoded' },
+  { value: '__custom__',                                label: '\u2699\ufe0f Custom' }
 ];
 
 function _buildCfExprCell(expr, i) {
-  /* Determine which preset matches, or literal/custom */
-  var presetValues = _CF_EXPR_PRESETS.map(function(p){ return p.value; }).filter(function(v){ return v && v !== '__literal__' && v !== '__custom__'; });
-  var isLiteral = expr && /^'.*'$/.test(expr.trim());
-  var isPreset  = presetValues.indexOf(expr) >= 0;
-  var selVal    = isPreset ? expr : (isLiteral ? '__literal__' : (expr ? '__custom__' : ''));
-  var literalVal = isLiteral ? expr.slice(1, -1) : '';
-  var customVal  = (!isPreset && !isLiteral && expr) ? expr : '';
+  /* Detect effective_date / as_of_date from existing stored expressions for round-trip loading:
+     first(FIELD)                              → __effective_date__ with field=FIELD
+     last_day(to_date(first(FIELD),'FMT'))     → __as_of_date__ with field=FIELD, fmt=FMT  */
+  var _effMatch  = expr && expr.match(/^first\(([^)]+)\)$/);
+  var _asofMatch = expr && expr.match(/^last_day\(to_date\(first\(([^)]+)\)\s*,\s*'([^']+)'\s*\)\)$/);
+
+  var presetValues = _CF_EXPR_PRESETS.map(function(p){ return p.value; })
+    .filter(function(v){ return v && v !== '__literal__' && v !== '__custom__' && v !== '__effective_date__' && v !== '__as_of_date__'; });
+  var isLiteral   = expr && /^'.*'$/.test(expr.trim());
+  var isPreset    = presetValues.indexOf(expr) >= 0;
+  var isEffDate   = !!_effMatch;
+  var isAsOfDate  = !!_asofMatch;
+
+  var selVal;
+  if (isEffDate)       selVal = '__effective_date__';
+  else if (isAsOfDate) selVal = '__as_of_date__';
+  else if (isPreset)   selVal = expr;
+  else if (isLiteral)  selVal = '__literal__';
+  else                 selVal = expr ? '__custom__' : '';
+
+  var literalVal  = isLiteral  ? expr.slice(1, -1) : '';
+  var customVal   = (!isPreset && !isLiteral && !isEffDate && !isAsOfDate && expr) ? expr : '';
+  var effField    = _effMatch  ? _effMatch[1]  : '';
+  var asofField   = _asofMatch ? _asofMatch[1] : '';
+  var asofFmt     = _asofMatch ? _asofMatch[2] : '';
 
   var opts = _CF_EXPR_PRESETS.map(function(p) {
     return '<option value="' + DS.fn.esc(p.value) + '"' + (p.value === selVal ? ' selected' : '') + '>' + p.label + '</option>';
@@ -288,6 +314,15 @@ function _buildCfExprCell(expr, i) {
     '<input type="text" class="cf-expr-custom" placeholder="PySpark expression" ' +
       'style="' + (selVal === '__custom__' ? '' : 'display:none;') + '" ' +
       'value="' + DS.fn.esc(customVal) + '" />' +
+    '<input type="text" class="cf-expr-eff-field" placeholder="Header field (e.g. INP-HDR-POST-DATE)" ' +
+      'style="' + (selVal === '__effective_date__' ? '' : 'display:none;') + '" ' +
+      'value="' + DS.fn.esc(effField) + '" />' +
+    '<div class="cf-expr-asof-wrap" style="' + (selVal === '__as_of_date__' ? 'display:flex;gap:4px;' : 'display:none;') + '">' +
+      '<input type="text" class="cf-expr-asof-field" placeholder="Header field" ' +
+        'value="' + DS.fn.esc(asofField) + '" style="flex:1" />' +
+      '<input type="text" class="cf-expr-asof-fmt" placeholder="Format (yyyyMMdd)" ' +
+        'value="' + DS.fn.esc(asofFmt) + '" style="width:110px" />' +
+    '</div>' +
   '</div>';
 }
 
@@ -641,6 +676,8 @@ function _redrawSrcChips(wrap) {
     var val   = $sel.val();
     $wrap.find('.cf-expr-literal').toggle(val === '__literal__');
     $wrap.find('.cf-expr-custom').toggle(val === '__custom__');
+    $wrap.find('.cf-expr-eff-field').toggle(val === '__effective_date__');
+    $wrap.find('.cf-expr-asof-wrap').toggle(val === '__as_of_date__');
   });
 
 })(window.DS);
