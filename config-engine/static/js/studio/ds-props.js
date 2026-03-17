@@ -281,14 +281,6 @@ function renderOutputProps(body, node) {
         formRow('Trailer Records',
           textInput('po-trailer-count', node.trailer_count !== undefined ? node.trailer_count : '0', '0'),
           'Number of trailer lines to write at bottom of file') +
-        formRow('Control File Gen',
-          '<label style="display:flex;align-items:center;gap:6px">' +
-            '<input type="checkbox" id="po-ctrl-file-gen"' + (node.ctrl_file_gen ? ' checked' : '') + ' />' +
-            '<span style="font-size:12px;color:#64748b">Generate control file from validate step</span>' +
-          '</label>') +
-        '<div class="path-info-banner" style="margin-top:2px">' +
-          '<i class="fa-solid fa-circle-info"></i> Control file schema &amp; path are derived automatically from the connected Data Validation step.' +
-        '</div>' +
       '</div>' +
       /* Delimited fields */
       '<div class="format-fields-group" id="po-delimited-fields"' + (isDelimO ? ' style="display:block"' : '') + '>' +
@@ -513,6 +505,10 @@ function _resolveUpstreamFields(node) {
     if (srcNode && srcNode.validate_rules && srcNode.validate_rules.length > 0) {
       upstreamFields = srcNode.validate_rules.map(function(r) {
         return { name: r.field, type: r.data_type === 'NUMBER' ? 'long' : 'string', nullable: r.nullable !== false };
+      });
+    } else if (srcNode && srcNode.type === 'ctrl_file' && srcNode.ctrl_file_fields && srcNode.ctrl_file_fields.length > 0) {
+      upstreamFields = srcNode.ctrl_file_fields.map(function(f) {
+        return { name: f.name, type: (f.type || 'STRING').toLowerCase(), length: f.length || 0, begin: f.begin || 0, format: f.format || '', nullable: false };
       });
     } else if (srcNode && srcNode.fields && srcNode.fields.length > 0) {
       upstreamFields = srcNode.fields.filter(function(f) {
@@ -1083,9 +1079,10 @@ function renderValidateProps(body, node) {
   /* Fail modes with FLAGGED */
   var FAIL_MODES_EXT = ['ABORT', 'DROP', 'FLAGGED'];
 
-  /* Header fields from connected input node for Previous Day Check dropdown */
+  /* Header fields from connected input node for Previous Day Check dropdown & ctrl field date builder */
   var _inputNodePD    = _getInputNodeForValidate(node);
   var _hdrFieldsPD    = (_inputNodePD && Array.isArray(_inputNodePD.header_fields)) ? _inputNodePD.header_fields : [];
+  var _hdrFieldNamesPD = _hdrFieldsPD.map(function(f){ return f.name || ''; }).filter(Boolean);
   var _curPdHdrField  = node.previous_day_header_date_field || '';
   var _hdrFieldOpts   = '<option value="">-- SELECT --</option>' +
     _hdrFieldsPD.map(function(f) {
@@ -1202,37 +1199,6 @@ function renderValidateProps(body, node) {
         '</div>' +
       '</div>' +
 
-      /* Control File Creation */
-      '<div class="pv-feature-card">' +
-        '<div class="pv-feature-card-header">' +
-          '<i class="fa-solid fa-file-csv"></i>' +
-          '<span>Control File Creation</span>' +
-          '<div class="pv-card-toggle">' +
-            '<input type="checkbox" id="pv-ctrl-create-check"' + (hasCtrl ? ' checked' : '') + '>' +
-            '<label for="pv-ctrl-create-check">Enable</label>' +
-          '</div>' +
-        '</div>' +
-        '<div id="pv-ctrl-create-section"' + (hasCtrl ? '' : ' style="display:none;"') + '>' +
-          '<div class="pv-feature-card-body">' +
-            formRow('Control File Name',
-              textInput('pv-ctrl-file-name', node.ctrl_file_name || '', 'e.g. USB.HOGON.TRAN.CNT.CTL'),
-              'Filename for the generated control file') +
-            formRow('Include Header',
-              '<label style="display:flex;align-items:center;gap:6px">' +
-                '<input type="checkbox" id="pv-ctrl-include-header"' + (node.ctrl_include_header ? ' checked' : '') + ' />' +
-                '<span style="font-size:12px;color:#64748b">Include header row in control file</span>' +
-              '</label>') +
-
-
-            DS.fn.buildControlFileFieldsEditor('pv-ctrl-fields', node.ctrl_file_fields || [],
-              '<button type="button" class="tbl-hdr-icon-btn' + ctrlSchemaBtnClass + '" id="pv-ctrl-import-schema-btn" title="' +
-                (ctrlSchemaFile ? 'Re-import schema \u2014 ' + DS.fn.esc(ctrlSchemaFile) + ' (' + ctrlFieldCount + ' fields)' : 'Import control file schema from a file') + '">' +
-                '<i class="fa-solid fa-file-import"></i> Import' +
-              '</button>'
-            ) +
-          '</div>' +
-        '</div>' +
-      '</div>' +
     '</div>' +
 
     /* ── DATA VALIDATION RULES (table-based) ── */
@@ -1266,25 +1232,9 @@ function renderValidateProps(body, node) {
         '</div>' +
       '</div>' +
 
-      /* Expected Control File — shown only when Control File Creation is enabled */
-      '<div id="pv-test-ctrl-wrap"' + (hasCtrl ? '' : ' style="display:none"') + '>' +
-        '<div class="props-import-section">' +
-          '<div class="props-import-title">' +
-            '<i class="fa-solid fa-file-csv" style="color:#16a34a"></i> Expected Control File' +
-            '<span style="font-size:10px;color:#94a3b8;margin-left:5px">— for Control File validation</span>' +
-          '</div>' +
-          '<button type="button" class="btn-import-sm' + ctrlTestBtnClass + '" id="pv-test-ctrl-file-btn" title="Upload expected control file to compare against generated output">' +
-            ctrlTestBtnLabel +
-          '</button>' +
-          '<div class="import-file-badge' + (ctrlTestFile ? ' visible' : '') + '" id="pv-test-ctrl-file-badge">' +
-            (ctrlTestFile ? '\u2713 ' + DS.fn.esc(ctrlTestFile) : '') +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-
-      /* Empty state when neither feature is enabled */
-      (!hasPrevDay && !hasCtrl
-        ? '<p style="font-size:12px;color:#94a3b8;margin:4px 0 0">Enable <strong>Previous Day Check</strong> or <strong>Control File Creation</strong> above to upload test files here.</p>'
+      /* Empty state when no previous day check */
+      (!hasPrevDay
+        ? '<p style="font-size:12px;color:#94a3b8;margin:4px 0 0">Enable <strong>Previous Day Check</strong> above to upload test files here.</p>'
         : ''
       ) +
     '</div>');
@@ -1821,6 +1771,7 @@ function showPropsPanel(node) {
   else if (node.type === 'validate')      renderValidateProps(body, node);
   else if (node.type === 'oracle_write')  renderOracleWriteProps(body, node);
   else if (node.type === 'efs_write')     renderOutputProps(body, node);
+  else if (node.type === 'ctrl_file')    renderCtrlFileProps(body, node);
   else renderCustomProps(body, node);
 
   DS.fn.initSrcDropdowns(body);
@@ -2028,7 +1979,7 @@ function _getListArr(node, ns) {
   if (ns === 'pa-grp') return node.agg_group_by;
   if (ns === 'pa-aggs') return node.agg_aggregations;
   if (ns === 'pv-rules') return node.validate_rules;
-  if (ns === 'pv-ctrl-fields') return node.ctrl_file_fields;
+  if (ns === 'pv-ctrl-fields' || ns === 'pcf-ctrl-fields') return node.ctrl_file_fields;
   return null;
 }
 
@@ -2102,19 +2053,31 @@ function readListEditorIntoNode(node) {
         arr[rowIdx].expression = lit ? "'" + lit + "'" : '';
       } else if (selVal === '__custom__') {
         arr[rowIdx].expression = ($item.find('.cf-expr-custom').val() || '').trim();
-      } else if (selVal === '__effective_date__') {
-        var effField = ($item.find('.cf-expr-eff-field').val() || '').trim();
-        arr[rowIdx].expression = effField ? 'first(' + effField + ')' : '';
-      } else if (selVal === '__as_of_date__') {
-        var asofField = ($item.find('.cf-expr-asof-field').val() || '').trim();
-        var asofFmt   = ($item.find('.cf-expr-asof-fmt').val()   || 'yyyyMMdd').trim();
-        arr[rowIdx].expression = asofField ? "last_day(to_date(first(" + asofField + "),'" + asofFmt + "'))" : '';
+      } else if (selVal === '__date__') {
+        /* Format comes from the field's own FORMAT property (copybook-defined), not a UI dropdown */
+        var dateFmt  = ((arr[rowIdx] && arr[rowIdx].format) || 'yyyyMMdd').trim() || 'yyyyMMdd';
+        var dateFunc = ($item.find('.cf-expr-date-func').val() || '').trim();
+        var dateSrc  = ($item.find('.cf-expr-date-src').val()  || '').trim();
+        var dateExpr = '';
+        if (dateFunc === 'CURRENTDATE') {
+          dateExpr = 'current_date()';
+        } else if (dateSrc) {
+          dateExpr = "to_date(first(`" + dateSrc + "`),'" + dateFmt + "')";
+        }
+        if (dateFunc === 'LASTDAY') {
+          if (dateExpr) {
+            dateExpr = 'last_day(' + dateExpr + ')';
+          } else {
+            dateExpr = 'last_day(current_date())';
+          }
+        }
+        arr[rowIdx].expression = dateExpr;
       }
     });
   }
-  if ($body.find('#pv-ctrl-fields-editor').length) {
-    node.ctrl_file_fields = readItems('#pv-ctrl-fields-editor');
-    fixCfExpressions(node.ctrl_file_fields, '#pv-ctrl-fields-editor');
+  if ($body.find('#pcf-ctrl-fields-editor').length) {
+    node.ctrl_file_fields = readItems('#pcf-ctrl-fields-editor');
+    fixCfExpressions(node.ctrl_file_fields, '#pcf-ctrl-fields-editor');
   }
   if ($body.find('#po-header-fields-editor').length) {
     node.header_fields = readItems('#po-header-fields-editor');
@@ -2240,7 +2203,6 @@ function applyPropsToNode(node) {
     node.header_count     = isNaN(_hcO) ? 0 : _hcO;
     node.trailer_count    = isNaN(_tcO) ? 0 : _tcO;
     node.delimiter_char   = g('po-delimiter-char') || '';
-    node.ctrl_file_gen    = gc('po-ctrl-file-gen');
     if (oldNameO && oldNameO !== node.name) {
       var $elO = $('[data-node-id="' + oldNameO + '"]');
       if ($elO.length) $elO.attr('data-node-id', node.id);
@@ -2277,7 +2239,6 @@ function applyPropsToNode(node) {
     node.header_count     = isNaN(_hcE) ? 0 : _hcE;
     node.trailer_count    = isNaN(_tcE) ? 0 : _tcE;
     node.delimiter_char   = g('po-delimiter-char') || '';
-    node.ctrl_file_gen    = gc('po-ctrl-file-gen');
     if (oldNameE && oldNameE !== node.name) {
       var $elE = $('[data-node-id="' + oldNameE + '"]');
       if ($elE.length) $elE.attr('data-node-id', node.id);
@@ -2369,10 +2330,6 @@ function applyPropsToNode(node) {
     /* Record Count Check */
     node.record_count_check = $('#pv-record-count-check').is(':checked');
     node.record_count_trailer_field = $('#pv-record-count-trailer-field').val() || '';
-    node.ctrl_file_create  = $('#pv-ctrl-create-check').is(':checked');
-    node.ctrl_file_name    = g('pv-ctrl-file-name')   || '';
-    node.ctrl_include_header = gc('pv-ctrl-include-header');
-    if (!node.ctrl_file_fields) node.ctrl_file_fields = [];
     /* Read validation rules from the editor DOM */
     node.validate_rules = [];
     $('#pv-rules-editor .validate-rule-item').each(function() {
@@ -2414,6 +2371,18 @@ function applyPropsToNode(node) {
     node.vault_username_key  = g('pow-vault-user-key')  || 'username';
     node.vault_password_key  = g('pow-vault-pass-key')  || 'password';
     propagateNodeIdAndAlias(_oldIdOW, _oldAliasOW, node);
+  } else if (node.type === 'ctrl_file') {
+    var _oldIdCF = node.id, _oldAliasCF = node.output_alias || node.step_id || node.id;
+    node.step_id          = g('pcf-id') || node.id;
+    node.id               = node.step_id;
+    node.name             = node.step_id;
+    node.description      = g('pcf-desc');
+    node.output_alias     = g('pcf-alias') || node.step_id;
+    node.source_inputs    = [DS.fn.getSingleSelectValue('pcf-src')].filter(Boolean);
+    node.ctrl_file_name   = g('pcf-ctrl-file-name') || '';
+    node.ctrl_include_header = gc('pcf-ctrl-include-header');
+    if (!node.ctrl_file_fields) node.ctrl_file_fields = [];
+    propagateNodeIdAndAlias(_oldIdCF, _oldAliasCF, node);
   } else {
     var _oldIdC = node.id, _oldAliasC = node.output_alias || node.step_id || node.id;
     node.step_id      = g('pc-id') || node.id;
@@ -2519,6 +2488,207 @@ function initSectionFold(body) {
 }
 
 
+/* ================================================================
+   props/ctrl_file.js — Control File node properties panel renderer.
+================================================================ */
+function renderCtrlFileProps(body, node) {
+  /* Header fields from upstream input node — for date builder dropdown */
+  var _inputNode      = _getInputNodeForValidate(node);
+  var _hdrFields      = (_inputNode && Array.isArray(_inputNode.header_fields)) ? _inputNode.header_fields : [];
+  var _hdrFieldNames  = _hdrFields.map(function(f){ return f.name || ''; }).filter(Boolean);
+
+  /* Schema import button */
+  var ctrlSchemaFile     = node._ctrl_schema_file || '';
+  var ctrlFieldCount     = node.ctrl_file_fields ? node.ctrl_file_fields.length : 0;
+  var ctrlSchemaBtnClass = ctrlSchemaFile ? ' has-file' : '';
+  var ctrlSchemaBtnHtml  = ctrlSchemaFile
+    ? '<button type="button" class="tbl-hdr-icon-btn has-file" id="pcf-import-schema-btn" title="Re-import schema — ' + DS.fn.esc(ctrlSchemaFile) + ' (' + ctrlFieldCount + ' fields)">' +
+        '<i class="fa-solid fa-file-import"></i> Import' +
+      '</button>'
+    : '<button type="button" class="tbl-hdr-icon-btn" id="pcf-import-schema-btn" title="Import field schema from copybook / CSV">' +
+        '<i class="fa-solid fa-file-import"></i> Import' +
+      '</button>';
+
+  $(body).html(
+    /* ── STEP INFO ── */
+    '<div class="props-section">' +
+      '<div class="props-section-title">Step Info</div>' +
+      formRow('Step ID',     textInput('pcf-id',   node.step_id,    'e.g. IFACE-CTRL-FILE-01')) +
+      formRow('Description', textInput('pcf-desc', node.description, 'Describe this control file')) +
+      formRow('Output Alias',textInput('pcf-alias', node.output_alias, 'e.g. IFACE-CTRL-FILE-OUT-01')) +
+      formRow('Source Input', DS.fn.singleSourceSelect('pcf-src', (node.source_inputs||[])[0] || '', node.id)) +
+    '</div>' +
+
+    /* ── CONTROL FILE SETTINGS ── */
+    '<div class="props-section">' +
+      '<div class="props-section-title">Control File Settings</div>' +
+      formRow('Control File Name', textInput('pcf-ctrl-file-name', node.ctrl_file_name || '', 'e.g. BANK-BATCH-CNT.CTL'),
+        'Name of the generated control file') +
+      '<div class="form-row checkbox-row">' +
+        '<input type="checkbox" id="pcf-ctrl-include-header"' + (node.ctrl_include_header ? ' checked' : '') + '>' +
+        '<label for="pcf-ctrl-include-header">Include header row in control file</label>' +
+      '</div>' +
+    '</div>' +
+
+    /* ── CONTROL FILE FIELDS ── */
+    '<div class="props-section">' +
+      '<div class="props-section-title props-section-title-row cf-section-title">' +
+        '<span>Control File Fields</span>' +
+        ctrlSchemaBtnHtml +
+      '</div>' +
+      DS.fn.buildControlFileFieldsEditor('pcf-ctrl-fields', node.ctrl_file_fields || [], '', _hdrFieldNames) +
+    '</div>' +
+
+    /* ── TEST DATA (starts collapsed) ── */
+    '<div class="props-section" data-default-fold="collapsed">' +
+      '<div class="props-section-title">Test Data</div>' +
+      '<div class="props-import-section" style="margin-bottom:10px">' +
+        '<div class="props-import-title">' +
+          '<i class="fa-solid fa-file-lines" style="color:#9333ea"></i> Expected Control File' +
+          '<span style="font-size:10px;color:#94a3b8;margin-left:5px">— for reconciliation</span>' +
+        '</div>' +
+        '<button type="button" class="btn-import-sm' + (node._test_ctrl_file ? ' has-file' : '') + '" id="pcf-test-ctrl-file-btn" title="Upload expected control file for reconciliation">' +
+          (node._test_ctrl_file
+            ? '<i class="fa-solid fa-check"></i> ' + DS.fn.esc(node._test_ctrl_file)
+            : '<i class="fa-solid fa-file-arrow-up"></i> Upload Expected Control File') +
+        '</button>' +
+        '<div class="import-file-badge' + (node._test_ctrl_file ? ' visible' : '') + '" id="pcf-test-ctrl-file-badge">' +
+          (node._test_ctrl_file ? '\u2713 ' + DS.fn.esc(node._test_ctrl_file) : '') +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  );
+
+  rebindPropsApply(node);
+
+  /* ---- Schema import button ---- */
+  var $cfImportBtn = $('#pcf-import-schema-btn');
+  if ($cfImportBtn.length) {
+    $cfImportBtn.on('click', function() {
+      _pickAndParseCtrlSchemaForCtrlNode(node, $cfImportBtn[0]);
+    });
+  }
+
+
+
+  /* ---- Test ctrl file upload ---- */
+  var $testCtrlBtn = $('#pcf-test-ctrl-file-btn');
+  if ($testCtrlBtn.length) {
+    $testCtrlBtn.on('click', function() {
+      DS.fn.uploadTestCtrlFile(node, 'pcf-test-ctrl-file-badge', $testCtrlBtn[0]);
+    });
+  }
+}
+
+/* ---- Schema import specifically for ctrl_file node ---- */
+function _pickAndParseCtrlSchemaForCtrlNode(node, btn) {
+  var $input = $('<input>').attr('type', 'file')
+    .attr('accept', '.json,.csv,.txt,.cbl,.cpy,.cob').css('display', 'none');
+  $(document.body).append($input);
+  $input.on('change', function() {
+    var file = $input[0].files && $input[0].files[0];
+    if (!file) { $input.remove(); return; }
+    var ext = file.name.split('.').pop().toLowerCase();
+    $(btn).html('<i class="fa-solid fa-spinner fa-spin"></i> Parsing\u2026');
+    btn.disabled = true;
+
+    var applyFields = function(parsedFields, filename) {
+      btn.disabled = false;
+      /* Reset button text whether parsing succeeded or not */
+      $(btn).html('<i class="fa-solid fa-file-import"></i> Import');
+      if (!parsedFields.length) { DS.fn.toast('No fields found in schema file.', 'error'); return; }
+      readListEditorIntoNode(node);
+      node.ctrl_file_fields = parsedFields.map(function(f) {
+        var existing = (node.ctrl_file_fields || []).find(function(x){ return x.name === f.name; });
+        return {
+          name:       f.name || '',
+          type:       (f.type || 'STRING').toUpperCase(),
+          expression: existing ? (existing.expression || '') : '',
+          begin:      parseInt(f.start || f.begin || 0, 10) || 0,
+          length:     parseInt(f.length || 0, 10) || 0,
+          format:     f.format || (existing ? (existing.format || '') : ''),
+          just_right: !!f.just_right
+        };
+      });
+      node._ctrl_schema_file = filename;
+      if (S.selectedNodeId === node.id) {
+        var _inputNode   = _getInputNodeForValidate(node);
+        var _hdrFN       = (_inputNode && Array.isArray(_inputNode.header_fields))
+                           ? _inputNode.header_fields.map(function(f){ return f.name || ''; }).filter(Boolean) : [];
+        var $existingEditor = $('#pcf-ctrl-fields-editor');
+        if ($existingEditor.length) {
+          var _btnHtml =
+            '<button type="button" class="tbl-hdr-icon-btn has-file" id="pcf-import-schema-btn" title="Re-import schema — ' + DS.fn.esc(filename) + ' (' + parsedFields.length + ' fields)">' +
+              '<i class="fa-solid fa-file-import"></i> Import' +
+            '</button>';
+          var $tpl = $('<div>').html(DS.fn.buildControlFileFieldsEditor('pcf-ctrl-fields', node.ctrl_file_fields || [], _btnHtml, _hdrFN));
+          $existingEditor.replaceWith($tpl.children().first());
+          var $newBtn = $('#pcf-import-schema-btn');
+          if ($newBtn.length) {
+            $newBtn.on('click', function() {
+              _pickAndParseCtrlSchemaForCtrlNode(node, $newBtn[0]);
+            });
+          }
+          rebindPropsApply(node);
+        } else {
+          showPropsPanel(node);
+        }
+      }
+      DS.fn.toast('Schema imported: ' + parsedFields.length + ' fields', 'success');
+    };
+
+    if (['cbl', 'cpy', 'cob'].indexOf(ext) >= 0) {
+      var configPath = ($('#current-file').text() || '').trim();
+      if (!configPath || configPath === 'Select an interface') {
+        DS.fn.toast('Select an interface first.', 'error');
+        btn.disabled = false;
+        $input.remove();
+        return;
+      }
+      var fd = new FormData();
+      fd.append('file', file);
+      fd.append('config_name', configPath);
+      $.ajax({
+        url: '/api/parse-copybook',
+        type: 'POST',
+        data: fd,
+        processData: false,
+        contentType: false,
+        success: function(res) {
+          var allFields = (res && res.fields) || [];
+          applyFields(allFields, file.name);
+          $input.remove();
+        },
+        error: function() {
+          DS.fn.toast('Failed to parse copybook.', 'error');
+          btn.disabled = false;
+          $(btn).html('<i class="fa-solid fa-file-import"></i> Import');
+          $input.remove();
+        }
+      });
+    } else {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var parsed = JSON.parse(e.target.result);
+          var fields = Array.isArray(parsed) ? parsed : (parsed.fields || []);
+          applyFields(fields, file.name);
+        } catch(ex) {
+          var lines = (e.target.result || '').split(/\r?\n/).filter(Boolean);
+          var csvFields = lines.map(function(ln) {
+            var parts = ln.split(',');
+            return { name: (parts[0] || '').trim(), type: (parts[1] || 'STRING').trim().toUpperCase(), length: parseInt(parts[2] || '0', 10) || 0 };
+          });
+          applyFields(csvFields, file.name);
+        }
+        $input.remove();
+      };
+      reader.readAsText(file);
+    }
+  });
+  $input.trigger('click');
+}
+
 // Export
 DS.fn.formRow                     = formRow;
 DS.fn.textInput                   = textInput;
@@ -2545,4 +2715,5 @@ DS.fn.renderUnionProps            = renderUnionProps;
 DS.fn.renderCustomProps           = renderCustomProps;
 DS.fn.renderValidateProps         = renderValidateProps;
 DS.fn.renderOracleWriteProps      = renderOracleWriteProps;
+DS.fn.renderCtrlFileProps         = renderCtrlFileProps;
 })(window.DS);

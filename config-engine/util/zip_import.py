@@ -16,7 +16,7 @@ import zipfile
 import tempfile
 import logging
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, Dict, List, Optional, Tuple
 
 from mainframe_parser.engine import MainframeConfigEngine
 from mainframe_parser.file_discovery import discover_mainframe_files
@@ -49,7 +49,7 @@ def _to_native(obj: Any) -> Any:
     return obj
 
 
-def _find_dir_case_insensitive(parent: Path, name: str) -> Path | None:
+def _find_dir_case_insensitive(parent: Path, name: str) -> Optional[Path]:
     """Find a direct child directory of parent whose name equals name (case-insensitive)."""
     if not parent.exists() or not parent.is_dir():
         return None
@@ -60,9 +60,9 @@ def _find_dir_case_insensitive(parent: Path, name: str) -> Path | None:
     return None
 
 
-def _all_subdirs_up_to_depth(root: Path, max_depth: int) -> list[Path]:
+def _all_subdirs_up_to_depth(root: Path, max_depth: int) -> List[Path]:
     """Return root and all subdirs within max_depth (1 = root + children, 2 = + grandchildren)."""
-    out: list[Path] = [root]
+    out: List[Path] = [root]
     if max_depth < 1:
         return out
     try:
@@ -78,7 +78,7 @@ def _all_subdirs_up_to_depth(root: Path, max_depth: int) -> list[Path]:
     return out
 
 
-def _resolve_input_output_roots(extracted_dir: Path) -> tuple[Path | None, Path | None]:
+def _resolve_input_output_roots(extracted_dir: Path) -> Tuple[Optional[Path], Optional[Path]]:
     """
     Resolve (input_root, output_root) from extracted zip.
     Looks for input/ and output/ (or expected_output/) case-insensitively,
@@ -110,9 +110,9 @@ def _resolve_input_output_roots(extracted_dir: Path) -> tuple[Path | None, Path 
     return inp_root, out_root
 
 
-def _read_csv_fallback(path: Path) -> list[dict]:
+def _read_csv_fallback(path: Path) -> List[dict]:
     """Read CSV using stdlib csv (no pandas). Limited to MAX_UPLOADED_ROWS."""
-    rows: list[dict] = []
+    rows: List[dict] = []
     try:
         with open(path, newline="", encoding="utf-8", errors="replace") as f:
             reader = csv.DictReader(f)
@@ -128,7 +128,7 @@ def _read_csv_fallback(path: Path) -> list[dict]:
 def _read_test_data_from_extracted_zip(
     extracted_dir: Path,
     config_dict: dict,
-) -> tuple[dict[str, list[dict]], dict[str, list[dict]]]:
+) -> Tuple[Dict[str, List[dict]], Dict[str, List[dict]]]:
     """
     Read optional input/ and output/ (or expected_output/) folders from extracted zip.
     Looks for INPUT/OUTPUT (case-insensitive) at root or inside a top-level folder (e.g. ENTERPRISE_BANK_BATCH/).
@@ -140,7 +140,7 @@ def _read_test_data_from_extracted_zip(
     input_names = list(inputs_cfg.keys()) if isinstance(inputs_cfg, dict) else []
     output_names = list(outputs_cfg.keys()) if isinstance(outputs_cfg, dict) else []
 
-    def _find_file(dir_path: Path, name: str, dataset: str | None = None) -> Path | None:
+    def _find_file(dir_path: Path, name: str, dataset: Optional[str] = None) -> Optional[Path]:
         """Find a file by config name or by dataset (DSN) so INPUT/PROD.BANK.TXN.DAILY is found when name is TXN."""
         if not dir_path.exists() or not dir_path.is_dir():
             return None
@@ -161,7 +161,7 @@ def _read_test_data_from_extracted_zip(
                     return f
         return None
 
-    def _read_dataset(path: Path, node_cfg: dict | None = None) -> list[dict]:
+    def _read_dataset(path: Path, node_cfg: Optional[dict] = None) -> List[dict]:
         try:
             # Check if this is a FIXED format file based on config
             fmt = ""
@@ -210,13 +210,13 @@ def _read_test_data_from_extracted_zip(
 
     inp_root, out_root = _resolve_input_output_roots(extracted_dir)
 
-    def _get_dataset(cfg: dict, name: str) -> str | None:
+    def _get_dataset(cfg: dict, name: str) -> Optional[str]:
         entry = cfg.get(name) if isinstance(cfg.get(name), dict) else None
         if not entry:
             return None
         return entry.get("dataset") or entry.get("Dataset") or entry.get("dsn")
 
-    input_data: dict[str, list[dict]] = {}
+    input_data: Dict[str, List[dict]] = {}
     if inp_root is not None:
         for name in input_names:
             dataset = _get_dataset(inputs_cfg, name)
@@ -226,7 +226,7 @@ def _read_test_data_from_extracted_zip(
                 input_data[name] = _read_dataset(p, ncfg)
                 LOG.info("Loaded input %s: %d rows from %s", name, len(input_data[name]), p.name)
 
-    expected_output: dict[str, list[dict]] = {}
+    expected_output: Dict[str, List[dict]] = {}
     if out_root is not None:
         for name in output_names:
             dataset = _get_dataset(outputs_cfg, name)
@@ -239,9 +239,9 @@ def _read_test_data_from_extracted_zip(
     return input_data, expected_output
 
 
-def _read_file_contents(paths: list[Path], max_chars: int = 50000) -> str:
+def _read_file_contents(paths: List[Path], max_chars: int = 50000) -> str:
     """Read and concatenate file contents up to max_chars total."""
-    out: list[str] = []
+    out: List[str] = []
     total = 0
     for p in paths:
         if total >= max_chars:
@@ -277,15 +277,15 @@ def _apply_dataset_path_prefixes(
 
 
 def generate_config_from_zip(
-    zip_path_or_file: str | Path | BinaryIO,
+    zip_path_or_file,  # type: Union[str, Path, BinaryIO]
     base_s3_path: str = "s3://migration-bucket/data",
-    input_dataset_prefix: str | None = None,
-    output_dataset_prefix: str | None = None,
+    input_dataset_prefix: Optional[str] = None,
+    output_dataset_prefix: Optional[str] = None,
     use_llm: bool = False,
-    llm_base_url: str | None = None,
-    llm_model: str | None = None,
+    llm_base_url: Optional[str] = None,
+    llm_model: Optional[str] = None,
     llm_timeout_seconds: int = 600,
-    log_sink: list | None = None,
+    log_sink: Optional[list] = None,
 ) -> dict:
     """
     Generate PySpark dataflow config JSON from a ZIP of mainframe artifacts.

@@ -1082,6 +1082,11 @@ class MainframeTransformationExecutor:
             result = self._apply_validate(source_df, logic)
         elif step_type == "select":
             result = self._apply_select(source_df, logic)
+        elif step_type == "ctrl_file":
+            # Control File step — aggregate source rows into a single summary row.
+            # The 1-row result is stored under output_alias so downstream Output
+            # nodes (e.g. OUTPUT-03) write exactly one ctrl record, not N data rows.
+            result = self._apply_ctrl_file(source_df, logic, step.get("id") or alias)
         elif step_type == "oracle_write":
             # Oracle Write is a terminal sink — loads data into Oracle via SQL*Loader.
             # The source DataFrame is passed through unchanged so downstream steps
@@ -1349,6 +1354,145 @@ class MainframeTransformationExecutor:
                     result = result.withColumn(target, F.lit(expr_str))
 
         return result
+
+    # ------------------------------------------------------------------
+    def _apply_ctrl_file(
+        self,
+        df: DataFrame,
+        logic: dict,
+        step_id: str,
+    ) -> DataFrame:
+        """
+        Aggregate *df* into a single summary row using the expressions defined
+        in ``ctrl_file_fields``.  The resulting 1-row DataFrame is stored in the
+        datasets registry under the step's output_alias so downstream Output
+        nodes receive exactly one control record (not the raw N-row source data).
+
+        Header-field date expressions (e.g. ``first(INP-HDR-FILE-DATE)``) are
+        resolved from ``_file_metadata`` (injected by the runner) in Python —
+        after validation the DataFrame contains only data rows so header columns
+        are empty.  The engine computes the date value in Python and passes it
+        as ``F.lit(result)`` instead of running a PySpark aggregation.
+
+        File writing to disk is handled by the runner's write_outputs →
+        _write_output path (and optionally _create_ctrl_file for curated ctrl).
+        """
+        import re as _re
+        import calendar as _calendar
+        from datetime import datetime as _datetime, date as _date
+
+        ctrl_file_fields = logic.get("ctrl_file_fields") or []
+        if not ctrl_file_fields:
+            LOG.warning("[CTRL_FILE:%s] No ctrl_file_fields defined; returning source_df unchanged.", step_id)
+            return df
+
+        # Flatten all header / trailer metadata into one {field_name: value} lookup
+        file_metadata = logic.get("_file_metadata") or {}
+        meta_values: dict = {}
+        for meta_dict in file_metadata.values():
+            if isinstance(meta_dict, dict):
+                meta_values.update(meta_dict)
+
+        def _resolve_header_date(expression: str, field_name: str):
+            """
+            Detect date-from-header-field patterns produced by the UI:
+              to_date(first(FIELD),'FMT')
+              last_day(to_date(first(FIELD),'FMT'))
+            Resolve the field value from *meta_values*, apply any date function
+            in Python, and return a (Column, str) tuple (lit_col, log_msg).
+            Returns None when the expression is not a header-date pattern.
+            """
+            m = _re.search(
+                r"to_date\s*\(\s*first\s*\(\s*`?([^`)\s]+)`?\s*\)\s*,\s*'([^']*)'\s*\)",
+                expression,
+                _re.IGNORECASE,
+            )
+            if not m:
+                return None
+
+            src_field  = m.group(1).strip()
+            spark_fmt  = m.group(2).strip()   # e.g. 'yyyyMMdd'
+            raw_val    = meta_values.get(src_field, "").strip()
+
+            if not raw_val:
+                LOG.warning(
+                    "[CTRL_FILE:%s] Header field '%s' not in metadata for '%s'; using empty string.",
+                    step_id, src_field, field_name,
+                )
+                return F.lit("")
+
+            # Parse the raw header date string
+            py_parse = _spark_to_py_strptime(spark_fmt)
+            dt = None
+            for try_fmt in (py_parse, "%Y%m%d", "%Y-%m-%d", "%m/%d/%Y"):
+                try:
+                    dt = _datetime.strptime(raw_val, try_fmt).date()
+                    break
+                except (ValueError, TypeError):
+                    continue
+
+            if dt is None:
+                LOG.warning(
+                    "[CTRL_FILE:%s] Could not parse header date '%s' for '%s'; using raw string.",
+                    step_id, raw_val, field_name,
+                )
+                return F.lit(raw_val)
+
+            # Apply date function when the expression is wrapped in last_day()
+            if _re.search(r"last_day\s*\(", expression, _re.IGNORECASE):
+                last_day_num = _calendar.monthrange(dt.year, dt.month)[1]
+                dt = _date(dt.year, dt.month, last_day_num)
+
+            result_str = dt.strftime(_spark_to_py_strptime(spark_fmt))
+            LOG.debug(
+                "[CTRL_FILE:%s] Resolved header field '%s' → '%s'.",
+                step_id, src_field, result_str,
+            )
+            return F.lit(result_str)
+
+        agg_exprs:  List[F.Column] = []
+        lit_fields: List[tuple]    = []   # (name, Column) resolved from metadata
+
+        for field_def in ctrl_file_fields:
+            name       = (field_def.get("name") or "").strip()
+            expression = (field_def.get("expression") or "").strip()
+            if not name:
+                continue
+            ftype = (field_def.get("type") or "STRING").upper()
+            if not expression:
+                expression = "count(*)" if ftype in ("LONG", "INT", "INTEGER", "BIGINT") else "cast(null as string)"
+
+            resolved = _resolve_header_date(expression, name)
+            if resolved is not None:
+                lit_fields.append((name, resolved))
+            else:
+                agg_exprs.append(F.expr(expression).alias(name))
+
+        if not agg_exprs and not lit_fields:
+            LOG.warning("[CTRL_FILE:%s] No valid expressions; returning source_df unchanged.", step_id)
+            return df
+
+        try:
+            if agg_exprs:
+                ctrl_df = df.agg(*agg_exprs)
+            else:
+                # All fields are literals — no aggregation; build a 1-row shell DataFrame
+                ctrl_df = df.sparkSession.range(1).select(F.lit(None).cast("string").alias("_ctrl_placeholder"))
+
+            for col_name, col_expr in lit_fields:
+                ctrl_df = ctrl_df.withColumn(col_name, col_expr)
+
+            if "_ctrl_placeholder" in ctrl_df.columns:
+                ctrl_df = ctrl_df.drop("_ctrl_placeholder")
+
+            LOG.info(
+                "[CTRL_FILE:%s] Produced 1 ctrl row: %d agg field(s), %d header-resolved field(s).",
+                step_id, len(agg_exprs), len(lit_fields),
+            )
+            return ctrl_df
+        except Exception as exc:
+            LOG.error("[CTRL_FILE:%s] Aggregation failed: %s; returning source_df unchanged.", step_id, exc)
+            return df
 
     # ------------------------------------------------------------------
     def _apply_oracle_write(

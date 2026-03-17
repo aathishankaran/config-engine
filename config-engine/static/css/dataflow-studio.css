@@ -52,6 +52,8 @@
   --node-oracle-write-header: #c2410c;
   --node-efs-write-border:    #7c3aed;
   --node-efs-write-header:    #7c3aed;
+  --node-ctrl-file-border:    #0891b2;
+  --node-ctrl-file-header:    #0891b2;
 }
 
 html, body {
@@ -377,6 +379,7 @@ html, body {
 .pi-validate      .palette-item-icon { background: #ccfbf1; color: #0d9488; }
 .pi-oracle-write  .palette-item-icon { background: #ffedd5; color: #c2410c; }
 .pi-efs-write     .palette-item-icon { background: #ede9fe; color: #7c3aed; }
+.pi-ctrl-file     .palette-item-icon { background: #cffafe; color: #0891b2; }
 
 /* ===================================================================
    CANVAS
@@ -518,6 +521,7 @@ html, body {
 .node-validate      .node-header { background: rgba(13,148,136,0.10); }
 .node-oracle-write  .node-header { background: rgba(194,65,12,0.10); }
 .node-efs_write     .node-header { background: rgba(124,58,237,0.10); }
+.node-ctrl_file     .node-header { background: rgba(8,145,178,0.10); }
 
 /* Elevated icon badge — larger box with shadow, floats above the card */
 .node-header-icon {
@@ -548,6 +552,7 @@ html, body {
 .node-validate      .node-header-icon { background: var(--node-validate-border); }
 .node-oracle-write  .node-header-icon { background: var(--node-oracle-write-border); }
 .node-efs_write     .node-header-icon { background: var(--node-efs-write-border); }
+.node-ctrl_file     .node-header-icon { background: var(--node-ctrl-file-border); }
 /* Larger, crisper SVG icons inside the elevated badge */
 .node-header-icon svg { width: 16px; height: 16px; stroke: #fff; color: #fff; stroke-width: 2; }
 
@@ -570,6 +575,7 @@ html, body {
 .node-validate      .node-type-label { color: #0f766e; }
 .node-oracle-write  .node-type-label { color: #9a3412; }
 .node-efs_write     .node-type-label { color: #6d28d9; }
+.node-ctrl_file     .node-type-label { color: #0891b2; }
 
 /* Node body */
 .node-body {
@@ -604,6 +610,7 @@ html, body {
 .df-node.node-validate      { border-left: 3px solid var(--node-validate-border); }
 .df-node.node-oracle-write  { border-left: 3px solid var(--node-oracle-write-border); }
 .df-node.node-efs_write     { border-left: 3px solid var(--node-efs-write-border); }
+.df-node.node-ctrl_file     { border-left: 3px solid var(--node-ctrl-file-border); }
 
 /* Connection Ports — small, clearly separated from the card icon */
 .node-port {
@@ -1685,6 +1692,144 @@ html, body {
 .cf-jr-label .cf-jr-text    { font-size: 9px; font-weight: 700; color: #64748b; line-height: 1; }
 .cf-jr-label:has(.cf-just-right:checked) .cf-jr-text { color: #0d9488; }
 .cf-field-inputs .cf-expr   { flex: 2.5; min-width: 100px; font-family: monospace; font-size: 11px; }
+
+/* DATE expression builder — now inline with preset select */
+.cf-expr-date-func,
+.cf-expr-date-src-inline {
+  font-size: 12px;
+  padding: 4px 6px;
+  height: 32px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--text, #1e293b);
+  min-width: 0;
+  flex: 1;
+}
+.cf-expr-date-func        { flex: 0 0 140px; }
+.cf-expr-date-src-inline  { flex: 1; min-width: 100px; }
+.cf-expr-date-func:disabled,
+.cf-expr-date-src-inline:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Control file field — card-based layout ── */
+.cf-field-card {
+  border-left: 3px solid rgba(8,145,178,0.35) !important;
+  margin-bottom: 10px !important;
+  padding: 10px 12px !important;
+}
+.cf-field-card:hover {
+  border-left-color: #0891b2 !important;
+}
+.cf-card-row {
+  flex-wrap: wrap;
+  gap: 6px !important;
+  margin-bottom: 6px;
+}
+.cf-card-row:last-child { margin-bottom: 0; }
+.cf-card-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  min-width: 40px;
+  flex-shrink: 0;
+  line-height: 32px;
+}
+.cf-card-lbl-sm {
+  min-width: auto;
+  margin-left: 2px;
+}
+.cf-card-lbl-expr {
+  color: #0e7490;
+}
+.cf-card-name {
+  flex: 1;
+  min-width: 120px;
+  height: 32px;
+  font-size: 13px;
+  padding: 4px 8px;
+}
+.cf-card-type {
+  flex: 0 0 100px;
+  min-width: 90px;
+  height: 32px;
+  font-size: 13px;
+}
+.cf-card-num {
+  flex: 0 0 68px;
+  min-width: 60px;
+  max-width: 80px;
+  height: 32px;
+  font-size: 13px;
+  padding: 4px 6px;
+  text-align: center;
+}
+.cf-card-fmt {
+  flex: 1;
+  min-width: 90px;
+  height: 32px;
+  font-size: 13px;
+  padding: 4px 8px;
+}
+.cf-card-jr {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  margin-left: 4px;
+  height: 32px;
+}
+.cf-card-jr .cf-just-right { margin: 0; cursor: pointer; }
+.cf-card-jr .cf-jr-text {
+  font-size: 10px; font-weight: 700; color: #64748b; line-height: 1;
+}
+.cf-card-jr:has(.cf-just-right:checked) .cf-jr-text { color: #0891b2; }
+.cf-card-expr-row {
+  background: rgba(8,145,178,0.05);
+  border-radius: 0 0 4px 4px;
+  padding: 8px 0 4px !important;
+  margin-top: 2px;
+}
+.cf-card-expr-row .cf-expr-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cf-card-expr-row .cf-expr-select {
+  flex: 0 0 140px;
+  height: 32px;
+  font-size: 12px;
+}
+/* Ctrl file fields editor header alignment */
+.cf-fields-editor .list-editor-header {
+  background: #faf5ff;
+  border-bottom-color: rgba(147,51,234,.15);
+}
+/* Ctrl file section — Import button purple theme + alignment */
+.cf-section-title .tbl-hdr-icon-btn {
+  border-color: rgba(147,51,234,.3);
+  color: #7e22ce;
+  background: #faf5ff;
+  margin-left: auto;
+  margin-right: 4px;
+}
+.cf-section-title .tbl-hdr-icon-btn:hover {
+  background: #f3e8ff;
+  border-color: #9333ea;
+  color: #581c87;
+}
+.cf-section-title .tbl-hdr-icon-btn.has-file {
+  background: #f3e8ff;
+  border-color: #9333ea;
+  color: #7e22ce;
+}
 
 /* ── Props subsection title (inside a Validation Settings section) ── */
 .props-subsection-title {

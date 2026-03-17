@@ -228,17 +228,11 @@ var _CF_EXPR_POPUP_HTML =
     '</div>' +
 
     '<div class="cf-expr-section">' +
-      '<div class="cf-expr-section-label">Date &amp; Time (scalar)</div>' +
-      '<div class="cf-expr-row"><span class="cf-expr-code">current_date()</span><span class="cf-expr-desc">Today\'s date</span></div>' +
-      '<div class="cf-expr-row"><span class="cf-expr-code">current_timestamp()</span><span class="cf-expr-desc">Current date and time</span></div>' +
-      '<div class="cf-expr-row"><span class="cf-expr-code">date_format(current_date(),\'yyyyMMdd\')</span><span class="cf-expr-desc">Formatted date string</span></div>' +
-      '<div class="cf-expr-row"><span class="cf-expr-code">last_day(current_date())</span><span class="cf-expr-desc">Last day of current month</span></div>' +
-    '</div>' +
-
-    '<div class="cf-expr-section">' +
-      '<div class="cf-expr-section-label">Header Date Fields (requires Header Post Date Field config)</div>' +
-      '<div class="cf-expr-row"><span class="cf-expr-code">effective_date</span><span class="cf-expr-desc">Header post-date value (raw)</span></div>' +
-      '<div class="cf-expr-row"><span class="cf-expr-code">as_of_date</span><span class="cf-expr-desc">Last calendar day of the month derived from header post-date</span></div>' +
+      '<div class="cf-expr-section-label">Date Builder (use the \ud83d\udcc5 Date preset)</div>' +
+      '<div class="cf-expr-row"><span class="cf-expr-code">Header Field Date</span><span class="cf-expr-desc">Date value from input header field</span></div>' +
+      '<div class="cf-expr-row"><span class="cf-expr-code">Last Day + Header</span><span class="cf-expr-desc">Last day of month from header date</span></div>' +
+      '<div class="cf-expr-row"><span class="cf-expr-code">Current Date</span><span class="cf-expr-desc">Today\'s date</span></div>' +
+      '<div class="cf-expr-row"><span class="cf-expr-code">Last Day + Current</span><span class="cf-expr-desc">Last day of current month</span></div>' +
     '</div>' +
 
     '<div class="cf-expr-section">' +
@@ -257,6 +251,16 @@ var _CF_EXPR_POPUP_HTML =
     '</div>' +
   '</div>';
 
+/* Date format options for the Date expression builder */
+var _DATE_FORMATS = [
+  'yyyyMMdd', 'yyyy-MM-dd', 'MMddyyyy', 'MM/dd/yyyy', 'yyyy/MM/dd', 'MMddyy', 'yyyyMMddHHmmss'
+];
+var _DATE_FUNCTIONS = [
+  { value: '',            label: '-- None --' },
+  { value: 'LASTDAY',     label: 'Last Day of Month' },
+  { value: 'CURRENTDATE', label: 'Current Date' }
+];
+
 /* Preset expressions for control file / header / trailer fields */
 var _CF_EXPR_PRESETS = [
   { value: '',                                          label: '-- Expression --' },
@@ -264,47 +268,66 @@ var _CF_EXPR_PRESETS = [
   { value: 'sum(amount)',                               label: 'sum(col)' },
   { value: 'max(load_date)',                            label: 'max(col)' },
   { value: 'min(load_date)',                            label: 'min(col)' },
-  { value: 'current_date()',                            label: 'current_date()' },
-  { value: 'current_timestamp()',                       label: 'current_timestamp()' },
-  { value: "date_format(current_date(),'yyyyMMdd')",    label: 'date_format(...)' },
-  { value: "last_day(current_date())",                  label: 'last_day(today)' },
+  { value: '__date__',                                  label: '\ud83d\udcc5 Date' },
   { value: 'lpad(cast(count(*) as string),10,\'0\')',   label: 'lpad count' },
-  { value: '__effective_date__',                        label: '\ud83d\udcc5 effective_date' },
-  { value: '__as_of_date__',                            label: '\ud83d\udcc5 as_of_date' },
   { value: '__literal__',                               label: '\u270f\ufe0f Hardcoded' },
   { value: '__custom__',                                label: '\u2699\ufe0f Custom' }
 ];
 
-function _buildCfExprCell(expr, i) {
-  /* Detect effective_date / as_of_date from existing stored expressions for round-trip loading:
-     first(FIELD)                              → __effective_date__ with field=FIELD
-     last_day(to_date(first(FIELD),'FMT'))     → __as_of_date__ with field=FIELD, fmt=FMT  */
-  var _effMatch  = expr && expr.match(/^first\(([^)]+)\)$/);
-  var _asofMatch = expr && expr.match(/^last_day\(to_date\(first\(([^)]+)\)\s*,\s*'([^']+)'\s*\)\)$/);
+function _buildCfExprCell(expr, i, hdrFieldNames) {
+  /* Round-trip detection for DATE expressions */
+  var _dateInfo = null; /* { func: '', source: '', format: '' } */
+  if (expr) {
+    var m;
+    if ((m = expr.match(/^last_day\(to_date\(first\(([^)]+)\)\s*,\s*'([^']+)'\s*\)\)$/))) {
+      _dateInfo = { func: 'LASTDAY', source: m[1], format: m[2] };
+    } else if ((m = expr.match(/^to_date\(first\(([^)]+)\)\s*,\s*'([^']+)'\s*\)$/))) {
+      _dateInfo = { func: '', source: m[1], format: m[2] };
+    } else if (expr === 'last_day(current_date())') {
+      _dateInfo = { func: 'LASTDAY', source: '', format: 'yyyyMMdd' };
+    } else if (expr === 'current_date()') {
+      _dateInfo = { func: 'CURRENTDATE', source: '', format: 'yyyyMMdd' };
+    } else if ((m = expr.match(/^first\(([^)]+)\)$/))) {
+      /* Legacy: first(FIELD) without to_date wrap */
+      _dateInfo = { func: '', source: m[1], format: 'yyyyMMdd' };
+    } else if ((m = expr.match(/^date_format\(current_date\(\)\s*,\s*'([^']+)'\s*\)$/))) {
+      _dateInfo = { func: 'CURRENTDATE', source: '', format: m[1] };
+    } else if ((m = expr.match(/^last_day\(to_date\(current_date\(\)\s*,\s*'([^']+)'\s*\)\)$/))) {
+      _dateInfo = { func: 'LASTDAY', source: '', format: m[1] };
+    }
+  }
+  var isDate = !!_dateInfo;
 
   var presetValues = _CF_EXPR_PRESETS.map(function(p){ return p.value; })
-    .filter(function(v){ return v && v !== '__literal__' && v !== '__custom__' && v !== '__effective_date__' && v !== '__as_of_date__'; });
-  var isLiteral   = expr && /^'.*'$/.test(expr.trim());
-  var isPreset    = presetValues.indexOf(expr) >= 0;
-  var isEffDate   = !!_effMatch;
-  var isAsOfDate  = !!_asofMatch;
+    .filter(function(v){ return v && v !== '__literal__' && v !== '__custom__' && v !== '__date__'; });
+  var isLiteral = expr && /^'.*'$/.test(expr.trim());
+  var isPreset  = presetValues.indexOf(expr) >= 0;
 
   var selVal;
-  if (isEffDate)       selVal = '__effective_date__';
-  else if (isAsOfDate) selVal = '__as_of_date__';
+  if (isDate)          selVal = '__date__';
   else if (isPreset)   selVal = expr;
   else if (isLiteral)  selVal = '__literal__';
   else                 selVal = expr ? '__custom__' : '';
 
-  var literalVal  = isLiteral  ? expr.slice(1, -1) : '';
-  var customVal   = (!isPreset && !isLiteral && !isEffDate && !isAsOfDate && expr) ? expr : '';
-  var effField    = _effMatch  ? _effMatch[1]  : '';
-  var asofField   = _asofMatch ? _asofMatch[1] : '';
-  var asofFmt     = _asofMatch ? _asofMatch[2] : '';
+  var literalVal = isLiteral ? expr.slice(1, -1) : '';
+  var customVal  = (!isPreset && !isLiteral && !isDate && expr) ? expr : '';
 
   var opts = _CF_EXPR_PRESETS.map(function(p) {
     return '<option value="' + DS.fn.esc(p.value) + '"' + (p.value === selVal ? ' selected' : '') + '>' + p.label + '</option>';
   }).join('');
+
+  /* Date builder dropdowns */
+  var fmtOpts = _DATE_FORMATS.map(function(fmt) {
+    return '<option value="' + fmt + '"' + (_dateInfo && _dateInfo.format === fmt ? ' selected' : '') + '>' + fmt + '</option>';
+  }).join('');
+  var funcOpts = _DATE_FUNCTIONS.map(function(fn) {
+    return '<option value="' + fn.value + '"' + (_dateInfo && _dateInfo.func === fn.value ? ' selected' : '') + '>' + fn.label + '</option>';
+  }).join('');
+  var srcDisabled = _dateInfo && _dateInfo.func === 'CURRENTDATE';
+  var srcOpts = '<option value="">-- Header Field --</option>' +
+    (hdrFieldNames || []).map(function(n) {
+      return '<option value="' + DS.fn.esc(n) + '"' + (_dateInfo && _dateInfo.source === n ? ' selected' : '') + '>' + DS.fn.esc(n) + '</option>';
+    }).join('');
 
   return '<div class="cf-expr-wrap">' +
     '<select class="cf-expr-select" data-field="expression" data-idx="' + i + '">' + opts + '</select>' +
@@ -314,56 +337,59 @@ function _buildCfExprCell(expr, i) {
     '<input type="text" class="cf-expr-custom" placeholder="PySpark expression" ' +
       'style="' + (selVal === '__custom__' ? '' : 'display:none;') + '" ' +
       'value="' + DS.fn.esc(customVal) + '" />' +
-    '<input type="text" class="cf-expr-eff-field" placeholder="Header field (e.g. INP-HDR-POST-DATE)" ' +
-      'style="' + (selVal === '__effective_date__' ? '' : 'display:none;') + '" ' +
-      'value="' + DS.fn.esc(effField) + '" />' +
-    '<div class="cf-expr-asof-wrap" style="' + (selVal === '__as_of_date__' ? 'display:flex;gap:4px;' : 'display:none;') + '">' +
-      '<input type="text" class="cf-expr-asof-field" placeholder="Header field" ' +
-        'value="' + DS.fn.esc(asofField) + '" style="flex:1" />' +
-      '<input type="text" class="cf-expr-asof-fmt" placeholder="Format (yyyyMMdd)" ' +
-        'value="' + DS.fn.esc(asofFmt) + '" style="width:110px" />' +
-    '</div>' +
+    '<select class="cf-expr-date-func" title="Date function"' +
+      (selVal !== '__date__' ? ' style="display:none;"' : '') + '>' + funcOpts + '</select>' +
+    '<select class="cf-expr-date-src cf-expr-date-src-inline" title="Header field source"' +
+      (srcDisabled ? ' disabled' : '') +
+      (selVal !== '__date__' ? ' style="display:none;"' : (srcDisabled ? ' style="opacity:0.4"' : '')) +
+      '>' + srcOpts + '</select>' +
   '</div>';
 }
 
-function buildControlFileFieldsEditor(ns, fields, headerBtns) {
-  var rows = (fields || []).map(function(f, i) {
+function buildControlFileFieldsEditor(ns, fields, headerBtns, hdrFieldNames) {
+  var _hfn = hdrFieldNames || [];
+  var cards = (fields || []).map(function(f, i) {
     var curType = (f.type || 'STRING').toUpperCase();
     var jrChecked = f.just_right ? ' checked' : '';
-    return '<div class="list-item cf-field-item">' +
-      '<div class="list-item-inputs cf-field-inputs">' +
-        '<input type="text" placeholder="Field name" value="' + DS.fn.esc(f.name||'') + '" data-field="name" data-idx="' + i + '" class="cf-name" title="Control file field name" />' +
-        selectOpts(C.FIELD_TYPES, curType, 'data-field="type" data-idx="' + i + '" class="cf-type" title="Data type"') +
-        '<input type="number" placeholder="Begin" min="0" value="' + (parseInt(f.begin||0)||0) + '" data-field="begin" data-idx="' + i + '" class="cf-begin" title="1-based start position in output record (0 = sequential after previous field)" />' +
-        '<input type="number" placeholder="Length" min="0" value="' + (parseInt(f.length||0)||0) + '" data-field="length" data-idx="' + i + '" class="cf-length" title="Field width in characters (0 = auto)" />' +
-        '<input type="text" placeholder="Format" value="' + DS.fn.esc(f.format||'') + '" data-field="format" data-idx="' + i + '" class="cf-format" title="Date format string e.g. yyyyMMdd (blank = type default)" />' +
-        '<label class="cf-jr-label" title="COBOL JUSTIFIED RIGHT — right-align this STRING field within its column width (space-pad on the left)">' +
+    return '<div class="vr-card cf-field-card cf-field-item">' +
+      '<button class="vr-card-remove list-item-remove" data-ns="' + ns + '" data-idx="' + i + '" title="Remove field">\xd7</button>' +
+      /* Row 1: Name + Type */
+      '<div class="vr-card-row cf-card-row">' +
+        '<label class="cf-card-lbl">Name</label>' +
+        '<input type="text" placeholder="Field name" value="' + DS.fn.esc(f.name||'') + '" data-field="name" data-idx="' + i + '" class="cf-card-name" />' +
+        '<label class="cf-card-lbl cf-card-lbl-sm">Type</label>' +
+        selectOpts(C.FIELD_TYPES, curType, 'data-field="type" data-idx="' + i + '" class="cf-card-type"') +
+      '</div>' +
+      /* Row 2: Begin + Length + Format + JR */
+      '<div class="vr-card-row cf-card-row">' +
+        '<label class="cf-card-lbl">Begin</label>' +
+        '<input type="number" placeholder="0" min="0" value="' + (parseInt(f.begin||0)||0) + '" data-field="begin" data-idx="' + i + '" class="cf-card-num" />' +
+        '<label class="cf-card-lbl cf-card-lbl-sm">Length</label>' +
+        '<input type="number" placeholder="0" min="0" value="' + (parseInt(f.length||0)||0) + '" data-field="length" data-idx="' + i + '" class="cf-card-num" />' +
+        '<label class="cf-card-lbl cf-card-lbl-sm">Format</label>' +
+        '<input type="text" placeholder="e.g. yyyyMMdd" value="' + DS.fn.esc(f.format||'') + '" data-field="format" data-idx="' + i + '" class="cf-card-fmt" />' +
+        '<label class="cf-card-jr" title="JUSTIFIED RIGHT — right-align STRING field">' +
           '<input type="checkbox" data-field="just_right" data-idx="' + i + '" class="cf-just-right"' + jrChecked + ' />' +
           '<span class="cf-jr-text">JR</span>' +
         '</label>' +
-        _buildCfExprCell(f.expression || '', i) +
       '</div>' +
-      '<div class="list-item-actions">' +
-        '<button class="list-item-remove" data-ns="' + ns + '" data-idx="' + i + '" title="Remove field">\xd7</button>' +
+      /* Row 3: Expression */
+      '<div class="vr-card-row cf-card-row cf-card-expr-row">' +
+        '<label class="cf-card-lbl cf-card-lbl-expr">Expr</label>' +
+        _buildCfExprCell(f.expression || '', i, _hfn) +
       '</div>' +
     '</div>';
   }).join('');
-  return '<div class="list-editor cf-fields-editor" id="' + ns + '-editor">' +
-    '<div class="list-editor-header"><span>Fields (' + (fields||[]).length + ')</span>' + (headerBtns ? '<span class="tbl-hdr-btn-group">' + headerBtns + '</span>' : '') + '</div>' +
-    '<div class="list-editor-col-header cf-col-header">' +
-      '<span class="cf-ch-name">Name</span>' +
-      '<span class="cf-ch-type">Type</span>' +
-      '<span class="cf-ch-begin">Begin</span>' +
-      '<span class="cf-ch-length">Length</span>' +
-      '<span class="cf-ch-format">Format</span>' +
-      '<span class="cf-ch-jr" title="JUSTIFIED RIGHT — right-align STRING field (from COBOL JUST RIGHT clause)">JR</span>' +
-      '<span class="cf-ch-expr">Expression ' +
-        '<button type="button" class="cf-expr-info-btn" id="cf-expr-info-btn" title="View supported expressions">i</button>' +
-        _CF_EXPR_POPUP_HTML +
-      '</span>' +
-      '<span class="cf-ch-del"></span>' +
+
+  var infoBtn = '<button type="button" class="cf-expr-info-btn" id="cf-expr-info-btn" title="View supported expressions" style="margin-left:4px">i</button>';
+
+  return '<div class="list-editor vr-cards-editor cf-fields-editor" id="' + ns + '-editor">' +
+    '<div class="list-editor-header">' +
+      '<span>Fields (' + (fields||[]).length + ') ' + infoBtn + '</span>' +
+      (headerBtns ? '<span class="tbl-hdr-btn-group">' + headerBtns + '</span>' : '') +
     '</div>' +
-    '<div class="list-editor-items" id="' + ns + '-items">' + rows + '</div>' +
+    _CF_EXPR_POPUP_HTML +
+    '<div class="vr-cards-list cf-cards-list" id="' + ns + '-items">' + cards + '</div>' +
     '<button class="btn-add-row" data-ns="' + ns + '" data-action="add-cf-field" title="Add a new control file field">+ Add Field</button>' +
   '</div>';
 }
@@ -668,7 +694,7 @@ function _redrawSrcChips(wrap) {
   DS.fn.getSingleSelectValue = getSingleSelectValue;
   DS.fn.initSrcDropdowns = initSrcDropdowns;
 
-  /* ---- Global delegated handler: cf-expr-select show/hide literal/custom inputs ---- */
+  /* ---- Global delegated handler: cf-expr-select show/hide conditional inputs ---- */
   /* Registered once at module load — covers all panels (validate, output header/trailer) */
   $(document).on('change', '.cf-expr-select', function() {
     var $sel  = $(this);
@@ -676,8 +702,25 @@ function _redrawSrcChips(wrap) {
     var val   = $sel.val();
     $wrap.find('.cf-expr-literal').toggle(val === '__literal__');
     $wrap.find('.cf-expr-custom').toggle(val === '__custom__');
-    $wrap.find('.cf-expr-eff-field').toggle(val === '__effective_date__');
-    $wrap.find('.cf-expr-asof-wrap').toggle(val === '__as_of_date__');
+    $wrap.find('.cf-expr-date-func').toggle(val === '__date__');
+    $wrap.find('.cf-expr-date-src').toggle(val === '__date__');
+    if (val === '__date__') {
+      var $func = $wrap.find('.cf-expr-date-func');
+      var $src  = $wrap.find('.cf-expr-date-src');
+      if ($func.val() === 'CURRENTDATE') {
+        $src.prop('disabled', true).css('opacity', '0.4');
+      }
+    }
+  });
+
+  /* Date builder: toggle header field dropdown when function changes */
+  $(document).on('change', '.cf-expr-date-func', function() {
+    var $func = $(this);
+    var $wrap = $func.closest('.cf-expr-wrap');
+    var $src  = $wrap.find('.cf-expr-date-src');
+    var isCurrent = ($func.val() === 'CURRENTDATE');
+    $src.prop('disabled', isCurrent).css('opacity', isCurrent ? '0.4' : '1');
+    if (isCurrent) $src.val('');
   });
 
 })(window.DS);

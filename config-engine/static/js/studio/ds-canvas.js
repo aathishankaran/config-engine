@@ -28,12 +28,14 @@ function buildNodeEl(node) {
   var isInput  = node.type === 'input';
   var isOutput = node.type === 'output' || node.type === 'efs_write';
 
+  var isCtrlFile = node.type === 'ctrl_file';
   var title = isInput || isOutput ? node.name || node.id
-             : node.output_alias || node.step_id || node.id;
+             : node.step_id || node.output_alias || node.id;
   var isValidate = node.type === 'validate';
   var subtitle = isInput  ? (node.format || '') + (node.dataset_name ? ' · ' + node.dataset_name : (node.path ? ' · ' + node.path.split('/').pop() : ''))
                : isOutput ? (node.format || '') + (node.dataset_name ? ' · ' + node.dataset_name : (node.path ? ' · ' + node.path.split('/').pop() : ''))
                : isValidate ? (node.dataset_name || node.description || node.type)
+               : isCtrlFile ? (node.ctrl_file_name || node.description || node.type)
                : node.description || node.type;
 
   var $el = $('<div>')
@@ -397,7 +399,6 @@ function silentApplyProps(node) {
       node.dataset_name = g('po-dataset-name') !== null ? g('po-dataset-name') : node.dataset_name;
       node.write_mode  = g('po-wmode') || node.write_mode;
       node.delimiter_char = g('po-delimiter-char') || node.delimiter_char || '';
-      node.ctrl_file_gen = gc('po-ctrl-file-gen');
       if (oldNameO && oldNameO !== node.name) {
         var $elOldO = $('[data-node-id="' + oldNameO + '"]');
         if ($elOldO.length) $elOldO.attr('data-node-id', node.id);
@@ -698,13 +699,6 @@ function loadConfig(config) {
       n.last_run_file_path  = logic.last_run_file_path  || '';
       n.last_run_file_name  = logic.last_run_file_name  || '';
       n.partition_column    = logic.partition_column    || '';
-      n.ctrl_file_create  = !!logic.ctrl_file_create;
-      n.ctrl_file_name    = logic.ctrl_file_name   || '';
-      n.ctrl_include_header = !!logic.ctrl_include_header;
-      n.ctrl_file_fields  = (logic.ctrl_file_fields || []).map(function(f) {
-        return { name: f.name || '', type: (f.type || 'STRING').toUpperCase(), expression: f.expression || '', length: f.length || 0, begin: f.begin || 0, format: f.format || '', just_right: !!f.just_right };
-      });
-      n._ctrl_schema_file = logic._ctrl_schema_file || '';
       n.validate_rules = (logic.rules || []).map(function(r) {
         return {
           field:       r.field       || '',
@@ -716,6 +710,13 @@ function loadConfig(config) {
           pattern:     r.pattern     || ''
         };
       });
+    } else if (s.type === 'ctrl_file') {
+      n.ctrl_file_name    = logic.ctrl_file_name   || '';
+      n.ctrl_include_header = !!logic.ctrl_include_header;
+      n.ctrl_file_fields  = (logic.ctrl_file_fields || []).map(function(f) {
+        return { name: f.name || '', type: (f.type || 'STRING').toUpperCase(), expression: f.expression || '', length: f.length || 0, begin: f.begin || 0, format: f.format || '', just_right: !!f.just_right };
+      });
+      n._ctrl_schema_file = logic._ctrl_schema_file || '';
     } else if (s.type === 'oracle_write') {
       n.ora_host         = logic.host         || '';
       n.ora_port         = String(logic.port  || '1521');
@@ -746,6 +747,28 @@ function loadConfig(config) {
     });
   });
 
+  /* ── Legacy migration: extract ctrl_file from validate steps ── */
+  S.nodes.slice().forEach(function(vn) {
+    if (vn.type !== 'validate') return;
+    /* Check if this validate node has legacy ctrl_file_create in the original step logic */
+    var origStep = steps.find(function(s){ return (s.id || '') === (vn.step_id || vn.id); });
+    var origLogic = (origStep && origStep.logic) || {};
+    if (!origLogic.ctrl_file_create) return;
+    /* Create a ctrl_file node from the legacy data */
+    var cfNode = DS.fn.defaultNodeData('ctrl_file');
+    cfNode.ctrl_file_name    = origLogic.ctrl_file_name   || '';
+    cfNode.ctrl_include_header = !!origLogic.ctrl_include_header;
+    cfNode.ctrl_file_fields  = (origLogic.ctrl_file_fields || []).map(function(f) {
+      return { name: f.name || '', type: (f.type || 'STRING').toUpperCase(), expression: f.expression || '', length: f.length || 0, begin: f.begin || 0, format: f.format || '', just_right: !!f.just_right };
+    });
+    cfNode._ctrl_schema_file = origLogic._ctrl_schema_file || '';
+    cfNode.source_inputs = [vn.output_alias || vn.step_id || vn.id];
+    cfNode.x = vn.x + 220;
+    cfNode.y = vn.y + 60;
+    addNode(cfNode);
+    S.connections.push({ id: 'conn_' + (S._connCounter++), from: vn.id, to: cfNode.id });
+  });
+
   /* Last row — Outputs */
   outputKeys.forEach(function(name, idx) {
     var d = outputs[name];
@@ -768,7 +791,6 @@ function loadConfig(config) {
     if (d.trailer_count    !== undefined) n.trailer_count    = d.trailer_count;
     if (d.control_file_path) n.control_file_path = d.control_file_path;
     if (d.delimiter_char)    n.delimiter_char    = d.delimiter_char;
-    if (d.ctrl_file_gen)     n.ctrl_file_gen     = d.ctrl_file_gen;
     if (d.target_file_name)  n.target_file_name  = d.target_file_name;
     if (d._schema_file) n._schema_file = d._schema_file;
     if (d._test_file)   n._test_file   = d._test_file;

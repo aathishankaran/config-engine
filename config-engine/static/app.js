@@ -2408,8 +2408,55 @@
     var allNames = {};
     Object.keys(expected).forEach(function (n) { allNames[n] = true; });
     Object.keys(generated).forEach(function (n) { allNames[n] = true; });
-    var names = Object.keys(allNames);
+    var names = Object.keys(allNames).filter(function (n) {
+      return n.indexOf('__ctrl__') !== 0;
+    });
     var html = uploadHtml;
+
+    // ── Build per-dataset info first so we can render tab bar with status ──
+    var datasetInfos = [];
+    names.forEach(function (name, ni) {
+      var expRows = expected[name] || [];
+      var genRows = generated[name] || [];
+      var reconResult = buildReconPairs(expRows, genRows);
+      var configOutputsCfg = (currentConfig && currentConfig.Outputs) || {};
+      var isCtrlKey  = name.indexOf('__ctrl__') === 0;
+      var matchCount = 0, diffCount = 0, onlyExpCount = 0, onlyGenCount = 0;
+      var expCols2 = reconResult.expCols.slice();
+      var colMap2  = Object.assign({}, reconResult.colMap);
+      if (!isCtrlKey && configOutputsCfg[name] && configOutputsCfg[name].fields && configOutputsCfg[name].fields.length) {
+        var schemaColSet2 = {};
+        configOutputsCfg[name].fields.forEach(function (f) {
+          if (f.name) { schemaColSet2[f.name.toUpperCase()] = true; schemaColSet2[f.name.replace(/-/g, '_').toUpperCase()] = true; }
+        });
+        expCols2 = expCols2.filter(function (ec) { return schemaColSet2[ec.toUpperCase()] || schemaColSet2[ec.replace(/-/g, '_').toUpperCase()]; });
+        Object.keys(colMap2).forEach(function (k) { if (!schemaColSet2[k.toUpperCase()] && !schemaColSet2[k.replace(/-/g,'_').toUpperCase()]) delete colMap2[k]; });
+      }
+      var matchedGenCols2 = {};
+      expCols2.forEach(function (ec) { if (colMap2[ec]) matchedGenCols2[colMap2[ec]] = true; });
+      var allCols2 = expCols2.slice();
+      reconResult.genCols.forEach(function (gc) { if (!matchedGenCols2[gc]) allCols2.push(gc); });
+      reconResult.pairs.forEach(function (pair) {
+        if (!pair.gen) { onlyExpCount++; return; }
+        if (!pair.exp) { onlyGenCount++; return; }
+        var hasDiff = allCols2.some(function (ec) { var gc = colMap2[ec]; var gv = (gc != null) ? normalizeReconValue(pair.gen[gc]) : ''; return normalizeReconValue(pair.exp[ec]) !== gv; });
+        if (hasDiff) diffCount++; else matchCount++;
+      });
+      var statusMatch = diffCount === 0 && onlyExpCount === 0 && onlyGenCount === 0;
+      datasetInfos.push({ name: name, ni: ni, statusMatch: statusMatch });
+    });
+
+    // ── Tab bar ────────────────────────────────────────────────────────────
+    if (names.length > 1) {
+      html += '<div class="recon-tabs-bar">';
+      datasetInfos.forEach(function (info, idx) {
+        var tabLabel  = escape(info.name);
+        var statusCls = info.statusMatch ? 'recon-tab-dot-match' : 'recon-tab-dot-mismatch';
+        html += '<button class="recon-tab' + (idx === 0 ? ' recon-tab-active' : '') + '" data-recon-tab="recon-panel-' + info.ni + '" title="' + tabLabel + '">' +
+          '<span class="recon-tab-dot ' + statusCls + '"></span>' + tabLabel + '</button>';
+      });
+      html += '</div>';
+    }
 
     names.forEach(function (name, ni) {
       var expRows = expected[name] || [];
@@ -2481,7 +2528,8 @@
         ? 'Control File: ' + escape(name.slice('__ctrl__'.length))
         : escape(name);
 
-      html += '<div class="test-recon-dataset">';
+      var panelHidden = names.length > 1 && ni > 0;
+      html += '<div class="test-recon-dataset" id="recon-panel-' + ni + '"' + (panelHidden ? ' style="display:none"' : '') + '>';
       // Header row: title + hide-matching toggle
       html += '<div class="recon-dataset-header">';
       html += '<h4 class="test-recon-dataset-title">' + displayTitle + ' <span class="' + statusClass + '">' + statusText + '</span>';
@@ -2628,6 +2676,16 @@
 
     $reconContainer.html(html || (uploadHtml + '<p class="test-recon-placeholder">No output datasets to compare.</p>'));
     _renderReconExpectedUpload($('#recon-expected-upload-nodes')[0]);
+
+    // Wire up tab clicks
+    $reconContainer.find('.recon-tab').on('click', function () {
+      var $btn = $(this);
+      var panelId = $btn.attr('data-recon-tab');
+      $reconContainer.find('.recon-tab').removeClass('recon-tab-active');
+      $btn.addClass('recon-tab-active');
+      $reconContainer.find('.test-recon-dataset').hide();
+      $reconContainer.find('#' + panelId).show();
+    });
   }
 
   var $outputCtaEl = $('#test-logs-output-cta');
@@ -2767,49 +2825,99 @@
               if ($showReconciliationBtnOutput.length) $showReconciliationBtnOutput.addClass('hidden');
             }
             if ($outputTables.length) {
-              $outputTables.html('');
               var esc2 = window.CodeParser.escapeHtml || escapeHtml;
               var outputs = res.outputs || {};
-              var outputNames = Object.keys(outputs);
-              outputNames.forEach(function (name) {
-                var rows = outputs[name] || [];
-                var cols = rows[0] ? Object.keys(rows[0]).filter(function (k) { return !k.startsWith('_'); }) : [];
-                if (cols.length === 0 && rows.length === 0) return;
-                if (cols.length === 0) cols = rows[0] ? Object.keys(rows[0]) : [];
-                var html = '<div class="test-table-wrap"><h3>' + esc2(name) + '</h3><table class="test-table"><thead><tr>' +
-                  cols.map(function (c) { return '<th>' + esc2(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
-                rows.slice(0, 10).forEach(function (r) {
-                  html += '<tr>' + cols.map(function (c) { return '<td>' + esc2(String(r[c] != null ? r[c] : '')) + '</td>'; }).join('') + '</tr>';
-                });
-                html += '</tbody></table></div>';
-                $outputTables.append(html);
-              });
-              // Also render control file outputs (same table pattern as output datasets)
               var ctrlOuts = res.ctrl_outputs || {};
-              Object.keys(ctrlOuts).forEach(function (stepId) {
-                var rows = ctrlOuts[stepId] || [];
-                var cols = rows[0] ? Object.keys(rows[0]).filter(function (k) { return !k.startsWith('_'); }) : [];
-                if (!cols.length && rows[0]) cols = Object.keys(rows[0]);
-                var html = '<div class="test-table-wrap"><h3>Control File: ' + esc2(stepId) + '</h3>';
-                if (!rows.length) {
-                  html += '<p class="test-output-empty" style="margin:4px 0 8px">Control file generated (0 data rows).</p>';
-                } else {
-                  html += '<table class="test-table"><thead><tr>' +
-                    cols.map(function (c) { return '<th>' + esc2(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
-                  rows.forEach(function (r) {
-                    html += '<tr>' + cols.map(function (c) { return '<td>' + esc2(String(r[c] != null ? r[c] : '')) + '</td>'; }).join('') + '</tr>';
-                  });
-                  html += '</tbody></table>';
-                }
-                html += '</div>';
-                $outputTables.append(html);
+              var outputNames = Object.keys(outputs).filter(function (n) {
+                var rows = outputs[n] || [];
+                return rows.length > 0 || true; // include all, filter empties below
               });
-              if (outputNames.length === 0 && Object.keys(ctrlOuts).length === 0 && res.error) {
-                $outputTables.html('<p class="test-error">' + (window.CodeParser.escapeHtml || escapeHtml)(res.error) + '</p>');
-              } else if (outputNames.length === 0 && Object.keys(ctrlOuts).length === 0 && !res.error) {
+              var ctrlNames = Object.keys(ctrlOuts);
+              var totalPanels = outputNames.length + ctrlNames.length;
+
+              if (totalPanels === 0 && res.error) {
+                $outputTables.html('<p class="test-error">' + esc2(res.error) + '</p>');
+              } else if (totalPanels === 0) {
                 $outputTables.html('<p class="test-output-empty">No output data was returned. The job may have written to a path we could not read.</p>');
-              } else if (outputNames.length > 0 && $outputTables.html() === '') {
-                $outputTables.html('<p class="test-output-empty">Output datasets are empty.</p>');
+              } else {
+                var tabHtml = '';
+                // ── Tab bar (only when more than one panel) ──────────────────
+                if (totalPanels > 1) {
+                  tabHtml += '<div class="recon-tabs-bar output-tabs-bar">';
+                  var tabIdx = 0;
+                  outputNames.forEach(function (name) {
+                    tabHtml += '<button class="recon-tab' + (tabIdx === 0 ? ' recon-tab-active' : '') +
+                      '" data-output-tab="out-panel-' + tabIdx + '" title="' + esc2(name) + '">' + esc2(name) + '</button>';
+                    tabIdx++;
+                  });
+                  ctrlNames.forEach(function (stepId) {
+                    var ctrlLabel = 'Ctrl: ' + esc2(stepId);
+                    tabHtml += '<button class="recon-tab' + (tabIdx === 0 ? ' recon-tab-active' : '') +
+                      '" data-output-tab="out-panel-' + tabIdx + '" title="' + ctrlLabel + '">' + ctrlLabel + '</button>';
+                    tabIdx++;
+                  });
+                  tabHtml += '</div>';
+                }
+
+                // ── Panels ───────────────────────────────────────────────────
+                var panelIdx = 0;
+                outputNames.forEach(function (name) {
+                  var rows = outputs[name] || [];
+                  var cols = rows[0] ? Object.keys(rows[0]).filter(function (k) { return !k.startsWith('_'); }) : [];
+                  if (cols.length === 0 && rows[0]) cols = Object.keys(rows[0]);
+                  var hidden = totalPanels > 1 && panelIdx > 0;
+                  tabHtml += '<div class="test-table-wrap output-panel" id="out-panel-' + panelIdx + '"' +
+                    (hidden ? ' style="display:none"' : '') + '>';
+                  tabHtml += '<h3>' + esc2(name) + '</h3>';
+                  if (cols.length === 0 && rows.length === 0) {
+                    tabHtml += '<p class="test-output-empty">Empty dataset.</p>';
+                  } else {
+                    tabHtml += '<table class="test-table"><thead><tr>' +
+                      cols.map(function (c) { return '<th>' + esc2(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+                    rows.slice(0, 200).forEach(function (r) {
+                      tabHtml += '<tr>' + cols.map(function (c) { return '<td>' + esc2(String(r[c] != null ? r[c] : '')) + '</td>'; }).join('') + '</tr>';
+                    });
+                    if (rows.length > 200) {
+                      tabHtml += '<tr><td colspan="' + cols.length + '" class="test-recon-more">… ' + (rows.length - 200) + ' more rows not shown</td></tr>';
+                    }
+                    tabHtml += '</tbody></table>';
+                  }
+                  tabHtml += '</div>';
+                  panelIdx++;
+                });
+
+                ctrlNames.forEach(function (stepId) {
+                  var rows = ctrlOuts[stepId] || [];
+                  var cols = rows[0] ? Object.keys(rows[0]).filter(function (k) { return !k.startsWith('_'); }) : [];
+                  if (!cols.length && rows[0]) cols = Object.keys(rows[0]);
+                  var hidden = totalPanels > 1 && panelIdx > 0;
+                  tabHtml += '<div class="test-table-wrap output-panel" id="out-panel-' + panelIdx + '"' +
+                    (hidden ? ' style="display:none"' : '') + '>';
+                  tabHtml += '<h3>Control File: ' + esc2(stepId) + '</h3>';
+                  if (!rows.length) {
+                    tabHtml += '<p class="test-output-empty" style="margin:4px 0 8px">Control file generated (0 data rows).</p>';
+                  } else {
+                    tabHtml += '<table class="test-table"><thead><tr>' +
+                      cols.map(function (c) { return '<th>' + esc2(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+                    rows.forEach(function (r) {
+                      tabHtml += '<tr>' + cols.map(function (c) { return '<td>' + esc2(String(r[c] != null ? r[c] : '')) + '</td>'; }).join('') + '</tr>';
+                    });
+                    tabHtml += '</tbody></table>';
+                  }
+                  tabHtml += '</div>';
+                  panelIdx++;
+                });
+
+                $outputTables.html(tabHtml);
+
+                // Wire tab clicks
+                $outputTables.find('[data-output-tab]').on('click', function () {
+                  var panelId = $(this).attr('data-output-tab');
+                  $outputTables.find('[data-output-tab]').removeClass('recon-tab-active');
+                  $(this).addClass('recon-tab-active');
+                  $outputTables.find('.output-panel').hide();
+                  $outputTables.find('#' + panelId).show();
+                });
               }
             }
           } catch (e) {}

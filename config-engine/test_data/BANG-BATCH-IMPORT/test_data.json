@@ -2,180 +2,89 @@
   "input_data": {
     "BANG-BATCH-IMPORT-INPUT-01": [
       {
+        "INP-DAT-REC-TYPE": "D",
+        "INP-DAT-TXN-ID": "TXN2026001",
+        "INP-DAT-TXN-DATE": "20260305",
+        "INP-DAT-VAL-DATE": "20260307",
+        "INP-DAT-TXN-TYPE": "DEP",
         "INP-DAT-ACCT-NUM": "100200300001",
         "INP-DAT-AMOUNT": "000000500000",
-        "INP-DAT-BRANCH-CD": "10001",
         "INP-DAT-CURRENCY": "USD",
-        "INP-DAT-DESC": "PAYROLL DEPOSIT MARCH 2026",
         "INP-DAT-EXCH-RATE": "0001000000",
-        "INP-DAT-FILLER": "",
-        "INP-DAT-MEMO": "DIRECT DEP",
-        "INP-DAT-REC-TYPE": "D",
         "INP-DAT-STATUS": "A",
-        "INP-DAT-TXN-DATE": "20260305",
-        "INP-DAT-TXN-ID": "TXN2026001",
-        "INP-DAT-TXN-TYPE": "DEP",
-        "INP-DAT-VAL-DATE": "20260307"
+        "INP-DAT-BRANCH-CD": "10001",
+        "INP-DAT-DESC": "PAYROLL DEPOSIT MARCH 2026",
+        "INP-DAT-MEMO": "DIRECT DEP",
+        "INP-DAT-FILLER": ""
       },
       {
+        "INP-DAT-REC-TYPE": "D",
+        "INP-DAT-TXN-ID": "TXN2026002",
+        "INP-DAT-TXN-DATE": "20260305",
+        "INP-DAT-VAL-DATE": "20260305",
+        "INP-DAT-TXN-TYPE": "WDR",
         "INP-DAT-ACCT-NUM": "100200300002",
         "INP-DAT-AMOUNT": "000000025050",
-        "INP-DAT-BRANCH-CD": "10001",
         "INP-DAT-CURRENCY": "USD",
-        "INP-DAT-DESC": "ATM WITHDRAWAL MAIN ST",
         "INP-DAT-EXCH-RATE": "0001000000",
-        "INP-DAT-FILLER": "",
-        "INP-DAT-MEMO": "ATM#4521",
-        "INP-DAT-REC-TYPE": "D",
         "INP-DAT-STATUS": "A",
-        "INP-DAT-TXN-DATE": "20260305",
-        "INP-DAT-TXN-ID": "TXN2026002",
-        "INP-DAT-TXN-TYPE": "WDR",
-        "INP-DAT-VAL-DATE": "20260305"
+        "INP-DAT-BRANCH-CD": "10001",
+        "INP-DAT-DESC": "ATM WITHDRAWAL MAIN ST",
+        "INP-DAT-MEMO": "ATM#4521",
+        "INP-DAT-FILLER": ""
       },
       {
+        "INP-DAT-REC-TYPE": "D",
+        "INP-DAT-TXN-ID": "TXN2026003",
+        "INP-DAT-TXN-DATE": "20260305",
+        "INP-DAT-VAL-DATE": "20260306",
+        "INP-DAT-TXN-TYPE": "TRF",
         "INP-DAT-ACCT-NUM": "100200300003",
         "INP-DAT-AMOUNT": "000000250000",
-        "INP-DAT-BRANCH-CD": "10002",
         "INP-DAT-CURRENCY": "USD",
-        "INP-DAT-DESC": "WIRE TRANSFER TO SAVINGS ACCT",
         "INP-DAT-EXCH-RATE": "0001000000",
-        "INP-DAT-FILLER": "",
-        "INP-DAT-MEMO": "REF#W2026001",
-        "INP-DAT-REC-TYPE": "D",
         "INP-DAT-STATUS": "A",
-        "INP-DAT-TXN-DATE": "20260305",
-        "INP-DAT-TXN-ID": "TXN2026003",
-        "INP-DAT-TXN-TYPE": "TRF",
-        "INP-DAT-VAL-DATE": "20260306"
+        "INP-DAT-BRANCH-CD": "10002",
+        "INP-DAT-DESC": "WIRE TRANSFER TO SAVINGS ACCT",
+        "INP-DAT-MEMO": "REF#W2026001",
+        "INP-DAT-FILLER": ""
       },
       {
+        "INP-DAT-REC-TYPE": "D",
+        "INP-DAT-TXN-ID": "TXN2026004",
+        "INP-DAT-TXN-DATE": "20260305",
+        "INP-DAT-VAL-DATE": "20260305",
+        "INP-DAT-TXN-TYPE": "FEE",
         "INP-DAT-ACCT-NUM": "100200300001",
         "INP-DAT-AMOUNT": "000000000500",
-        "INP-DAT-BRANCH-CD": "10001",
         "INP-DAT-CURRENCY": "USD",
-        "INP-DAT-DESC": "MONTHLY SERVICE CHARGE",
         "INP-DAT-EXCH-RATE": "0001000000",
-        "INP-DAT-FILLER": "",
-        "INP-DAT-MEMO": "SVC FEE MAR26",
-        "INP-DAT-REC-TYPE": "D",
         "INP-DAT-STATUS": "A",
-        "INP-DAT-TXN-DATE": "20260305",
-        "INP-DAT-TXN-ID": "TXN2026004",
-        "INP-DAT-TXN-TYPE": "FEE",
-        "INP-DAT-VAL-DATE": "20260305"
+        "INP-DAT-BRANCH-CD": "10001",
+        "INP-DAT-DESC": "MONTHLY SERVICE CHARGE",
+        "INP-DAT-MEMO": "SVC FEE MAR26",
+        "INP-DAT-FILLER": ""
       },
       {
+        "INP-DAT-REC-TYPE": "D",
+        "INP-DAT-TXN-ID": "TXN2026005",
+        "INP-DAT-TXN-DATE": "20260305",
+        "INP-DAT-VAL-DATE": "20260308",
+        "INP-DAT-TXN-TYPE": "DEP",
         "INP-DAT-ACCT-NUM": "100200300004",
         "INP-DAT-AMOUNT": "000000108500",
-        "INP-DAT-BRANCH-CD": "10003",
         "INP-DAT-CURRENCY": "EUR",
-        "INP-DAT-DESC": "INTL WIRE RECEIPT EUR PAYMENT",
         "INP-DAT-EXCH-RATE": "0001085000",
-        "INP-DAT-FILLER": "",
-        "INP-DAT-MEMO": "SWIFT REF#0305",
-        "INP-DAT-REC-TYPE": "D",
         "INP-DAT-STATUS": "P",
-        "INP-DAT-TXN-DATE": "20260305",
-        "INP-DAT-TXN-ID": "TXN2026005",
-        "INP-DAT-TXN-TYPE": "DEP",
-        "INP-DAT-VAL-DATE": "20260308"
+        "INP-DAT-BRANCH-CD": "10003",
+        "INP-DAT-DESC": "INTL WIRE RECEIPT EUR PAYMENT",
+        "INP-DAT-MEMO": "SWIFT REF#0305",
+        "INP-DAT-FILLER": ""
       }
     ],
     "__ctrl__BANG-BATCH-IMPORT-DATA-VALIDATION-01": []
   },
   "expected_output": {
-    "BANG-BATCH-IMPORT-OUTPUT-01": [
-      {
-        "OUT-DAT-ACCT-NUM": "100200300001",
-        "OUT-DAT-AMOUNT": "000000500000",
-        "OUT-DAT-BRANCH-CD": "10001",
-        "OUT-DAT-CURRENCY": "USD",
-        "OUT-DAT-DESC": "PAYROLL DEPOSIT MARCH 2026",
-        "OUT-DAT-EXCH-RATE": "0001000000",
-        "OUT-DAT-FILLER-1": "",
-        "OUT-DAT-MEMO": "DIRECT DEP",
-        "OUT-DAT-REC-TYPE": "D",
-        "OUT-DAT-STATUS": "A",
-        "OUT-DAT-TXN-DATE": "20260305",
-        "OUT-DAT-TXN-ID": "TXN2026001",
-        "OUT-DAT-TXN-TYPE": "DEP",
-        "OUT-DAT-VAL-DATE": "20260307"
-      },
-      {
-        "OUT-DAT-ACCT-NUM": "100200300002",
-        "OUT-DAT-AMOUNT": "000000025050",
-        "OUT-DAT-BRANCH-CD": "10001",
-        "OUT-DAT-CURRENCY": "USD",
-        "OUT-DAT-DESC": "ATM WITHDRAWAL MAIN ST",
-        "OUT-DAT-EXCH-RATE": "0001000000",
-        "OUT-DAT-FILLER-1": "",
-        "OUT-DAT-MEMO": "ATM#4521",
-        "OUT-DAT-REC-TYPE": "D",
-        "OUT-DAT-STATUS": "A",
-        "OUT-DAT-TXN-DATE": "20260305",
-        "OUT-DAT-TXN-ID": "TXN2026002",
-        "OUT-DAT-TXN-TYPE": "WDR",
-        "OUT-DAT-VAL-DATE": "20260305"
-      },
-      {
-        "OUT-DAT-ACCT-NUM": "100200300003",
-        "OUT-DAT-AMOUNT": "000000250000",
-        "OUT-DAT-BRANCH-CD": "10002",
-        "OUT-DAT-CURRENCY": "USD",
-        "OUT-DAT-DESC": "WIRE TRANSFER TO SAVINGS ACCT",
-        "OUT-DAT-EXCH-RATE": "0001000000",
-        "OUT-DAT-FILLER-1": "",
-        "OUT-DAT-MEMO": "REF#W2026001",
-        "OUT-DAT-REC-TYPE": "D",
-        "OUT-DAT-STATUS": "A",
-        "OUT-DAT-TXN-DATE": "20260305",
-        "OUT-DAT-TXN-ID": "TXN2026003",
-        "OUT-DAT-TXN-TYPE": "TRF",
-        "OUT-DAT-VAL-DATE": "20260306"
-      },
-      {
-        "OUT-DAT-ACCT-NUM": "100200300001",
-        "OUT-DAT-AMOUNT": "000000000500",
-        "OUT-DAT-BRANCH-CD": "10001",
-        "OUT-DAT-CURRENCY": "USD",
-        "OUT-DAT-DESC": "MONTHLY SERVICE CHARGE",
-        "OUT-DAT-EXCH-RATE": "0001000000",
-        "OUT-DAT-FILLER-1": "",
-        "OUT-DAT-MEMO": "SVC FEE MAR26",
-        "OUT-DAT-REC-TYPE": "D",
-        "OUT-DAT-STATUS": "A",
-        "OUT-DAT-TXN-DATE": "20260305",
-        "OUT-DAT-TXN-ID": "TXN2026004",
-        "OUT-DAT-TXN-TYPE": "FEE",
-        "OUT-DAT-VAL-DATE": "20260305"
-      },
-      {
-        "OUT-DAT-ACCT-NUM": "100200300004",
-        "OUT-DAT-AMOUNT": "000000108500",
-        "OUT-DAT-BRANCH-CD": "10003",
-        "OUT-DAT-CURRENCY": "EUR",
-        "OUT-DAT-DESC": "INTL WIRE RECEIPT EUR PAYMENT",
-        "OUT-DAT-EXCH-RATE": "0001085000",
-        "OUT-DAT-FILLER-1": "",
-        "OUT-DAT-MEMO": "SWIFT REF#0305",
-        "OUT-DAT-REC-TYPE": "D",
-        "OUT-DAT-STATUS": "P",
-        "OUT-DAT-TXN-DATE": "20260305",
-        "OUT-DAT-TXN-ID": "TXN2026005",
-        "OUT-DAT-TXN-TYPE": "DEP",
-        "OUT-DAT-VAL-DATE": "20260308"
-      }
-    ],
-    "__ctrl__BANG-BATCH-IMPORT-DATA-VALIDATION-01": [
-      {
-        "COUNT-RECORDS": "5",
-        "EFFECTIVE-RECORD": "20260316",
-        "AS-OF-DATE": "20260316",
-        "SOURCE-CODE": "105",
-        "SOURCE-ID": "55"
-      }
-    ],
     "BANG-BATCH-IMPORT-EFS-OUTPUT-02": [
       {
         "OUT-DAT-REC-TYPE": "D",
@@ -257,15 +166,122 @@
         "OUT-DAT-MEMO": "SWIFT REF#0305",
         "OUT-DAT-FILLER-1": ""
       }
+    ],
+    "BANG-BATCH-IMPORT-OUTPUT-01": [
+      {
+        "OUT-DAT-REC-TYPE": "D",
+        "OUT-DAT-TXN-ID": "TXN2026001",
+        "OUT-DAT-TXN-DATE": "20260305",
+        "OUT-DAT-VAL-DATE": "20260307",
+        "OUT-DAT-TXN-TYPE": "DEP",
+        "OUT-DAT-ACCT-NUM": "100200300001",
+        "OUT-DAT-AMOUNT": "000000500000",
+        "OUT-DAT-CURRENCY": "USD",
+        "OUT-DAT-EXCH-RATE": "0001000000",
+        "OUT-DAT-STATUS": "A",
+        "OUT-DAT-BRANCH-CD": "10001",
+        "OUT-DAT-DESC": "PAYROLL DEPOSIT MARCH 2026",
+        "OUT-DAT-MEMO": "DIRECT DEP",
+        "OUT-DAT-FILLER-1": ""
+      },
+      {
+        "OUT-DAT-REC-TYPE": "D",
+        "OUT-DAT-TXN-ID": "TXN2026002",
+        "OUT-DAT-TXN-DATE": "20260305",
+        "OUT-DAT-VAL-DATE": "20260305",
+        "OUT-DAT-TXN-TYPE": "WDR",
+        "OUT-DAT-ACCT-NUM": "100200300002",
+        "OUT-DAT-AMOUNT": "000000025050",
+        "OUT-DAT-CURRENCY": "USD",
+        "OUT-DAT-EXCH-RATE": "0001000000",
+        "OUT-DAT-STATUS": "A",
+        "OUT-DAT-BRANCH-CD": "10001",
+        "OUT-DAT-DESC": "ATM WITHDRAWAL MAIN ST",
+        "OUT-DAT-MEMO": "ATM#4521",
+        "OUT-DAT-FILLER-1": ""
+      },
+      {
+        "OUT-DAT-REC-TYPE": "D",
+        "OUT-DAT-TXN-ID": "TXN2026003",
+        "OUT-DAT-TXN-DATE": "20260305",
+        "OUT-DAT-VAL-DATE": "20260306",
+        "OUT-DAT-TXN-TYPE": "TRF",
+        "OUT-DAT-ACCT-NUM": "100200300003",
+        "OUT-DAT-AMOUNT": "000000250000",
+        "OUT-DAT-CURRENCY": "USD",
+        "OUT-DAT-EXCH-RATE": "0001000000",
+        "OUT-DAT-STATUS": "A",
+        "OUT-DAT-BRANCH-CD": "10002",
+        "OUT-DAT-DESC": "WIRE TRANSFER TO SAVINGS ACCT",
+        "OUT-DAT-MEMO": "REF#W2026001",
+        "OUT-DAT-FILLER-1": ""
+      },
+      {
+        "OUT-DAT-REC-TYPE": "D",
+        "OUT-DAT-TXN-ID": "TXN2026004",
+        "OUT-DAT-TXN-DATE": "20260305",
+        "OUT-DAT-VAL-DATE": "20260305",
+        "OUT-DAT-TXN-TYPE": "FEE",
+        "OUT-DAT-ACCT-NUM": "100200300001",
+        "OUT-DAT-AMOUNT": "000000000500",
+        "OUT-DAT-CURRENCY": "USD",
+        "OUT-DAT-EXCH-RATE": "0001000000",
+        "OUT-DAT-STATUS": "A",
+        "OUT-DAT-BRANCH-CD": "10001",
+        "OUT-DAT-DESC": "MONTHLY SERVICE CHARGE",
+        "OUT-DAT-MEMO": "SVC FEE MAR26",
+        "OUT-DAT-FILLER-1": ""
+      },
+      {
+        "OUT-DAT-REC-TYPE": "D",
+        "OUT-DAT-TXN-ID": "TXN2026005",
+        "OUT-DAT-TXN-DATE": "20260305",
+        "OUT-DAT-VAL-DATE": "20260308",
+        "OUT-DAT-TXN-TYPE": "DEP",
+        "OUT-DAT-ACCT-NUM": "100200300004",
+        "OUT-DAT-AMOUNT": "000000108500",
+        "OUT-DAT-CURRENCY": "EUR",
+        "OUT-DAT-EXCH-RATE": "0001085000",
+        "OUT-DAT-STATUS": "P",
+        "OUT-DAT-BRANCH-CD": "10003",
+        "OUT-DAT-DESC": "INTL WIRE RECEIPT EUR PAYMENT",
+        "OUT-DAT-MEMO": "SWIFT REF#0305",
+        "OUT-DAT-FILLER-1": ""
+      }
+    ],
+    "__ctrl__BANG-BATCH-IMPORT-DATA-VALIDATION-01": [
+      {
+        "AS-OF-DATE": "20260316",
+        "COUNT-RECORDS": "5",
+        "EFFECTIVE-RECORD": "20260316",
+        "SOURCE-CODE": "105",
+        "SOURCE-ID": "55"
+      }
+    ],
+    "BANG-BATCH-IMPORT-OUTPUT-03": [
+      {
+        "COUNT-RECORDS": "0000000000005",
+        "EFFECTIVE-RECORD": "20260305",
+        "AS-OF-DATE": "20260305",
+        "SOURCE-CODE": "105",
+        "SOURCE-ID": "BANK-BATCH-INPUT.DAT"
+      }
+    ],
+    "__ctrl__BANG-BATCH-IMPORT-CTRL-FILE-01": [
+      {
+        "COUNT-RECORDS": "5",
+        "EFFECTIVE-RECORD": "20260305",
+        "AS-OF-DATE": "20260305",
+        "SOURCE-CODE": "105",
+        "SOURCE-ID": "BANK-BATCH-INPUT.DAT"
+      }
     ]
   },
   "file_meta": {
     "BANG-BATCH-IMPORT-INPUT-01": {
       "test_file": "BANK-BATCH-INPUT.DAT",
-      "rows": 7,
-      "type": "input",
-      "copybook_file": "BANK-BATCH-INPUT.CPY",
-      "fields": 26
+      "rows": 5,
+      "type": "input"
     },
     "VAL_3": {
       "copybook_file": "BANK-BATCH-CTRL.CPY",
@@ -274,10 +290,8 @@
     },
     "BANG-BATCH-IMPORT-OUTPUT-01": {
       "test_file": "BANK-BATCH-OUTPUT.DAT",
-      "rows": 7,
-      "type": "output",
-      "copybook_file": "BANK-BATCH-OUTPUT.CPY",
-      "fields": 28
+      "rows": 5,
+      "type": "output"
     },
     "__ctrl__BANG-BATCH-IMPORT-DATA-VALIDATION-01": {
       "test_file": "BANK-BATCH-CTRL.DAT",
@@ -285,21 +299,30 @@
       "type": "expected_output"
     },
     "BANG-BATCH-IMPORT-EFS-OUTPUT-02": {
-      "copybook_file": "BANK-BATCH-OUTPUT.CPY",
-      "fields": 28,
+      "test_file": "BANK-BATCH-OUTPUT.DAT",
+      "rows": 5,
+      "type": "output"
+    },
+    "BANG-BATCH-IMPORT-OUTPUT-03": {
+      "test_file": "BANK-BATCH-CNT.CTL.DAT",
+      "rows": 1,
       "type": "output"
     }
   },
   "last_run_files": {
     "BANG-BATCH-IMPORT-DATA-VALIDATION-01": {
       "file": "BANK-BATCH-INPUT-PREV.DAT",
-      "path": "/Users/Alagushankar/WorkSpace/Claude/cloude-engine/config-engine/test_data/BANG-BATCH-IMPORT/last_run/BANG-BATCH-IMPORT-DATA-VALIDATION-01/BANK-BATCH-INPUT-PREV.DAT"
+      "path": "/Users/Alagushankar/WorkSpace/Claude/cloude-engine/mainframe-modernization/config-engine/config-engine/test_data/BANG-BATCH-IMPORT/last_run/BANG-BATCH-IMPORT-DATA-VALIDATION-01/BANK-BATCH-INPUT-PREV.DAT"
     }
   },
   "test_ctrl_files": {
     "BANG-BATCH-IMPORT-DATA-VALIDATION-01": {
       "file": "BANK-BATCH-CNT.CTL.DAT",
       "path": "/Users/Alagushankar/WorkSpace/Claude/cloude-engine/config-engine/test_data/BANG-BATCH-IMPORT/test_ctrl/BANG-BATCH-IMPORT-DATA-VALIDATION-01/BANK-BATCH-CNT.CTL.DAT"
+    },
+    "BANG-BATCH-IMPORT-CTRL-FILE-01": {
+      "file": "BANK-BATCH-CNT.CTL.DAT",
+      "path": "/Users/Alagushankar/WorkSpace/Claude/cloude-engine/mainframe-modernization/config-engine/config-engine/test_data/BANG-BATCH-IMPORT/test_ctrl/BANG-BATCH-IMPORT-CTRL-FILE-01/BANK-BATCH-CNT.CTL.DAT"
     }
   }
 }

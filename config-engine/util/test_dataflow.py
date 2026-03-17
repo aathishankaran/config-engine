@@ -12,10 +12,10 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional, Tuple
 
 
-def _dataflow_engine_dir() -> Path | None:
+def _dataflow_engine_dir() -> Optional[Path]:
     """Return path to dataflow-engine project, or None if not found."""
     env_path = os.environ.get("DATAFLOW_ENGINE_DIR")
     if env_path:
@@ -37,7 +37,7 @@ def _has_pyspark(python_exe: str) -> bool:
     try:
         result = subprocess.run(
             [python_exe, "-c", "import pyspark"],
-            capture_output=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             timeout=10,
         )
         return result.returncode == 0
@@ -74,7 +74,8 @@ def _get_spark_env() -> dict:
         try:
             ver_out = subprocess.run(
                 [str(Path(current_java) / "bin" / "java"), "-version"],
-                capture_output=True, text=True, timeout=5,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                universal_newlines=True, timeout=5,
             ).stderr
             # Parse version like "17.0.9" or "11.0.27"
             import re
@@ -84,10 +85,11 @@ def _get_spark_env() -> dict:
         except Exception:
             pass
 
-    # 3-4. Well-known macOS paths for JDK 17 / 11
+    # 3-4. Well-known macOS paths — prefer JDK 11 (PySpark 3.1.x compatible),
+    #       then JDK 17 (needs --add-opens but works with PySpark 3.2+).
     for jdk in (
-        "/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home",
         "/Library/Java/JavaVirtualMachines/jdk-11.jdk/Contents/Home",
+        "/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home",
     ):
         if Path(jdk).is_dir():
             env["JAVA_HOME"] = jdk
@@ -96,7 +98,7 @@ def _get_spark_env() -> dict:
     return env
 
 
-def _find_python_with_pyspark(engine_dir: Path | None = None) -> str:
+def _find_python_with_pyspark(engine_dir: Optional[Path] = None) -> str:
     """
     Return a Python executable that has PySpark installed.
 
@@ -128,7 +130,8 @@ def _find_python_with_pyspark(engine_dir: Path | None = None) -> str:
     for name in ("python3", "python"):
         try:
             full = subprocess.run(
-                ["which", name], capture_output=True, text=True, timeout=5
+                ["which", name], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                universal_newlines=True, timeout=5
             ).stdout.strip()
             if full and _has_pyspark(full):
                 return full
@@ -188,7 +191,7 @@ def _sample_value(field: dict, row_idx: int) -> str:
     return val
 
 
-def generate_sample_data(config: dict, num_rows: int = 5) -> dict[str, list[dict]]:
+def generate_sample_data(config: dict, num_rows: int = 5) -> Dict[str, List[dict]]:
     """
     Generate minimal sample input data from config schema (Inputs.fields).
     Returns dict mapping input name -> list of row dicts.
@@ -197,7 +200,7 @@ def generate_sample_data(config: dict, num_rows: int = 5) -> dict[str, list[dict
     validation steps don't abort on malformed sample data.
     """
     inputs = config.get("Inputs") or config.get("inputs") or {}
-    out: dict[str, list[dict]] = {}
+    out: Dict[str, List[dict]] = {}
     for name, cfg in inputs.items():
         if not isinstance(cfg, dict):
             continue
@@ -270,9 +273,9 @@ def _copy_last_run_file(
 
 
 def _write_fixed_input(
-    rows: list[dict], path: Path, cfg: dict,
-    trailer_data: dict | None = None,
-    header_data: dict | None = None,
+    rows: List[dict], path: Path, cfg: dict,
+    trailer_data: Optional[dict] = None,
+    header_data: Optional[dict] = None,
 ) -> None:
     """
     Write sample rows as a fixed-width text file matching the input field schema.
@@ -321,7 +324,7 @@ def _write_fixed_input(
             line[start:end] = list(val[:end - start])
         return "".join(line)
 
-    lines: list[str] = []
+    lines: List[str] = []
     # Build header row values: prefer real values from uploaded .DAT file,
     # fall back to generated sample values so the runner extracts meaningful metadata
     # (e.g. INP-HDR-FILE-DATE → "20260305") for ctrl file expression resolution.
@@ -345,9 +348,9 @@ def _write_fixed_input(
 
 
 def _write_input_file(
-    name: str, rows: list[dict], inp_cfg: dict, input_dir: Path,
-    trailer_data: dict | None = None,
-    header_data: dict | None = None,
+    name: str, rows: List[dict], inp_cfg: dict, input_dir: Path,
+    trailer_data: Optional[dict] = None,
+    header_data: Optional[dict] = None,
 ) -> str:
     """
     Write test input rows in the format specified by inp_cfg["format"].
@@ -386,9 +389,9 @@ def _prepare_run(
     config: dict,
     config_name: str,
     base_path: Path,
-    sample_data: dict | None,
+    sample_data: Optional[dict],
     num_sample_rows: int,
-) -> tuple[Path, Path, Path]:
+) -> Tuple[Path, Path, Path]:
     """
     Write config and sample data to a temp dir. Returns (temp_dir, config_path, base_path).
 
@@ -417,7 +420,7 @@ def _prepare_run(
     # engine subtracts header_count/trailer_count from before comparing.
     # Build a mapping of input_name -> {field_name: inclusive_count} so the
     # correct value is written into the trailer line of every FIXED test file.
-    _trailer_inject: dict[str, dict] = {}
+    _trailer_inject: Dict[str, dict] = {}
     trans_steps = (cfg.get("Transformations") or cfg.get("transformations") or {}).get("steps") or []
     _all_inputs_cfg = cfg.get("Inputs") or cfg.get("inputs") or {}
     for _vstep in trans_steps:
@@ -457,7 +460,7 @@ def _prepare_run(
     # ── Extract header field values from original raw .DAT files on disk ──────
     # When ctrl file expressions reference header fields (e.g. first(INP-HDR-FILE-DATE)),
     # the runner needs real header values. Read them from the raw upload files.
-    _header_inject: dict[str, dict] = {}
+    _header_inject: Dict[str, dict] = {}
     _test_data_dir = base_path.parent / "test_data" / config_name.replace(".json", "")
     for name, inp_cfg_td in (cfg.get("Inputs") or cfg.get("inputs") or {}).items():
         if not isinstance(inp_cfg_td, dict):
@@ -610,7 +613,7 @@ def _prepare_run(
     return temp_dir, config_path, temp_dir
 
 
-def _parse_fixed_output(text: str, fields: list, header_count: int, trailer_count: int) -> list[dict]:
+def _parse_fixed_output(text: str, fields: list, header_count: int, trailer_count: int) -> List[dict]:
     """
     Parse fixed-width output text into a list of row dicts, skipping header/trailer
     lines and using only DATA fields (record_type != HEADER/TRAILER).
@@ -634,7 +637,7 @@ def _parse_fixed_output(text: str, fields: list, header_count: int, trailer_coun
         return []
 
     # Pre-compute (pos, length) for each field using cumulative lengths
-    field_slices: list[tuple[str, int, int]] = []
+    field_slices: List[Tuple[str, int, int]] = []
     pos = 0
     for f in data_fields:
         fname = f.get("name") or ""
@@ -651,7 +654,7 @@ def _parse_fixed_output(text: str, fields: list, header_count: int, trailer_coun
     return rows
 
 
-def _read_outputs(temp_dir: Path, config: dict) -> dict[str, list[dict]]:
+def _read_outputs(temp_dir: Path, config: dict) -> Dict[str, List[dict]]:
     """
     Read actual output files from temp_dir/output/ in each output's configured format.
 
@@ -662,7 +665,7 @@ def _read_outputs(temp_dir: Path, config: dict) -> dict[str, list[dict]]:
     """
     output_dir = temp_dir / "output"
     outputs_cfg = config.get("Outputs") or config.get("outputs") or {}
-    result: dict[str, list[dict]] = {}
+    result: Dict[str, List[dict]] = {}
 
     for name, out_cfg in outputs_cfg.items():
         if not isinstance(out_cfg, dict):
@@ -673,7 +676,7 @@ def _read_outputs(temp_dir: Path, config: dict) -> dict[str, list[dict]]:
         out_dir = output_dir / name
         hdr_skip = int(out_cfg.get("header_count") or 0)
         trl_skip = int(out_cfg.get("trailer_count") or 0)
-        rows: list[dict] = []
+        rows: List[dict] = []
 
         if fmt == "FIXED":
             # Find the output file: named file first, then spark text part files
@@ -746,7 +749,7 @@ def _read_outputs(temp_dir: Path, config: dict) -> dict[str, list[dict]]:
     return result
 
 
-def _parse_ctrl_output(text: str, ctrl_file_fields: list, ctrl_include_header: bool) -> list[dict]:
+def _parse_ctrl_output(text: str, ctrl_file_fields: list, ctrl_include_header: bool) -> List[dict]:
     """
     Parse a fixed-width control file into column-keyed row dicts.
 
@@ -774,7 +777,7 @@ def _parse_ctrl_output(text: str, ctrl_file_fields: list, ctrl_include_header: b
         return [{"value": line} for line in lines]
 
     # Build (name, pos, length, is_numeric) slices using same defaults as _create_ctrl_file
-    field_slices: list[tuple[str, int, int, bool]] = []
+    field_slices: List[Tuple[str, int, int, bool]] = []
     pos = 0
     for f in ctrl_file_fields:
         name = (f.get("name") or "").strip()
@@ -817,7 +820,7 @@ def _parse_ctrl_output(text: str, ctrl_file_fields: list, ctrl_include_header: b
     return rows
 
 
-def _read_ctrl_outputs(temp_dir: Path, config: dict) -> dict[str, list[dict]]:
+def _read_ctrl_outputs(temp_dir: Path, config: dict) -> Dict[str, List[dict]]:
     """
     Read control file outputs from temp_dir/ctrl/<step_id>/ for every validate
     step that has ctrl_file_create enabled.  Returns dict keyed by step_id.
@@ -831,7 +834,7 @@ def _read_ctrl_outputs(temp_dir: Path, config: dict) -> dict[str, list[dict]]:
         return {}
 
     trans = config.get("Transformations") or config.get("transformations") or {}
-    result: dict[str, list[dict]] = {}
+    result: Dict[str, List[dict]] = {}
     for step in trans.get("steps") or []:
         if not isinstance(step, dict):
             continue
@@ -895,7 +898,7 @@ def run_dataflow_test(
     config: dict,
     config_name: str,
     base_path: Path,
-    sample_data: dict | None = None,
+    sample_data: Optional[dict] = None,
     num_sample_rows: int = 5,
 ) -> dict:
     """
@@ -926,8 +929,8 @@ def run_dataflow_test(
             [python_exe, str(run_script), str(config_path), "--base-path", str(run_base), "--no-cobrix",
              "--settings", str(base_path / "static" / "config" / "settings.json")],
             cwd=str(engine_dir),
-            capture_output=True,
-            text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            universal_newlines=True,
             timeout=300,
             env=_get_spark_env(),
         )
@@ -965,7 +968,7 @@ def run_dataflow_test_stream(
     config: dict,
     config_name: str,
     base_path: Path,
-    sample_data: dict | None = None,
+    sample_data: Optional[dict] = None,
     num_sample_rows: int = 5,
 ):
     """
@@ -1006,16 +1009,18 @@ def run_dataflow_test_stream(
             cwd=str(engine_dir),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True,
+            universal_newlines=True,
             bufsize=1,
             env=_get_spark_env(),
         )
         if proc.stdout:
             for line in proc.stdout:
                 # Suppress noisy cloudpickle/PySpark serialisation diagnostics
-                # ("when serializing function/tuple/object") — internal pickle
-                # tracing messages that are not useful to the user.
                 if "when serializing" in line:
+                    continue
+                # Suppress Spark progress bar lines (they use \r for in-place updates
+                # but line-by-line iteration captures each update separately)
+                if "[Stage" in line:
                     continue
                 yield "LOG: " + line
         proc.wait(timeout=300)

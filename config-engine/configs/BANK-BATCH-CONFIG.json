@@ -380,31 +380,41 @@
               "name": "COUNT-RECORDS",
               "type": "LONG",
               "expression": "count(*)",
-              "length": 0
+              "length": 0,
+              "begin": 0,
+              "format": ""
             },
             {
               "name": "EFFECTIVE-RECORD",
               "type": "STRING",
-              "expression": "current_date()",
-              "length": 0
+              "expression": "",
+              "length": 0,
+              "begin": 0,
+              "format": ""
             },
             {
               "name": "AS-OF-DATE",
               "type": "STRING",
-              "expression": "current_date()",
-              "length": 0
+              "expression": "",
+              "length": 0,
+              "begin": 0,
+              "format": ""
             },
             {
               "name": "SOURCE-CODE",
               "type": "STRING",
               "expression": "'105'",
-              "length": 0
+              "length": 0,
+              "begin": 0,
+              "format": ""
             },
             {
               "name": "SOURCE-ID",
               "type": "STRING",
               "expression": "'BANK-BATCH-INPUT.DAT'",
-              "length": 0
+              "length": 0,
+              "begin": 0,
+              "format": ""
             }
           ]
         },

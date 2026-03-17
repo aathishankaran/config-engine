@@ -1870,6 +1870,49 @@ body {
 .test-reconciliation-content {
   margin-top: 0.5rem;
 }
+/* ── Reconciliation tab bar ───────────────────────────────────────────────── */
+.recon-tabs-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 0 6px;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  margin-bottom: 12px;
+}
+.recon-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  background: var(--bg-secondary, #f8fafc);
+  color: var(--text, #374151);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recon-tab:hover { background: var(--bg-tertiary, #f1f5f9); border-color: var(--primary, #3b82f6); }
+.recon-tab-active {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+.recon-tab-active:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+.recon-tab-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.recon-tab-dot-match    { background: #16a34a; }
+.recon-tab-dot-mismatch { background: #dc2626; }
+
 .test-recon-dataset {
   margin-bottom: 1.5rem;
   border: 1px solid var(--border-color, #e2e8f0);

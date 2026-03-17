@@ -175,7 +175,7 @@ function defaultNodeData(type) {
     return Object.assign(base, {
       name: outputName, format: 'fixed', source_path: '', dataset: '',
       write_mode: 'overwrite', source_inputs: [], fields: [],
-      output_columns: '', delimiter_char: '', ctrl_file_gen: false
+      output_columns: '', delimiter_char: ''
     });
   }
   if (type === 'efs_write') {
@@ -183,7 +183,7 @@ function defaultNodeData(type) {
     return Object.assign(base, {
       name: efsName, format: 'fixed', source_path: '', dataset: '',
       write_mode: 'overwrite', source_inputs: [], fields: [],
-      output_columns: '', delimiter_char: '', ctrl_file_gen: false,
+      output_columns: '', delimiter_char: '',
       target_storage: 'efs'
     });
   }
@@ -213,7 +213,15 @@ function defaultNodeData(type) {
     });
   }
   if (type === 'validate') {
-    Object.assign(stepDefaults, { previous_day_check: false, ctrl_include_header: false });
+    Object.assign(stepDefaults, { previous_day_check: false });
+  }
+  if (type === 'ctrl_file') {
+    var cfName = autoName('CTRL-FILE', '_ctrlFileSeq');
+    Object.assign(stepDefaults, {
+      name: cfName, step_id: cfName, id: cfName,
+      ctrl_file_name: '', ctrl_include_header: false,
+      ctrl_file_fields: [], _ctrl_schema_file: ''
+    });
   }
   return stepDefaults;
 }

@@ -202,7 +202,7 @@
       ],
       "_schema_file": "BANK-BATCH-INPUT.CPY",
       "_test_file": "BANK-BATCH-INPUT.DAT",
-      "_test_rows": 7,
+      "_test_rows": 5,
       "prev_day_check": {
         "enabled": true,
         "header_date_field": "PREV_DATE()"
@@ -413,7 +413,9 @@
           "length": 81
         }
       ],
-      "_schema_file": "BANK-BATCH-OUTPUT.CPY"
+      "_schema_file": "BANK-BATCH-OUTPUT.CPY",
+      "_test_file": "BANK-BATCH-OUTPUT.DAT",
+      "_test_rows": 5
     },
     "BANG-BATCH-IMPORT-OUTPUT-01": {
       "name": "BANG-BATCH-IMPORT-OUTPUT-01",
@@ -428,7 +430,6 @@
       ],
       "header_count": 1,
       "trailer_count": 1,
-      "ctrl_file_gen": true,
       "fields": [
         {
           "name": "OUT-DAT-REC-TYPE",
@@ -623,7 +624,70 @@
       ],
       "_schema_file": "BANK-BATCH-OUTPUT.CPY",
       "_test_file": "BANK-BATCH-OUTPUT.DAT",
-      "_test_rows": 7
+      "_test_rows": 5
+    },
+    "BANG-BATCH-IMPORT-OUTPUT-03": {
+      "name": "BANG-BATCH-IMPORT-OUTPUT-03",
+      "format": "FIXED",
+      "write_mode": "OVERWRITE",
+      "dataset_name": "BANK-BATCH-CNT.CTL",
+      "source_file_name": "BANK-BATCH-CNT.CTL",
+      "frequency": "DAILY",
+      "source_path": "file:///opt/data/s3/curated/BANG-BATCH-IMPORT/",
+      "source_inputs": [
+        "ctrl_file_out_1"
+      ],
+      "header_count": 0,
+      "trailer_count": 0,
+      "fields": [
+        {
+          "name": "COUNT-RECORDS",
+          "type": "LONG",
+          "start": 1,
+          "length": 13,
+          "nullable": true
+        },
+        {
+          "name": "EFFECTIVE-RECORD",
+          "type": "STRING",
+          "start": 14,
+          "length": 8,
+          "nullable": true,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "AS-OF-DATE",
+          "type": "STRING",
+          "start": 22,
+          "length": 8,
+          "nullable": true,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "SOURCE-CODE",
+          "type": "STRING",
+          "start": 30,
+          "length": 8,
+          "nullable": true
+        },
+        {
+          "name": "SOURCE-ID",
+          "type": "STRING",
+          "start": 38,
+          "length": 40,
+          "nullable": true
+        }
+      ],
+      "output_columns": [
+        "COUNT-RECORDS",
+        "EFFECTIVE-RECORD",
+        "AS-OF-DATE",
+        "SOURCE-CODE",
+        "SOURCE-ID"
+      ],
+      "_schema_file": "BANK-BATCH-CTRL.CPY",
+      "_test_file": "BANK-BATCH-CNT.CTL.DAT",
+      "_test_rows": 1
     }
   },
   "Transformations": {
@@ -752,55 +816,65 @@
           "record_count_trailer_field": "INP-TRL-ERR-COUNT",
           "record_count_file_path": "file:///opt/data/s3/raw/BANG-BATCH-IMPORT/",
           "record_count_frequency": "DAILY",
-          "record_count_file_name": "BANK-BATCH-INPUT.DAT",
-          "ctrl_file_create": true,
+          "record_count_file_name": "BANK-BATCH-INPUT.DAT"
+        },
+        "output_alias": "BANG-BATCH-IMPORT-DATA-VALIDATION-OUT-01"
+      },
+      {
+        "id": "BANG-BATCH-IMPORT-CTRL-FILE-01",
+        "description": "",
+        "type": "ctrl_file",
+        "source_inputs": [
+          "BANG-BATCH-IMPORT-DATA-VALIDATION-OUT-01"
+        ],
+        "logic": {
           "ctrl_file_name": "BANK-BATCH-CNT.CTL",
-          "ctrl_include_header": true,
-          "_ctrl_schema_file": "BANK-BATCH-CTRL.CPY",
+          "ctrl_include_header": false,
           "ctrl_file_fields": [
             {
               "name": "COUNT-RECORDS",
               "type": "LONG",
               "expression": "count(*)",
-              "length": 0,
-              "begin": 0,
+              "length": 13,
+              "begin": 1,
               "format": ""
             },
             {
               "name": "EFFECTIVE-RECORD",
-              "type": "DATE",
-              "expression": "first(INP-HDR-FILE-DATE)",
-              "length": 0,
-              "begin": 0,
-              "format": ""
+              "type": "STRING",
+              "expression": "to_date(first(INP-HDR-FILE-DATE),'YYYYMMDD')",
+              "length": 8,
+              "begin": 14,
+              "format": "YYYYMMDD"
             },
             {
               "name": "AS-OF-DATE",
-              "type": "DATE",
-              "expression": "current_date()",
-              "length": 0,
-              "begin": 0,
-              "format": ""
+              "type": "STRING",
+              "expression": "last_day(to_date(first(INP-HDR-FILE-DATE),'YYYYMMDD'))",
+              "length": 8,
+              "begin": 22,
+              "format": "YYYYMMDD"
             },
             {
               "name": "SOURCE-CODE",
               "type": "STRING",
-              "expression": "105",
-              "length": 0,
-              "begin": 0,
+              "expression": "'105'",
+              "length": 8,
+              "begin": 30,
               "format": ""
             },
             {
               "name": "SOURCE-ID",
               "type": "STRING",
-              "expression": "55",
-              "length": 0,
-              "begin": 0,
+              "expression": "'BANK-BATCH-INPUT.DAT'",
+              "length": 40,
+              "begin": 38,
               "format": ""
             }
-          ]
+          ],
+          "_ctrl_schema_file": "BANK-BATCH-CTRL.CPY"
         },
-        "output_alias": "BANG-BATCH-IMPORT-DATA-VALIDATION-OUT-01"
+        "output_alias": "ctrl_file_out_1"
       }
     ]
   }

@@ -57,11 +57,22 @@ function elbowPath(from, to) {
   var mid2Y = to.y   - C.ELBOW_GAP;
 
   if (Math.abs(from.x - to.x) < 4) {
+    // Long same-column jump (skipping intermediate rows): bypass to the right
+    // to avoid passing through intermediate nodes. Short direct hops stay straight.
+    if (to.y - from.y > C.NODE_H + 40) {
+      var bypassX = from.x + Math.round(C.NODE_W / 2) + 20;
+      return 'M ' + from.x + ' ' + from.y
+           + ' L ' + from.x + ' ' + mid1Y
+           + ' L ' + bypassX + ' ' + mid1Y
+           + ' L ' + bypassX + ' ' + mid2Y
+           + ' L ' + to.x   + ' ' + mid2Y
+           + ' L ' + to.x   + ' ' + to.y;
+    }
     return 'M ' + from.x + ' ' + from.y + ' L ' + to.x + ' ' + to.y;
   }
 
   if (to.y >= from.y) {
-    var midY = (from.y + to.y) / 2;
+    var midY = to.y - C.ELBOW_GAP;
     return 'M ' + from.x + ' ' + from.y
          + ' L ' + from.x + ' ' + midY
          + ' L ' + to.x   + ' ' + midY
@@ -95,8 +106,9 @@ function updateLayoutToggle(mode) {
 function autoLayout() {
   var snap = DS.fn.snap;
   var inputNodes  = S.nodes.filter(function(n){ return n.type === 'input'; });
-  var outputNodes = S.nodes.filter(function(n){ return n.type === 'output' || n.type === 'efs_write'; });
-  var stepNodes   = S.nodes.filter(function(n){ return n.type !== 'input' && n.type !== 'output' && n.type !== 'efs_write'; });
+  var outputTypes = { output: true, efs_write: true, oracle_write: true };
+  var outputNodes = S.nodes.filter(function(n){ return outputTypes[n.type]; });
+  var stepNodes   = S.nodes.filter(function(n){ return n.type !== 'input' && !outputTypes[n.type]; });
 
   var rowGap   = C.NODE_H + 60;
   var startX   = 60;
@@ -115,20 +127,43 @@ function autoLayout() {
     });
   }
 
-  var orderedIds  = DS.fn.topoSort();
-  var sortedSteps = stepNodes.slice().sort(function(a, b) {
-    var ai = orderedIds.indexOf(a.id), bi = orderedIds.indexOf(b.id);
-    if (ai < 0) ai = 9999; if (bi < 0) bi = 9999;
-    return ai - bi;
+  /* Compute topological depth for each step node so siblings at the same
+     depth are laid out side-by-side instead of stacked vertically. */
+  var inEdges = {};
+  S.nodes.forEach(function(n) { inEdges[n.id] = []; });
+  S.connections.forEach(function(c) {
+    if (inEdges[c.to]) inEdges[c.to].push(c.from);
   });
+
+  var depth = {};
+  var orderedIds = DS.fn.topoSort();
+  orderedIds.forEach(function(id) {
+    var parents = inEdges[id] || [];
+    depth[id] = parents.length === 0 ? 0
+              : Math.max.apply(null, parents.map(function(p) { return (depth[p] || 0) + 1; }));
+  });
+
+  /* Group step nodes by depth */
+  var depthGroups = {};
+  stepNodes.forEach(function(n) {
+    var d = depth[n.id] || 0;
+    if (!depthGroups[d]) depthGroups[d] = [];
+    depthGroups[d].push(n);
+  });
+  var depthKeys = Object.keys(depthGroups).sort(function(a, b) { return +a - +b; });
+
+  /* Re-compute grid width to account for widest row */
+  var widestRow = Math.max(inputNodes.length, outputNodes.length, 1);
+  depthKeys.forEach(function(d) { widestRow = Math.max(widestRow, depthGroups[d].length); });
+  gridW = widestRow * C.NODE_W + (widestRow - 1) * 40;
+  pipelineCenterX = startX + gridW / 2;
 
   var currentY = startY;
   layoutRow(inputNodes, currentY);
   if (inputNodes.length > 0) currentY += rowGap;
 
-  sortedSteps.forEach(function(n) {
-    n.x = snap(pipelineCenterX - C.NODE_W / 2);
-    n.y = snap(currentY);
+  depthKeys.forEach(function(d) {
+    layoutRow(depthGroups[d], currentY);
     currentY += rowGap;
   });
 

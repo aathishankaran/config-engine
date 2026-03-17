@@ -1,9 +1,9 @@
 # PySpark Dataflow Engine
-# Python 3.6.8+  |  Linux / macOS / Windows
+# Python 3.6.8  |  Java 11.0.25  |  Linux / macOS / Windows
 
 # ── Core ──────────────────────────────────────────────────────────────────────
-# PySpark 3.1.x is the last release supporting Python 3.6.
-pyspark>=3.0.0,<3.2
+# PySpark 3.2.x supports Python 3.6+ and Java 11; pinned to exact server version.
+pyspark==3.2.4
 
 # ── AWS S3 support (optional — needed when reading/writing s3:// paths) ───────
 boto3>=1.20.0,<1.27      # boto3 1.27+ requires Python 3.7+
@@ -15,7 +15,7 @@ hvac>=0.11.0,<1.0        # hvac 1.0+ requires Python 3.7+
 requests>=2.25.0,<2.28   # requests 2.28+ requires Python 3.7+
 
 # ── Data utilities ─────────────────────────────────────────────────────────────
-pyarrow>=3.0.0,<6.0      # pyarrow 6.0+ requires Python 3.7+
+pyarrow>=4.0.0,<6.0      # pyarrow 6.0+ requires Python 3.7+; 4.x/5.x support 3.6
 
 # ── COBOL / EBCDIC mainframe support (optional — Cobrix Spark package) ─────────
 # Install the Cobrix JAR via spark-submit --packages instead of pip:

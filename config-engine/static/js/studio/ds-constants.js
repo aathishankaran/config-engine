@@ -25,7 +25,8 @@ C.TYPE_ICONS = {
   custom:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2M12 20v2"/></svg>',
   validate:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>',
   oracle_write:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><polyline points="8 14 12 18 16 14"/></svg>',
-  efs_write:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 17 15 14"/></svg>'
+  efs_write:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 17 15 14"/></svg>',
+  ctrl_file:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/><line x1="11" y1="9" x2="10.2" y2="19"/><line x1="14" y1="9" x2="13.2" y2="19"/></svg>'
 };
 
 C.TYPE_META = {
@@ -39,7 +40,8 @@ C.TYPE_META = {
   custom:    { label: 'Custom',    color: '#64748b' },
   validate:      { label: 'Data Validation', color: '#0d9488' },
   oracle_write:  { label: 'Oracle Write', color: '#c2410c' },
-  efs_write:     { label: 'EFS Write',    color: '#7c3aed' }
+  efs_write:     { label: 'EFS Write',    color: '#7c3aed' },
+  ctrl_file:     { label: 'Control File', color: '#0891b2' }
 };
 
 C.SELECT_OPS      = ['MOVE','ADD','SUBTRACT','MULTIPLY','DIVIDE','COMPUTE','INITIALIZE','STRING','UNSTRING','INSPECT'];

@@ -133,20 +133,22 @@
           if (_fileNameRC) vLogic.record_count_file_name = _fileNameRC;
         }
       }
-      if (node.ctrl_file_create) {
-        vLogic.ctrl_file_create = true;
-        if (node.ctrl_file_name) vLogic.ctrl_file_name = node.ctrl_file_name;
-        if (node.ctrl_include_header) vLogic.ctrl_include_header = true;
-        if (node._ctrl_schema_file) vLogic._ctrl_schema_file = node._ctrl_schema_file;
-        vLogic.ctrl_file_fields = (node.ctrl_file_fields || [])
+      return vLogic;
+    }
+    if (node.type === 'ctrl_file') {
+      var cfLogic = {
+        ctrl_file_name: node.ctrl_file_name || '',
+        ctrl_include_header: !!node.ctrl_include_header,
+        ctrl_file_fields: (node.ctrl_file_fields || [])
           .filter(function(f){ return f.name; })
           .map(function(f){
             var fd = { name: f.name, type: (f.type||'STRING').toUpperCase(), expression: f.expression || '', length: parseInt(f.length || 0, 10) || 0, begin: parseInt(f.begin || 0, 10) || 0, format: f.format || '' };
             if (f.just_right) fd.just_right = true;
             return fd;
-          });
-      }
-      return vLogic;
+          })
+      };
+      if (node._ctrl_schema_file) cfLogic._ctrl_schema_file = node._ctrl_schema_file;
+      return cfLogic;
     }
     if (node.type === 'oracle_write') {
       var owLogic = {
@@ -244,7 +246,6 @@
           if (n.record_length !== undefined) out.record_length = n.record_length;
           if (n.header_count  !== undefined) out.header_count  = n.header_count;
           if (n.trailer_count !== undefined) out.trailer_count = n.trailer_count;
-          if (n.ctrl_file_gen) out.ctrl_file_gen = true;
         }
         if (outFmt === 'DELIMITED' && n.delimiter_char) {
           out.delimiter_char = n.delimiter_char;

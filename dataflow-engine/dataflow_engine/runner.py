@@ -1506,6 +1506,14 @@ class DataFlowRunner:
                 i + 1, step_id, step_type, source_names, alias,
             )
 
+            # ── Ctrl-file step: inject header/trailer metadata ────────────────
+            # ctrl_file date expressions reference header fields (e.g. INP-HDR-FILE-DATE).
+            # After validation those fields are absent from data rows, so the engine
+            # resolves them from _file_metadata instead of running first() aggregation.
+            if step_type == "ctrl_file":
+                step.setdefault("logic", {})
+                step["logic"]["_file_metadata"] = self._file_metadata
+
             # ── Validate step: inject source input field definitions ──────────
             # This allows _apply_validate() to write validated/error files as
             # true fixed-width flat files (same layout as the input file) rather

@@ -6,6 +6,7 @@ Only data inputs/outputs are included; libraries and intermediate (passed) DDs a
 """
 
 import re
+from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -30,11 +31,11 @@ class DDStatement:
     """Represents a JCL DD statement."""
 
     ddname: str
-    dsn: str | None = None
-    disp: str | None = None
-    unit: str | None = None
-    space: str | None = None
-    dcb: str | None = None
+    dsn: Optional[str] = None
+    disp: Optional[str] = None
+    unit: Optional[str] = None
+    space: Optional[str] = None
+    dcb: Optional[str] = None
     is_input: bool = False
     is_output: bool = False
 
@@ -79,7 +80,7 @@ class JCLParser:
         re.IGNORECASE,
     )
 
-    def parse_exec_steps(self, content: str) -> list[dict]:
+    def parse_exec_steps(self, content: str) -> List[dict]:
         """
         Parse all EXEC statements from a JCL file.
 
@@ -87,14 +88,14 @@ class JCLParser:
             {
               "step":      str,          # e.g. "S10"
               "proc":      str,          # e.g. "GENFMT01"
-              "params":    dict[str,str],# override parameters {name: value}
+              "params":    Dict[str,str],# override parameters {name: value}
               "condition": str|None,     # COND= clause, if any
             }
 
         Handles multi-line EXEC parameter continuations (lines that begin with
         ``//`` followed only by spaces and ``PARAM='VALUE'``).
         """
-        steps: list[dict] = []
+        steps: List[dict] = []
         lines = content.splitlines()
         i = 0
         # Track IF/ENDIF blocks for conditional step detection
@@ -138,7 +139,7 @@ class JCLParser:
             rest_of_line = exec_m.group(3)
 
             # Extract COND from the same line
-            condition: str | None = None
+            condition: Optional[str] = None
             cond_m = self._COND_RE.search(rest_of_line)
             if cond_m:
                 condition = cond_m.group(1)
@@ -146,7 +147,7 @@ class JCLParser:
                 condition = "conditional"
 
             # Collect EXEC parameter overrides from continuation lines
-            params: dict[str, str] = {}
+            params: Dict[str, str] = {}
             j = i + 1
             while j < len(lines):
                 cont = lines[j].strip()
@@ -173,20 +174,20 @@ class JCLParser:
 
         return steps
 
-    def parse_file(self, path: Path) -> tuple[list[InputConfig], list[OutputConfig]]:
+    def parse_file(self, path: Path) -> Tuple[List[InputConfig], List[OutputConfig]]:
         """Parse a JCL or PROC file and return inputs/outputs."""
         content = path.read_text(encoding="utf-8", errors="ignore")
         return self.parse_content(content)
 
     def parse_content(
         self, content: str
-    ) -> tuple[list[InputConfig], list[OutputConfig]]:
+    ) -> Tuple[List[InputConfig], List[OutputConfig]]:
         """Parse JCL/PROC content and extract DD statements."""
-        inputs: list[InputConfig] = []
-        outputs: list[OutputConfig] = []
+        inputs: List[InputConfig] = []
+        outputs: List[OutputConfig] = []
 
         lines = content.splitlines()
-        current_dd: dict | None = None
+        current_dd: Optional[dict] = None
 
         for line in lines:
             if line.strip().startswith("//") and " DD " in line.upper():
@@ -215,7 +216,7 @@ class JCLParser:
 
         return inputs, outputs
 
-    def _infer_io_from_ddname(self, ddname: str) -> str | None:
+    def _infer_io_from_ddname(self, ddname: str) -> Optional[str]:
         """Infer input vs output from DD name when DISP is missing or symbolic. Returns 'input', 'output', or None."""
         name = ddname.upper()
         out_marks = ("OUT", "OUTPUT", "SUMMARY", "RPT", "REPORT", "REPORT1", "REPORT2", "WRITE", "DEST", "TARGET")
@@ -229,8 +230,8 @@ class JCLParser:
     def _process_dd(
         self,
         dd: dict,
-        inputs: list[InputConfig],
-        outputs: list[OutputConfig],
+        inputs: List[InputConfig],
+        outputs: List[OutputConfig],
     ) -> None:
         """Process a DD statement into InputConfig or OutputConfig."""
         ddname = dd["ddname"]

@@ -54,6 +54,9 @@ def _build_spark_session(master: str) -> SparkSession:
         .appName("dataflow_engine")
         .master(master)
         .config("spark.sql.legacy.timeParserPolicy", "LEGACY")
+        .config("spark.sql.shuffle.partitions", "2")
+        .config("spark.default.parallelism", "2")
+        .config("spark.ui.showConsoleProgress", "false")
         # Ensure PySpark workers use the same Python interpreter
         .config("spark.pyspark.python",        sys.executable)
         .config("spark.pyspark.driver.python", sys.executable)
@@ -107,7 +110,21 @@ def _build_spark_session(master: str) -> SparkSession:
         # ── Linux (default production environment) ─────────────────────────
         LOG.debug("Linux: using default Spark configuration")
 
-    return builder.getOrCreate()
+    spark = builder.getOrCreate()
+
+    # ── Suppress noisy-but-benign shutdown messages ────────────────────────
+    # ContextCleaner logs InterruptedException at ERROR level when the JVM
+    # shuts down while its GC thread is still running — this is harmless.
+    # BlockManager and DAGScheduler produce similar shutdown noise.
+    try:
+        log4j = spark.sparkContext._jvm.org.apache.log4j
+        log4j.Logger.getLogger("org.apache.spark.ContextCleaner").setLevel(log4j.Level.OFF)
+        log4j.Logger.getLogger("org.apache.spark.storage.BlockManager").setLevel(log4j.Level.ERROR)
+        log4j.Logger.getLogger("org.apache.spark.scheduler.DAGScheduler").setLevel(log4j.Level.ERROR)
+    except Exception:
+        pass  # log4j access is best-effort; never break on this
+
+    return spark
 
 
 def _error_messages(exc: BaseException) -> List[str]:
