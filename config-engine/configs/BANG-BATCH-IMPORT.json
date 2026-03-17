@@ -828,7 +828,7 @@
             {
               "name": "EFFECTIVE-RECORD",
               "type": "STRING",
-              "expression": "",
+              "expression": "to_date(first(`INP-HDR-FILE-DATE`),'YYYYMMDD')",
               "length": 8,
               "begin": 14,
               "format": "YYYYMMDD"
