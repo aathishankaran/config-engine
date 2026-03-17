@@ -280,16 +280,16 @@ function _buildCfExprCell(expr, i, hdrFieldNames) {
   if (expr) {
     var m;
     if ((m = expr.match(/^last_day\(to_date\(first\(([^)]+)\)\s*,\s*'([^']+)'\s*\)\)$/))) {
-      _dateInfo = { func: 'LASTDAY', source: m[1], format: m[2] };
+      _dateInfo = { func: 'LASTDAY', source: m[1].replace(/`/g, ''), format: m[2] };
     } else if ((m = expr.match(/^to_date\(first\(([^)]+)\)\s*,\s*'([^']+)'\s*\)$/))) {
-      _dateInfo = { func: '', source: m[1], format: m[2] };
+      _dateInfo = { func: '', source: m[1].replace(/`/g, ''), format: m[2] };
     } else if (expr === 'last_day(current_date())') {
       _dateInfo = { func: 'LASTDAY', source: '', format: 'yyyyMMdd' };
     } else if (expr === 'current_date()') {
       _dateInfo = { func: 'CURRENTDATE', source: '', format: 'yyyyMMdd' };
     } else if ((m = expr.match(/^first\(([^)]+)\)$/))) {
       /* Legacy: first(FIELD) without to_date wrap */
-      _dateInfo = { func: '', source: m[1], format: 'yyyyMMdd' };
+      _dateInfo = { func: '', source: m[1].replace(/`/g, ''), format: 'yyyyMMdd' };
     } else if ((m = expr.match(/^date_format\(current_date\(\)\s*,\s*'([^']+)'\s*\)$/))) {
       _dateInfo = { func: 'CURRENTDATE', source: '', format: m[1] };
     } else if ((m = expr.match(/^last_day\(to_date\(current_date\(\)\s*,\s*'([^']+)'\s*\)\)$/))) {
