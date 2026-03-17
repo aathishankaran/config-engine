@@ -1412,7 +1412,10 @@ class MainframeTransformationExecutor:
 
             src_field  = m.group(1).strip()
             spark_fmt  = m.group(2).strip()   # e.g. 'yyyyMMdd'
-            raw_val    = meta_values.get(src_field, "").strip()
+            # Metadata keys use underscores (from copybook parser); expressions
+            # use hyphens (from UI).  Try both forms.
+            norm_field = src_field.replace("-", "_")
+            raw_val    = (meta_values.get(src_field) or meta_values.get(norm_field) or "").strip()
 
             if not raw_val:
                 LOG.warning(

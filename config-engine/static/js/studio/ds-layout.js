@@ -34,6 +34,28 @@ function getPortCenter(nodeId, portType) {
   return { x: cx, y: n.y };
 }
 
+/* ---- Check for intermediate nodes on a vertical path ---- */
+function _hasBlockingNode(fromX, fromY, toX, toY) {
+  /* Returns true when any node sits between from and to in the vertical
+     band (checking x overlap) — meaning a straight or simple elbow line
+     would visually pass through that node. */
+  var minY = Math.min(fromY, toY) + C.NODE_H / 2;
+  var maxY = Math.max(fromY, toY) - C.NODE_H / 2;
+  var bandLeft  = Math.min(fromX, toX) - C.NODE_W / 2;
+  var bandRight = Math.max(fromX, toX) + C.NODE_W / 2;
+  for (var i = 0; i < S.nodes.length; i++) {
+    var n = S.nodes[i];
+    var nw = n.width || C.NODE_W;
+    var nh = C.NODE_H;
+    var ncx = n.x + nw / 2;
+    var ncy = n.y + nh / 2;
+    if (ncy > minY && ncy < maxY && ncx > bandLeft && ncx < bandRight) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /* ---- Orthogonal elbow path ---- */
 function elbowPath(from, to) {
   if (S.layoutMode === 'horizontal') {
@@ -56,9 +78,9 @@ function elbowPath(from, to) {
   var mid1Y = from.y + C.ELBOW_GAP;
   var mid2Y = to.y   - C.ELBOW_GAP;
 
+  /* Same column: straight line for adjacent hops, bypass-right for long jumps
+     that skip intermediate rows. */
   if (Math.abs(from.x - to.x) < 4) {
-    // Long same-column jump (skipping intermediate rows): bypass to the right
-    // to avoid passing through intermediate nodes. Short direct hops stay straight.
     if (to.y - from.y > C.NODE_H + 40) {
       var bypassX = from.x + Math.round(C.NODE_W / 2) + 20;
       return 'M ' + from.x + ' ' + from.y
@@ -71,7 +93,26 @@ function elbowPath(from, to) {
     return 'M ' + from.x + ' ' + from.y + ' L ' + to.x + ' ' + to.y;
   }
 
+  /* Different columns, downward flow: check if a simple elbow would
+     pass through an intermediate node.  If so, route via the outside
+     (left or right) to avoid overlapping. */
   if (to.y >= from.y) {
+    if (_hasBlockingNode(from.x, from.y, to.x, to.y)) {
+      /* Route around: drop down a bit, move horizontally outside, then
+         drop to target.  Pick the side that moves away from center. */
+      var outsideX;
+      if (to.x < from.x) {
+        outsideX = Math.min(from.x, to.x) - C.NODE_W / 2 - 30;
+      } else {
+        outsideX = Math.max(from.x, to.x) + C.NODE_W / 2 + 30;
+      }
+      return 'M ' + from.x   + ' ' + from.y
+           + ' L ' + from.x   + ' ' + mid1Y
+           + ' L ' + outsideX + ' ' + mid1Y
+           + ' L ' + outsideX + ' ' + mid2Y
+           + ' L ' + to.x     + ' ' + mid2Y
+           + ' L ' + to.x     + ' ' + to.y;
+    }
     var midY = to.y - C.ELBOW_GAP;
     return 'M ' + from.x + ' ' + from.y
          + ' L ' + from.x + ' ' + midY
