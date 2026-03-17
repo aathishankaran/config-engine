@@ -78,10 +78,9 @@ function elbowPath(from, to) {
   var mid1Y = from.y + C.ELBOW_GAP;
   var mid2Y = to.y   - C.ELBOW_GAP;
 
-  /* Same column: straight line for adjacent hops, bypass-right for long jumps
-     that skip intermediate rows. */
+  /* Same column: straight line unless a node actually blocks the path. */
   if (Math.abs(from.x - to.x) < 4) {
-    if (to.y - from.y > C.NODE_H + 40) {
+    if (_hasBlockingNode(from.x, from.y, to.x, to.y)) {
       var bypassX = from.x + Math.round(C.NODE_W / 2) + 20;
       return 'M ' + from.x + ' ' + from.y
            + ' L ' + from.x + ' ' + mid1Y
@@ -209,6 +208,29 @@ function autoLayout() {
   });
 
   layoutRow(outputNodes, currentY);
+
+  /* ---- Post-layout refinement: align single-node depth groups ----
+     When a depth group has only one node, centre it over its downstream
+     children instead of the pipeline centre.  This prevents a lone
+     step (e.g. Ctrl File) from sitting in the same column as unrelated
+     nodes and blocking their connections. */
+  var outEdges = {};
+  S.nodes.forEach(function(n) { outEdges[n.id] = []; });
+  S.connections.forEach(function(c) {
+    if (outEdges[c.from]) outEdges[c.from].push(c.to);
+  });
+
+  depthKeys.forEach(function(d) {
+    var group = depthGroups[d];
+    if (group.length !== 1) return;          // only refine single-node rows
+    var n = group[0];
+    var children = outEdges[n.id] || [];
+    if (children.length !== 1) return;       // only align nodes with exactly 1 child
+
+    /* Align with the single downstream child */
+    var child = S.nodes.find(function(nd){ return nd.id === children[0]; });
+    if (child) n.x = child.x;
+  });
 
   S.nodes.forEach(function(n) {
     var $el = $('[data-node-id="' + n.id + '"]');

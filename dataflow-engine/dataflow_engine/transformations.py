@@ -1463,7 +1463,7 @@ class MainframeTransformationExecutor:
                 continue
             ftype = (field_def.get("type") or "STRING").upper()
             if not expression:
-                expression = "count(*)" if ftype in ("LONG", "INT", "INTEGER", "BIGINT") else "cast(null as string)"
+                expression = "count(*)" if ftype in ("LONG", "INT", "INTEGER", "BIGINT") else "cast('' as string)"
 
             resolved = _resolve_header_date(expression, name)
             if resolved is not None:

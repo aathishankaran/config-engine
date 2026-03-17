@@ -679,8 +679,12 @@ def _read_outputs(temp_dir: Path, config: dict) -> Dict[str, List[dict]]:
         rows: List[dict] = []
 
         if fmt == "FIXED":
-            # Find the output file: named file first, then spark text part files
-            target_name = (out_cfg.get("target_file_name") or "").strip()
+            # Find the output file: named file first, then spark text part files.
+            # The runner uses target_file_name ?? dataset_name and appends .DAT
+            # for fixed/text formats when the name doesn't already end with .DAT.
+            target_name = (out_cfg.get("target_file_name") or out_cfg.get("dataset_name") or "").strip()
+            if target_name and not target_name.upper().endswith(".DAT"):
+                target_name = target_name + ".DAT"
             text = ""
             if target_name and out_dir.is_dir() and (out_dir / target_name).exists():
                 text = (out_dir / target_name).read_text(encoding="utf-8", errors="replace")

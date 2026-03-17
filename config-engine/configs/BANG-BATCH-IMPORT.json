@@ -551,75 +551,61 @@
       "header_fields": [
         {
           "name": "OUT-HDR-REC-TYPE",
-          "type": "STRING",
-          "length": 0
+          "type": "STRING"
         },
         {
           "name": "OUT-HDR-FILE-DATE",
-          "type": "DATE",
-          "length": 0
+          "type": "DATE"
         },
         {
           "name": "OUT-HDR-SEQ-NUM",
-          "type": "LONG",
-          "length": 0
+          "type": "LONG"
         },
         {
           "name": "OUT-HDR-SRC-ID",
-          "type": "STRING",
-          "length": 0
+          "type": "STRING"
         },
         {
           "name": "OUT-HDR-FILE-NAME",
-          "type": "STRING",
-          "length": 0
+          "type": "STRING"
         },
         {
           "name": "OUT-HDR-FILLER",
-          "type": "STRING",
-          "length": 0
+          "type": "STRING"
         }
       ],
       "trailer_fields": [
         {
           "name": "OUT-TRL-REC-TYPE",
-          "type": "STRING",
-          "length": 0
+          "type": "STRING"
         },
         {
           "name": "OUT-TRL-REC-COUNT",
-          "type": "LONG",
-          "length": 0
+          "type": "LONG"
         },
         {
           "name": "OUT-TRL-TOTAL-AMT",
-          "type": "DOUBLE",
-          "length": 0
+          "type": "DOUBLE"
         },
         {
           "name": "OUT-TRL-HASH-TOTAL",
-          "type": "LONG",
-          "length": 0
+          "type": "LONG"
         },
         {
           "name": "OUT-TRL-ERR-COUNT",
-          "type": "LONG",
-          "length": 0
+          "type": "LONG"
         },
         {
           "name": "OUT-TRL-VALID-CNT",
-          "type": "LONG",
-          "length": 0
+          "type": "LONG"
         },
         {
           "name": "OUT-TRL-INVALID-CNT",
-          "type": "LONG",
-          "length": 0
+          "type": "LONG"
         },
         {
           "name": "OUT-TRL-FILLER",
-          "type": "STRING",
-          "length": 0
+          "type": "STRING"
         }
       ],
       "_schema_file": "BANK-BATCH-OUTPUT.CPY",
@@ -842,7 +828,7 @@
             {
               "name": "EFFECTIVE-RECORD",
               "type": "STRING",
-              "expression": "to_date(first(INP-HDR-FILE-DATE),'YYYYMMDD')",
+              "expression": "",
               "length": 8,
               "begin": 14,
               "format": "YYYYMMDD"
@@ -850,7 +836,7 @@
             {
               "name": "AS-OF-DATE",
               "type": "STRING",
-              "expression": "last_day(to_date(first(INP-HDR-FILE-DATE),'YYYYMMDD'))",
+              "expression": "to_date(first(`INP-HDR-FILE-DATE`),'YYYYMMDD')",
               "length": 8,
               "begin": 22,
               "format": "YYYYMMDD"

@@ -973,6 +973,9 @@ class DataFlowRunner:
                 # String: left-justify, pad / truncate to length
                 piece = F.rpad(F.substring(F.col(col_name).cast("string"), 1, length), length, " ")
 
+            # Coalesce to blank string so a single NULL column doesn't
+            # collapse the entire concatenated line to NULL.
+            piece = F.coalesce(piece, F.lit(" " * length))
             line_expr = piece if line_expr is None else F.concat(line_expr, piece)
 
         if record_length > 0 and line_expr is not None:

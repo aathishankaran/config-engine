@@ -1807,6 +1807,16 @@ html, body {
   height: 32px;
   font-size: 12px;
 }
+.cf-card-expr-row .cf-expr-literal,
+.cf-card-expr-row .cf-expr-custom {
+  flex: 1;
+  min-width: 120px;
+  height: 32px;
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 4px;
+}
 /* Ctrl file fields editor header alignment */
 .cf-fields-editor .list-editor-header {
   background: #faf5ff;
